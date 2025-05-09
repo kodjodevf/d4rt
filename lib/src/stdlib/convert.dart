@@ -1,0 +1,53 @@
+import 'package:d4rt/src/environment.dart';
+import 'package:d4rt/src/stdlib/convert/ascii.dart';
+import 'package:d4rt/src/stdlib/convert/base64.dart';
+import 'package:d4rt/src/stdlib/convert/byte_conversion.dart';
+import 'package:d4rt/src/stdlib/convert/chunked_conversion.dart';
+import 'package:d4rt/src/stdlib/convert/codec.dart';
+import 'package:d4rt/src/stdlib/convert/converter.dart';
+import 'package:d4rt/src/stdlib/convert/encoding.dart';
+import 'package:d4rt/src/stdlib/convert/html_escape.dart';
+import 'package:d4rt/src/stdlib/convert/json.dart';
+import 'package:d4rt/src/stdlib/convert/latin1.dart';
+import 'package:d4rt/src/stdlib/convert/line_splitter.dart';
+import 'package:d4rt/src/stdlib/convert/string_conversion.dart';
+import 'package:d4rt/src/stdlib/convert/utf.dart';
+
+export 'package:d4rt/src/environment.dart';
+export 'package:d4rt/src/stdlib/convert/ascii.dart';
+export 'package:d4rt/src/stdlib/convert/base64.dart';
+export 'package:d4rt/src/stdlib/convert/byte_conversion.dart';
+export 'package:d4rt/src/stdlib/convert/chunked_conversion.dart';
+export 'package:d4rt/src/stdlib/convert/codec.dart';
+export 'package:d4rt/src/stdlib/convert/converter.dart';
+export 'package:d4rt/src/stdlib/convert/encoding.dart';
+export 'package:d4rt/src/stdlib/convert/html_escape.dart';
+export 'package:d4rt/src/stdlib/convert/json.dart';
+export 'package:d4rt/src/stdlib/convert/latin1.dart';
+export 'package:d4rt/src/stdlib/convert/line_splitter.dart';
+export 'package:d4rt/src/stdlib/convert/string_conversion.dart';
+export 'package:d4rt/src/stdlib/convert/utf.dart';
+
+void registerConvertLibs(Environment environment) {
+  AsciiCodecConvert().setEnvironment(environment);
+  AsciiEncoderConvert().setEnvironment(environment);
+  AsciiDecoderConvert().setEnvironment(environment);
+  Base64CodecConvert().setEnvironment(environment);
+  Base64EncoderConvert().setEnvironment(environment);
+  Base64DecoderConvert().setEnvironment(environment);
+  ByteConversionConvert().setEnvironment(environment);
+  ChunkedConversionConvert().setEnvironment(environment);
+  CodecConvert().setEnvironment(environment);
+  ConverterConvert().setEnvironment(environment);
+  EncodingConvert().setEnvironment(environment);
+  HtmlEscapeConvert().setEnvironment(environment);
+  JsonCodecConvert().setEnvironment(environment);
+  JsonEncoderConvert().setEnvironment(environment);
+  JsonDecoderConvert().setEnvironment(environment);
+  Latin1Convert().setEnvironment(environment);
+  LineSplitterConvert().setEnvironment(environment);
+  StringConversionConvert().setEnvironment(environment);
+  Utf8CodecConvert().setEnvironment(environment);
+  Utf8EncoderConvert().setEnvironment(environment);
+  Utf8DecoderConvert().setEnvironment(environment);
+}
