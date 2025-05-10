@@ -16,4 +16,4 @@ export 'src/utils/extensions/visitor.dart';
 export 'package:collection/collection.dart';
 export 'src/runtime_interfaces.dart';
 export 'package:d4rt/src/async_state.dart';
-export 'package:d4rt/src/utils/logger.dart';
+export 'package:d4rt/src/utils/logger/logger.dart';

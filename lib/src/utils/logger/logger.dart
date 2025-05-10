@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'io.dart' if (dart.library.html) 'web.dart';
 
 enum LogLevel { debug, info, warning, error }
 
@@ -40,7 +40,7 @@ class Logger {
     if (stackTrace != null) {
       output.write('\n$stackTrace');
     }
-    stdout.writeln(output.toString());
+    dPrint(output.toString());
   }
 
   static void debug(String message) => log(message, level: LogLevel.debug);

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:d4rt/src/callable.dart';
@@ -10,8 +9,8 @@ import 'package:d4rt/src/model/method.dart';
 import 'package:d4rt/src/stdlib/core.dart';
 import 'package:d4rt/src/stdlib/convert.dart';
 import 'package:d4rt/src/stdlib/math.dart';
-import 'package:d4rt/src/stdlib/io.dart';
 import 'package:d4rt/src/stdlib/async.dart';
+import 'stdlib_io.dart' if (dart.library.html) 'stdlib_web.dart';
 
 class Stdlib {
   final Environment environment;
@@ -38,7 +37,7 @@ class Stdlib {
     registerMathLibs(environment);
     registerConvertLibs(environment);
     registerAsyncLibs(environment);
-    registerIoLibs(environment);
+    StdlibIo.registerStdIoLibs(environment);
   }
 
   Object? evalMethod(
@@ -84,14 +83,6 @@ class Stdlib {
       value = StreamSinkAsync();
     } else if (target.isType<StreamSubscription<dynamic>>()) {
       value = StreamSubscriptionAsync();
-    } else if (target.isType<HttpClient>()) {
-      value = HttpClientIo();
-    } else if (target.isType<HttpClientRequest>()) {
-      value = HttpClientRequestIo();
-    } else if (target.isType<HttpServer>()) {
-      value = HttpServerIo();
-    } else if (target.isType<HttpClientResponse>()) {
-      value = HttpClientResponseIo();
     } else if (target.isType<String>()) {
       value = StringCore();
     } else if (target.isType<List<dynamic>>()) {
@@ -172,24 +163,6 @@ class Stdlib {
       value = PointMath();
     } else if (target.isType<Random>()) {
       value = RandomMath();
-    } else if (target.isType<Directory>()) {
-      value = DirectoryIo();
-    } else if (target.isType<File>()) {
-      value = FileIo();
-    } else if (target.isType<FileSystemEntity>()) {
-      value = FileSystemEntityIo();
-    } else if (target.isType<FileStat>()) {
-      value = FileStatIo();
-    } else if (target.isType<FileSystemEntityType>()) {
-      value = FileSystemEntityTypeIo();
-    } else if (target.isType<FileSystemEvent>()) {
-      value = FileSystemEventIo();
-    } else if (target.isType<Stdin>()) {
-      value = StdinIo();
-    } else if (target.isType<Stdout>()) {
-      value = StdoutIo();
-    } else if (target.isType<StdioType>()) {
-      value = StdioTypeIo();
     } else if (target.isType<Rectangle>()) {
       value = RectangleMath();
     } else if (target.isType<Future<dynamic>>()) {
@@ -198,8 +171,10 @@ class Stdlib {
       value = FormatExceptionCore();
     } else if (target.isType<Exception>()) {
       value = ExceptionCore();
+    } else {
+      value = StdlibIo.get(
+          target, name, arguments, namedArguments, visitor, typeArguments);
     }
-
     if (value != null) {
       return value.evalMethod(
         target,

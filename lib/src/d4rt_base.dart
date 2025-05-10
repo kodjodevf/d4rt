@@ -2,7 +2,7 @@ import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
-import 'package:d4rt/src/utils/logger.dart';
+import 'package:d4rt/src/utils/logger/logger.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:d4rt/src/bridge/bridged_types.dart';
 import 'package:d4rt/src/runtime_types.dart';
