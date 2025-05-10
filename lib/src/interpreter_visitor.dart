@@ -921,7 +921,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   Object? visitAssignmentExpression(AssignmentExpression node) {
     final lhs = node.leftHandSide;
     // Evaluate RHS once, used by multiple branches below
-    final rhsValue = node.rightHandSide.accept<Object?>(this);
+    Object? rhsValue = node.rightHandSide.accept<Object?>(this);
 
     // Handle suspension on the right-hand side
     if (rhsValue is AsyncSuspensionRequest) {
@@ -1034,6 +1034,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               return newValue;
             }
           } else if (toBridgedInstance(thisInstance).$2) {
+            if (rhsValue is BridgedEnumValue) {
+              rhsValue = rhsValue.nativeValue;
+            }
             final bridgedInstance = toBridgedInstance(thisInstance).$1!;
             final bridgedClass = bridgedInstance.bridgedClass;
             final setterAdapter =
@@ -1225,6 +1228,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           return newValue; // Compound returns new value
         }
       } else if (toBridgedInstance(targetValue).$2) {
+        if (rhsValue is BridgedEnumValue) {
+          rhsValue = rhsValue.nativeValue;
+        }
         final bridgedInstance = toBridgedInstance(targetValue).$1!;
         final setterAdapter = bridgedInstance.bridgedClass
             .findInstanceSetterAdapter(propertyName);
@@ -1262,6 +1268,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "Cannot assign to property '$propertyName' on bridged instance of '${bridgedInstance.bridgedClass.name}': No setter adapter found.");
         }
       } else if (targetValue is BoundBridgedSuper) {
+        if (rhsValue is BridgedEnumValue) {
+          rhsValue = rhsValue.nativeValue;
+        }
         // This handles: super.property = rhsValue;
         if (operatorType != TokenType.EQ) {
           throw UnimplementedError(
@@ -1429,6 +1438,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           return newValue; // Compound returns new value
         }
       } else if (toBridgedInstance(target).$2) {
+        if (rhsValue is BridgedEnumValue) {
+          rhsValue = rhsValue.nativeValue;
+        }
         final bridgedInstance = toBridgedInstance(target).$1!;
 
         final setterAdapter = bridgedInstance.bridgedClass
@@ -4500,8 +4512,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final bridgedInstance = toBridgedInstance(currentValue);
     final left =
         bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : currentValue;
-    final right =
-        bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : rhsValue;
+    final right = rhsValue;
 
     if (operatorType == TokenType.PLUS_EQ) {
       // Use unwrapped left/right for calculation
