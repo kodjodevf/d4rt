@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/src/environment.dart';
 import 'package:d4rt/src/callable.dart';
+import 'package:d4rt/src/exceptions.dart';
 
 /// Represents the state of an ongoing asynchronous function execution.
 /// This object tracks the progress and context needed for resumption.
@@ -57,6 +58,12 @@ class AsyncExecutionState {
   /// Store return value if a return happens inside a try with a finally.
   Object? returnAfterFinally;
 
+  /// Flag to indicate if we are currently executing a catch block body.
+  bool isHandlingErrorForRethrow = false;
+
+  /// Store the original exception wrapped for potential rethrow.
+  InternalInterpreterException? originalErrorForRethrow;
+
   AsyncExecutionState({
     required this.environment,
     required this.completer,
@@ -73,6 +80,8 @@ class AsyncExecutionState {
     this.currentStackTrace,
     this.activeTryStatement,
     this.returnAfterFinally,
+    this.isHandlingErrorForRethrow = false,
+    this.originalErrorForRethrow,
   });
 }
 

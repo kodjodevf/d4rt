@@ -4962,14 +4962,29 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitRethrowExpression(RethrowExpression node) {
-    if (!_isInCatchBlock ||
-        _originalCaughtInternalExceptionForRethrow == null) {
+    final asyncState = currentAsyncState;
+    if (asyncState == null) {
+      if (!_isInCatchBlock ||
+          _originalCaughtInternalExceptionForRethrow == null) {
+        throw RuntimeError("'rethrow' can only be used within a catch block.");
+      }
+      Logger.debug(
+          "[Rethrow] Rethrowing original internal exception: ${_originalCaughtInternalExceptionForRethrow!.originalThrownValue}");
+      // Re-launch the *original internal exception* that was caught by the enclosing catch block
+      throw _originalCaughtInternalExceptionForRethrow!;
+    }
+    if (!asyncState.isHandlingErrorForRethrow) {
       throw RuntimeError("'rethrow' can only be used within a catch block.");
     }
+    final originalError = asyncState.originalErrorForRethrow;
+    if (originalError == null) {
+      // Should not happen if isHandlingErrorForRethrow is true, but safety check
+      throw StateError("Internal error: Inconsistent state for rethrow.");
+    }
     Logger.debug(
-        "[Rethrow] Rethrowing original internal exception: ${_originalCaughtInternalExceptionForRethrow!.originalThrownValue}");
-    // Re-launch the *original internal exception* that was caught by the enclosing catch block
-    throw _originalCaughtInternalExceptionForRethrow!;
+        "[Rethrow] Rethrowing original internal exception: ${originalError.originalThrownValue}");
+    // Relaunch the original exception stored in the async state
+    throw originalError;
   }
 
   @override

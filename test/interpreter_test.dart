@@ -7,7 +7,8 @@ Matcher throwsRuntimeError(dynamic messageMatcher) {
 }
 
 dynamic execute(String source) {
-  return D4rt().execute(source);
+  final d4rt = D4rt()..setDebug(false);
+  return d4rt.execute(source);
 }
 
 void main() {

@@ -525,5 +525,37 @@ void main() {
 
       expect(result, equals('Second If False'));
     });
+    test('Async Try/Catch/rethrow with await error', () async {
+      final sourceCode = '''
+        Future<String> operationThatThrows() async {
+          await Future.delayed(Duration(milliseconds: 1));
+          throw Exception('Something went wrong asynchronously');
+          // Unreachable
+          // return "Success";
+        }
+
+        Future<String> testTryCatch() async {
+          String status = "Initial";
+          try {
+            status = "In Try";
+            await operationThatThrows();
+            status = "Try Completed (Should not happen)";
+          } catch (e) {
+            rethrow;
+          }
+          return "ok"; 
+        }
+
+        Future<void> main() async {
+          await testTryCatch();
+        }
+      ''';
+
+      expect(
+        () async => await execute(sourceCode),
+        throwsA(isA<Exception>().having((e) => e.toString(), 'toString()',
+            'Exception: Something went wrong asynchronously')),
+      );
+    });
   });
 }

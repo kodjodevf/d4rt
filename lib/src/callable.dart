@@ -523,13 +523,13 @@ class InterpretedFunction implements Callable {
     final previousCurrentFunction = visitor.currentFunction; // Save previous
     visitor.currentFunction = this; // Set current function
     final previousAsyncState =
-        visitor.currentAsyncState; // Sauvegarder l'état async actuel
+        visitor.currentAsyncState; // Save current async state
 
     try {
       if (isAsync) {
         final completer = Completer<Object?>();
 
-        // Déterminer le premier état (nœud AST)
+        // Determine the first state (AST node)
         AstNode? initialStateIdentifier;
         final bodyToExecute = _body;
         if (!redirected) {
@@ -539,17 +539,17 @@ class InterpretedFunction implements Callable {
             initialStateIdentifier = bodyToExecute.expression;
           } else if (bodyToExecute is EmptyFunctionBody) {
             initialStateIdentifier =
-                null; // Fonction vide, se complète immédiatement
+                null; // Empty function, completes immediately
           } else {
             throw StateError(
                 "Unhandled function body type for async state machine: ${bodyToExecute.runtimeType}");
           }
         } else {
-          // Constructeur redirigé, se complète avec 'this'
+          // Redirecting constructor, completes with 'this'
           initialStateIdentifier = null;
         }
 
-        // Créer l'état initial
+        // Create the initial state
         final asyncState = AsyncExecutionState(
           environment: executionEnvironment,
           completer: completer,
@@ -557,21 +557,21 @@ class InterpretedFunction implements Callable {
           function: this,
         );
 
-        // Gérer les cas où la fonction se termine immédiatement
+        // Handle cases where the function completes immediately
         if (initialStateIdentifier == null) {
           if (redirected) {
             completer.complete(executionEnvironment.get('this'));
           } else {
-            completer.complete(null); // Fonction vide
+            completer.complete(null); // Empty function
           }
         } else {
-          // Le moteur prendra en charge la planification (ex: via Future.microtask)
-          // Mettre le visiteur dans l'état initial pour le moteur
+          // The engine will take care of scheduling (ex: via Future.microtask)
+          // Put the visitor in the initial state for the engine
           visitor.currentAsyncState = asyncState;
           _startAsyncStateMachine(visitor, asyncState);
         }
 
-        // Retourner immédiatement le Future
+        // Return immediately the Future
         return completer.future;
       } else {
         Object? syncResult;
@@ -644,21 +644,21 @@ class InterpretedFunction implements Callable {
     }
   }
 
-  // Moteur principal de la machine à états asynchrone
-  // Planifié via Future.microtask pour démarrer l'exécution
+  // Main engine of the async state machine
+  // Scheduled via Future.microtask to start execution
   static Future<void> _runStateMachine(
       InterpreterVisitor visitor, AsyncExecutionState currentState) async {
     Object? lastResult;
     AstNode? currentNode = currentState.nextStateIdentifier;
 
-    // Boucle principale d'exécution des états
+    // Main loop of state machine execution
     while (currentNode != null) {
-      // Sauvegarder l'environnement visiteur actuel (au cas où)
+      // Save current visitor environment (in case of error)
       final originalVisitorEnv = visitor.environment;
       final previousAsyncState = visitor.currentAsyncState;
 
-      // Configurer le visiteur pour l'état courant
-      // Utiliser l'environnement de la boucle FOR si on est dedans, sinon l'environnement principal de l'état
+      // Configure the visitor for the current state
+      // Use the loop environment for FOR loops, otherwise the state environment
       visitor.environment =
           currentState.forLoopEnvironment ?? currentState.environment;
       visitor.currentAsyncState = currentState;
@@ -668,75 +668,75 @@ class InterpretedFunction implements Callable {
           " [StateMachine] Executing state: ${currentNode.runtimeType} in state env ${currentState.environment.hashCode}, loop env ${currentState.forLoopEnvironment?.hashCode}. Visitor env set to: ${visitor.environment.hashCode}");
 
       try {
-        // Cas: Boucle While
+        // Case: While loop
         if (currentNode is WhileStatement) {
           final whileNode = currentNode;
           Logger.debug("[StateMachine] Handling WhileStatement condition.");
-          // Évaluer la condition
+          // Evaluate the condition
           final conditionResult = whileNode.condition.accept<Object?>(visitor);
 
           if (conditionResult is AsyncSuspensionRequest) {
-            // La condition elle-même est asynchrone, suspendre
+            // The condition itself is asynchronous, suspend
             Logger.debug(
                 " [StateMachine] While condition suspended. Waiting...");
             lastResult =
-                conditionResult; // Mettre à jour lastResult pour le traitement ci-dessous
+                conditionResult; // Update lastResult for the processing below
           } else if (conditionResult is bool) {
-            // Condition synchrone
+            // Synchronous condition
             if (conditionResult) {
-              // Condition vraie: le prochain état est le corps de la boucle
+              // True condition: the next state is the body of the loop
               Logger.debug(
                   "[StateMachine] While condition TRUE. Next node is body: ${whileNode.body.runtimeType}");
-              // Si le corps est un bloc, prendre la première instruction
+              // If the body is a block, take the first statement
               if (whileNode.body is Block) {
                 currentNode = (whileNode.body as Block).statements.firstOrNull;
               } else {
                 currentNode = whileNode.body;
               }
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle while de la machine à états avec le nouveau nœud
+              continue; // Restart the while loop of the state machine with the new node
             } else {
-              // Condition fausse: sauter la boucle, trouver le nœud suivant après le while
+              // False condition: skip the loop, find the next node after the while
               Logger.debug(
                   "[StateMachine] While condition FALSE. Finding node after while.");
               currentNode = _findNextSequentialNode(visitor, whileNode);
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle while de la machine à états
+              continue; // Restart the while loop of the state machine
             }
           } else {
-            // La condition n'a retourné ni booléen ni suspension
+            // The condition did not return a boolean or suspension
             throw RuntimeError(
                 "While loop condition must evaluate to a boolean, but got ${conditionResult?.runtimeType}.");
           }
         } else if (currentNode is DoStatement) {
           final doNode = currentNode;
-          // La logique du DoStatement est particulière:
-          // 1. Si on arrive sur le DoStatement la *première fois* (ou après une condition vraie),
-          //    il faut exécuter le corps.
-          // 2. Si on arrive sur le DoStatement après avoir exécuté la *dernière* instruction du corps
-          //    (détecté par _findNextSequentialNode retournant le DoStatement),
-          //    il faut évaluer la condition.
+          // The logic of DoStatement is particular:
+          // 1. If we arrive on the DoStatement the *first time* (or after a true condition),
+          //    we need to execute the body.
+          // 2. If we arrive on the DoStatement after having executed the *last* instruction of the body
+          //    (detected by _findNextSequentialNode returning the DoStatement),
+          //    we need to evaluate the condition.
 
-          // Pour différencier, on peut regarder l'état précédent ou ajouter un flag dans AsyncExecutionState.
-          // Approche simple: si l'état actuel pointe vers DoStatement, on suppose qu'on doit évaluer la condition
-          // car _findNextSequentialNode nous y a mené depuis la fin du corps.
-          // Si on entrait directement dans la boucle par un autre moyen (non standard), cela pourrait échouer.
+          // To differentiate, we can look at the previous state or add a flag in AsyncExecutionState.
+          // Simple approach: if the current state points to DoStatement, we assume we need to evaluate the condition
+          // because _findNextSequentialNode led us to the DoStatement from the end of the body.
+          // If we entered the loop in a non-standard way, this could fail.
 
           Logger.debug(
               "[StateMachine] Handling DoStatement. Evaluating condition.");
-          // Évaluer la condition
+          // Evaluate the condition
           final conditionResult = doNode.condition.accept<Object?>(visitor);
 
           if (conditionResult is AsyncSuspensionRequest) {
-            // La condition est asynchrone, suspendre
+            // The condition is asynchronous, suspend
             Logger.debug(
                 " [StateMachine] DoWhile condition suspended. Waiting...");
             lastResult =
-                conditionResult; // Mettre à jour lastResult pour le traitement ci-dessous
+                conditionResult; // Update lastResult for the processing below
           } else if (conditionResult is bool) {
-            // Condition synchrone
+            // Synchronous condition
             if (conditionResult) {
-              // Condition vraie: le prochain état est le début du corps de la boucle
+              // True condition: the next state is the beginning of the loop body
               Logger.debug(
                   "[StateMachine] DoWhile condition TRUE. Next node is body: ${doNode.body.runtimeType}");
               if (doNode.body is Block) {
@@ -745,22 +745,22 @@ class InterpretedFunction implements Callable {
                 currentNode = doNode.body;
               }
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle de la machine à états avec le début du corps
+              continue; // Restart the state machine loop with the beginning of the body
             } else {
-              // Condition fausse: sortir de la boucle, trouver le nœud suivant après le do-while
+              // False condition: exit the loop, find the next node after the do-while
               Logger.debug(
                   "[StateMachine] DoWhile condition FALSE. Finding node after do-while.");
               currentNode = _findNextSequentialNode(visitor, doNode);
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle de la machine à états
+              continue; // Restart the state machine loop
             }
           } else {
-            // La condition n'a retourné ni booléen ni suspension
+            // The condition did not return a boolean or suspension
             throw RuntimeError(
                 "DoWhile loop condition must evaluate to a boolean, but got ${conditionResult?.runtimeType}.");
           }
-          // Si la condition était suspendue, lastResult contient AsyncSuspensionRequest
-          // et sera géré par la logique de suspension plus bas.
+          // If the condition was suspended, lastResult contains AsyncSuspensionRequest
+          // and will be handled by the suspension logic below.
         } else if (currentNode is ForStatement &&
             currentNode.forLoopParts is ForEachParts) {
           final forNode = currentNode;
@@ -768,23 +768,22 @@ class InterpretedFunction implements Callable {
 
           Iterator<Object?>? iterator = currentState.currentForInIterator;
 
-          // Première fois ou reprise après le corps?
+          // First time or resumed after the body?
           if (iterator == null) {
-            // Première fois: évaluer l'iterable et créer l'itérateur
+            // First time: evaluate the iterable and create the iterator
             Logger.debug(
                 " [StateMachine] Handling ForIn: Evaluating iterable.");
             final iterableResult = parts.iterable.accept<Object?>(visitor);
 
-            // Gérer si l'évaluation de l'iterable suspend
+            // Handle if the iterable evaluation is suspended
             if (iterableResult is AsyncSuspensionRequest) {
               Logger.debug(
                   "[StateMachine] ForIn iterable suspended. Waiting...");
               lastResult = iterableResult;
-              // La logique de suspension ci-dessous s'en chargera.
+              // The suspension logic below will handle it.
             } else if (iterableResult is Iterable) {
               iterator = iterableResult.iterator;
-              currentState.currentForInIterator =
-                  iterator; // Sauvegarder l'itérateur
+              currentState.currentForInIterator = iterator; // Save the iterator
               Logger.debug("[StateMachine] ForIn: Iterator created.");
             } else {
               throw RuntimeError(
@@ -792,7 +791,7 @@ class InterpretedFunction implements Callable {
             }
           }
 
-          // Si on a un itérateur (soit créé, soit repris), on continue la boucle
+          // If we have an iterator (either created or resumed), we continue the loop
           if (iterator != null && lastResult is! AsyncSuspensionRequest) {
             bool hasNext;
             try {
@@ -804,24 +803,24 @@ class InterpretedFunction implements Callable {
             }
 
             if (hasNext) {
-              // Élément suivant disponible
+              // Next item available
               final currentItem = iterator.current;
               Logger.debug("[StateMachine] ForIn: Got next item: $currentItem");
 
               if (parts is ForEachPartsWithDeclaration) {
                 final loopVariable = parts.loopVariable;
-                // Créer un environnement dédié à la boucle si ce n'est pas déjà fait
+                // Create a dedicated environment for the loop if it hasn't been done yet
                 currentState.forLoopEnvironment ??=
                     Environment(enclosing: currentState.environment);
                 visitor.environment = currentState.forLoopEnvironment!;
-                // Définir la variable de boucle dans cet environnement
+                // Define the loop variable in this environment
                 currentState.forLoopEnvironment!
                     .define(loopVariable.name.lexeme, currentItem);
               } else if (parts is ForEachPartsWithIdentifier) {
-                // Pas de déclaration, on assigne dans l'environnement courant
+                // No declaration, assign in the current environment
                 currentState.environment
                     .assign(parts.identifier.name, currentItem);
-                // S'assurer qu'on n'utilise pas un environnement de boucle résiduel
+                // Ensure we don't use a residual loop environment
                 currentState.forLoopEnvironment = null;
                 visitor.environment = currentState.environment;
               } else {
@@ -829,7 +828,7 @@ class InterpretedFunction implements Callable {
                     "Unknown ForEachParts type: \\${parts.runtimeType}");
               }
 
-              // Le prochain état est le corps de la boucle
+              // The next state is the body of the loop
               Logger.debug(
                   "[StateMachine] ForIn: Next node is body: \\${forNode.body.runtimeType}");
               if (forNode.body is Block) {
@@ -838,50 +837,49 @@ class InterpretedFunction implements Callable {
                 currentNode = forNode.body;
               }
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle de la machine à états avec le début du corps
+              continue; // Restart the state machine loop with the beginning of the body
             } else {
-              // Fin de l'itération
+              // End of iteration
               Logger.debug(
                   "[StateMachine] ForIn: Iteration finished. Finding node after loop. (forNode: \\${forNode.runtimeType}, parent: \\${forNode.parent?.runtimeType}, env: \\${visitor.environment.hashCode})");
-              currentState.currentForInIterator = null; // Nettoyer l'itérateur
-              // Nettoyer l'environnement de boucle s'il y en avait un
+              currentState.currentForInIterator = null; // Clean the iterator
+              // Clean the loop environment if it existed
               currentState.forLoopEnvironment = null;
               visitor.environment = currentState.environment;
               currentNode = _findNextSequentialNode(visitor, forNode);
               Logger.debug(
                   "[StateMachine] ForIn: After _findNextSequentialNode, currentNode: \\${currentNode?.runtimeType}, parent: \\${currentNode?.parent?.runtimeType}");
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle de la machine à états
+              continue; // Restart the state machine loop
             }
           }
-          // Si l'évaluation de l'iterable a été suspendue, lastResult contient
-          // AsyncSuspensionRequest et sera géré par la logique ci-dessous.
+          // If the iterable evaluation was suspended, lastResult contains
+          // AsyncSuspensionRequest and will be handled by the logic below.
         } else if (currentNode is ForStatement &&
             (currentNode.forLoopParts is ForPartsWithDeclarations ||
                 currentNode.forLoopParts is ForPartsWithExpression)) {
           final forNode = currentNode;
           final parts = forNode.forLoopParts;
-          bool cameFromBody =
-              false; // Flag pour savoir si on vient de terminer le corps
+          bool cameFromBody = false; // Flag to know if we came from the body
 
-          // Déterminer si on vient de terminer le corps de la boucle
-          // (Approximation: si le nœud actuel est ForStatement et qu'on a un environnement de boucle)
+          // Determine if we came from the body of the loop
+          // (Approximation: if the current node is ForStatement and we have a loop environment)
           if (currentState.forLoopEnvironment != null &&
               currentState.forLoopInitialized &&
               !currentState.resumedFromInitializer) {
-            // On vient du corps si l'env existe, est initialisé, ET on ne reprend pas de l'init
+            // We came from the body if the env exists, is initialized, and we didn't resume from the initializer
             cameFromBody = true;
           }
-          // Réinitialiser le flag après l'avoir utilisé
+          // Reset the flag after having used it
           currentState.resumedFromInitializer = false;
 
           if (!currentState.forLoopInitialized) {
             Logger.debug(" [StateMachine] Handling For: Initializing.");
-            // Créer l'environnement de boucle une seule fois
+            // Create the loop environment once
             currentState.forLoopEnvironment =
                 Environment(enclosing: currentState.environment);
             visitor.environment =
-                currentState.forLoopEnvironment!; // Utiliser l'env de la boucle
+                currentState.forLoopEnvironment!; // Use the loop env
 
             AstNode? initNode;
             if (parts is ForPartsWithDeclarations) {
@@ -892,39 +890,39 @@ class InterpretedFunction implements Callable {
 
             if (initNode != null) {
               lastResult = initNode
-                  .accept<Object?>(visitor); // Exécute dans forLoopEnvironment
+                  .accept<Object?>(visitor); // Execute in forLoopEnvironment
 
               if (lastResult is AsyncSuspensionRequest) {
-                // Suspendu pendant l'initialisation
+                // Suspended during initialization
                 Logger.debug(
                     "[StateMachine] For loop initialization suspended. Will resume.");
-                // Marquer comme initialisé pour que la reprise passe à la condition
+                // Mark as initialized so the suspension logic will resume
                 currentState.forLoopInitialized = true;
-                // Laisser lastResult tel quel, la logique de suspension générale le gérera
-                // Ne PAS continuer vers la condition ou les updaters maintenant.
-                // Le 'finally' restaurera l'env, et la reprise via .then() relancera _runStateMachine.
+                // Leave lastResult as is, the general suspension logic will handle it
+                // Do NOT continue to the condition or updaters now.
+                // The 'finally' will restore the env, and the .then() will restart _runStateMachine.
               } else {
-                // Initialisation synchrone terminée
+                // Synchronous initialization completed
                 currentState.forLoopInitialized = true;
-                cameFromBody = false; // Ne pas aller aux updaters
-                // Continuer vers la condition DANS CETTE MEME ITERATION de la boucle while
+                cameFromBody = false; // Do NOT go to updaters
+                // Continue to the condition IN THIS SAME ITERATION of the loop
               }
             } else {
-              // Pas d'initialisation
+              // No initialization
               currentState.forLoopInitialized = true;
               cameFromBody = false;
             }
-            // Ne pas restaurer l'environnement ici, on en aura besoin pour la condition/updater
-            // visitor.environment = currentState.environment; // Ne pas restaurer ici
+            // Do NOT restore the environment here, we will need it for the condition/updaters
+            // visitor.environment = currentState.environment; // Do NOT restore here
           }
 
-          // S'exécute seulement si on n'est pas suspendu par l'initialisation
+          // Runs only if we are not suspended by the initialization
           if (cameFromBody &&
               currentState.forLoopInitialized &&
               lastResult is! AsyncSuspensionRequest) {
             Logger.debug(" [StateMachine] Handling For: Running updaters.");
             visitor.environment =
-                currentState.forLoopEnvironment!; // Utiliser l'env de la boucle
+                currentState.forLoopEnvironment!; // Use the loop env
             NodeList<Expression>? updaters;
             if (parts is ForPartsWithDeclarations) {
               updaters = parts.updaters;
@@ -934,30 +932,30 @@ class InterpretedFunction implements Callable {
 
             if (updaters != null) {
               for (final updateExpr in updaters) {
-                lastResult = updateExpr.accept<Object?>(
-                    visitor); // Exécute dans forLoopEnvironment
+                lastResult = updateExpr
+                    .accept<Object?>(visitor); // Execute in forLoopEnvironment
                 if (lastResult is AsyncSuspensionRequest) {
-                  // Suspendu pendant la mise à jour
+                  // Suspended during the update
                   Logger.debug("[StateMachine] For loop updater suspended.");
-                  // Garder l'environnement pour la reprise
-                  break; // Sortir de la boucle des updaters, la suspension sera gérée
+                  // Keep the environment for the suspension logic
+                  break; // Exit the updaters loop, the suspension will be handled
                 }
               }
             }
-            // Ne pas restaurer l'environnement ici, on en aura besoin pour la condition
+            // Do NOT restore the environment here, we will need it for the condition
             // visitor.environment = currentState.environment;
-            // Après les updaters (ou s'il n'y en a pas), on passe à la condition
+            // After the updaters (or if there are no updaters), we go to the condition
             cameFromBody =
-                false; // Ne plus considérer qu'on vient du corps pour la condition
+                false; // Do NOT consider we came from the body for the condition
           }
 
-          // Condition (si initialisation terminée et pas suspendu pendant init/updater)\
-          // S'exécute après init (si sync) ou après updater (si sync)
+          // Condition (if initialized and not suspended during init/updater)\
+          // Runs after init (if sync) or after updater (if sync)
           if (currentState.forLoopInitialized &&
               lastResult is! AsyncSuspensionRequest) {
             Logger.debug(" [StateMachine] Handling For: Evaluating condition.");
             visitor.environment =
-                currentState.forLoopEnvironment!; // Utiliser l'env de la boucle
+                currentState.forLoopEnvironment!; // Use the loop env
             Expression? condition;
             if (parts is ForPartsWithDeclarations) {
               condition = parts.condition;
@@ -965,81 +963,81 @@ class InterpretedFunction implements Callable {
               condition = parts.condition;
             }
 
-            bool conditionValue = true; // La condition est vraie si absente
+            bool conditionValue = true; // The condition is true if absent
             if (condition != null) {
               lastResult = condition
-                  .accept<Object?>(visitor); // Exécute dans forLoopEnvironment
+                  .accept<Object?>(visitor); // Execute in forLoopEnvironment
               if (lastResult is AsyncSuspensionRequest) {
-                // Suspendu pendant la condition
+                // Suspended during the condition
                 Logger.debug("[StateMachine] For loop condition suspended.");
-                // Garder l'environnement pour la reprise
+                // Keep the environment for the suspension logic
               } else if (lastResult is bool) {
                 conditionValue = lastResult;
               } else {
-                // Restaurer l'environnement avant de lever l'erreur
+                // Restore the environment before throwing the error
                 visitor.environment = currentState.environment;
                 throw RuntimeError(
                     "For loop condition must be a boolean, but got ${lastResult?.runtimeType}");
               }
             }
-            // Ne pas restaurer l'environnement ici si on continue dans le corps
+            // Do NOT restore the environment here if we continue in the body
 
-            // Décision basée sur la condition (si pas suspendu)\
+            // Decision based on the condition (if not suspended)\
             if (lastResult is! AsyncSuspensionRequest) {
               if (conditionValue) {
-                // Condition vraie: le prochain état est le corps
+                // Condition true: the next state is the body
                 Logger.debug(
                     "[StateMachine] For condition TRUE. Next node is body: ${forNode.body.runtimeType}");
-                // L'environnement de la boucle reste actif pour l'exécution du corps
+                // The loop environment remains active for the body execution
                 if (forNode.body is Block) {
                   currentNode = (forNode.body as Block).statements.firstOrNull;
                 } else {
                   currentNode = forNode.body;
                 }
-                // Si le corps est vide, on va boucler directement vers les updaters
+                // If the body is empty, we loop directly to the updaters
                 if (currentNode == null) {
                   Logger.debug(
                       "[StateMachine] For loop body is empty. Proceeding to updaters/condition.");
-                  // Simuler qu'on vient du corps pour déclencher les updaters
+                  // Simulate that we came from the body to trigger the updaters
                   visitor.environment =
-                      currentState.environment; // Restaurer avant de continuer
+                      currentState.environment; // Restore before continuing
                   currentState.nextStateIdentifier =
-                      forNode; // Revenir au ForStatement
+                      forNode; // Go back to the ForStatement
                   continue;
                 } else {
                   currentState.nextStateIdentifier = currentNode;
-                  // Ne pas restaurer l'environnement, le corps s'exécute dedans
-                  continue; // Relancer la boucle de la machine à états avec le corps
+                  // Do NOT restore the environment, the body will execute in it
+                  continue; // Restart the state machine loop with the body
                 }
               } else {
-                // Condition fausse: sortir de la boucle
+                // Condition false: exit the loop
                 Logger.debug(
                     "[StateMachine] For condition FALSE. Finding node after loop.");
-                // Nettoyer l'état de la boucle for
+                // Clean the loop state
                 currentState.forLoopInitialized = false;
                 currentState.forLoopEnvironment = null;
                 visitor.environment =
-                    currentState.environment; // Restaurer l'environnement
+                    currentState.environment; // Restore the environment
                 currentNode = _findNextSequentialNode(visitor, forNode);
                 currentState.nextStateIdentifier = currentNode;
-                continue; // Relancer la boucle de la machine à états avec le nœud suivant
+                continue; // Restart the state machine loop with the next node
               }
             }
           }
-          // Si on est suspendu (lastResult is AsyncSuspensionRequest), la logique de suspension générale prend le relais.
-          // L'environnement du visiteur doit être restauré dans le finally de la boucle principale.
+          // If suspended (lastResult is AsyncSuspensionRequest), the general suspension logic takes over.
+          // The visitor environment must be restored in the finally of the main loop.
         } else if (currentNode is TryStatement) {
-          // Lorsqu'on entre dans un TryStatement, on l'enregistre
+          // When entering a TryStatement, register it
           currentState.activeTryStatement = currentNode;
           Logger.debug(
               "[StateMachine] Entering TryStatement: ${currentNode.offset}. Proceeding to body.");
-          // Le prochain état est la première instruction du bloc try
+          // The next state is the first instruction of the try block
           currentNode = currentNode.body.statements.firstOrNull;
-          // Si le bloc try est vide, chercher le noeud suivant après le try
+          // If the try block is empty, find the next node after the try
           if (currentNode == null) {
             Logger.debug(
                 " [StateMachine] Try block is empty. Finding node after TryStatement.");
-            // Y a-t-il un finally? Si oui, y aller.
+            // Is there a finally? If yes, go to it.
             if (currentState.activeTryStatement?.finallyBlock != null) {
               Logger.debug(
                   "[StateMachine] Empty try block, jumping to finally.");
@@ -1050,81 +1048,81 @@ class InterpretedFunction implements Callable {
               currentState.pendingFinallyBlock =
                   null; // Le finally est maintenant en cours
             } else {
-              // Pas de finally, trouver le noeud après le Try
+              // No finally, find the node after the Try
               currentNode = _findNextSequentialNode(
                   visitor, currentState.activeTryStatement!);
-              currentState.activeTryStatement = null; // Fin du try
+              currentState.activeTryStatement = null; // End of try
             }
           }
           currentState.nextStateIdentifier = currentNode;
-          continue; // Continuer avec le premier état du try (ou du finally ou après)
+          continue; // Continue with the first state of the try (or finally or after)
         } else if (currentNode is IfStatement) {
           final ifNode = currentNode;
           Logger.debug("[StateMachine] Handling IfStatement condition.");
-          // Évaluer la condition
+          // Evaluate the condition
           final conditionResult = ifNode.expression.accept<Object?>(visitor);
 
           if (conditionResult is AsyncSuspensionRequest) {
-            // La condition est asynchrone, suspendre
+            // The condition is asynchronous, suspend
             Logger.debug(" [StateMachine] If condition suspended. Waiting...");
             lastResult =
-                conditionResult; // Mettre à jour lastResult pour le traitement ci-dessous
-            // La logique de suspension générale gérera l'attente et la reprise
+                conditionResult; // Update lastResult for the processing below
+            // The general suspension logic will handle the await and resume
           } else if (conditionResult is bool) {
-            // Condition synchrone
+            // Synchronous condition
             if (conditionResult) {
-              // Condition vraie: le prochain état est la branche 'then'
+              // Condition true: the next state is the 'then' branch
               Logger.debug(
                   "[StateMachine] If condition TRUE. Next node is thenBranch: ${ifNode.thenStatement.runtimeType}");
-              // Si then est un bloc, prendre la première instruction
+              // If then is a block, take the first instruction
               if (ifNode.thenStatement is Block) {
                 currentNode =
                     (ifNode.thenStatement as Block).statements.firstOrNull;
               } else {
                 currentNode = ifNode.thenStatement;
               }
-              // Si la branche then est vide, passer à l'instruction suivante
+              // If the 'then' branch is empty, go to the next instruction
               if (currentNode == null) {
                 Logger.debug(
                     "[StateMachine] If 'then' branch is empty. Finding node after IfStatement.");
                 currentNode = _findNextSequentialNode(visitor, ifNode);
               }
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle while de la machine à états avec le nouveau nœud
+              continue; // Restart the state machine loop with the new node
             } else {
-              // Condition fausse: vérifier la branche 'else'
+              // Condition false: check the 'else' branch
               if (ifNode.elseStatement != null) {
                 Logger.debug(
                     "[StateMachine] If condition FALSE. Next node is elseBranch: ${ifNode.elseStatement?.runtimeType}");
-                // Si else est un bloc, prendre la première instruction
+                // If else is a block, take the first instruction
                 if (ifNode.elseStatement is Block) {
                   currentNode =
                       (ifNode.elseStatement as Block).statements.firstOrNull;
                 } else {
                   currentNode = ifNode.elseStatement;
                 }
-                // Si la branche else est vide, passer à l'instruction suivante
+                // If the 'else' branch is empty, go to the next instruction
                 if (currentNode == null) {
                   Logger.debug(
                       "[StateMachine] If 'else' branch is empty. Finding node after IfStatement.");
                   currentNode = _findNextSequentialNode(visitor, ifNode);
                 }
               } else {
-                // Pas de branche else, trouver l'instruction suivante après le if
+                // No 'else' branch, find the next instruction after the if
                 Logger.debug(
                     "[StateMachine] If condition FALSE, no else branch. Finding node after IfStatement.");
                 currentNode = _findNextSequentialNode(visitor, ifNode);
               }
               currentState.nextStateIdentifier = currentNode;
-              continue; // Relancer la boucle while de la machine à états
+              continue; // Restart the state machine loop
             }
           } else {
-            // La condition n'a retourné ni booléen ni suspension
+            // The condition did not return a boolean or a suspension
             throw RuntimeError(
                 "If condition must evaluate to a boolean, but got ${conditionResult?.runtimeType}.");
           }
-          // Si la condition était suspendue, lastResult contient AsyncSuspensionRequest
-          // et sera géré par la logique de suspension plus bas.
+          // If the condition was suspended, lastResult contains AsyncSuspensionRequest
+          // and will be handled by the suspension logic below.
         } else {
           if (currentNode is ReturnStatement) {
             try {
@@ -1145,31 +1143,48 @@ class InterpretedFunction implements Callable {
           try {
             lastResult = currentNode.accept<Object?>(visitor);
           } on ReturnException {
-            rethrow; // Relancer pour que le catch ReturnException plus bas gère le retour
+            rethrow; // Re-throw to be caught by the ReturnException catch below
           } catch (error, stackTrace) {
-            Logger.debug(
-                " [StateMachine] Caught SYNC error during accept(): $error");
-            // Erreur synchrone: stocker et tenter de gérer
-            currentState.currentError = error;
-            currentState.currentStackTrace = stackTrace;
-            _handleAsyncError(visitor, currentState, currentNode);
-            return; // Sortir, _handleAsyncError s'occupe de la suite
+            if (error is InternalInterpreterException) {
+              // This is an exception rethrown by rethrow. Propagate immediately.
+              Logger.debug(
+                  " [StateMachine] Caught InternalInterpreterException from accept()/rethrow. Propagating.");
+              // Reset the rethrow state
+              currentState.isHandlingErrorForRethrow = false;
+              currentState.originalErrorForRethrow = null;
+              if (!currentState.completer.isCompleted) {
+                // Ensure the error is not null for completeError
+                final errorToComplete = error.originalThrownValue ??
+                    Exception('Unknown rethrown error during accept()');
+                currentState.completer
+                    .completeError(errorToComplete, stackTrace);
+              }
+              return; // Stop the state machine
+            } else {
+              // Standard synchronous error during accept(): store and try to handle
+              Logger.debug(
+                  " [StateMachine] Caught standard SYNC error during accept(): $error");
+              currentState.currentError = error;
+              currentState.currentStackTrace = stackTrace;
+              _handleAsyncError(visitor, currentState, currentNode);
+              return; // Exit, _handleAsyncError will take care of the rest
+            }
           }
         }
 
-        // Analyser le résultat (peut venir de accept() ou de l'évaluation de condition while)
+        // Analyze the result (can come from accept() or from condition evaluation in while)
         if (lastResult is AsyncSuspensionRequest) {
-          // Vérifier si accept() a retourné une suspension
+          // Check if accept() returned a suspension
           final AsyncSuspensionRequest suspension = lastResult;
 
           Logger.debug(
               "[StateMachine] Suspension requested (from ${currentNode.runtimeType}). Waiting for Future...");
 
-          // Attacher les callbacks au Future
+          // Attach the callbacks to the Future
           suspension.future.then((futureResult) {
             Logger.debug(
                 " [StateMachine] Future completed successfully with: $futureResult");
-            // Mettre à jour l'état avec le résultat
+            // Update the state with the result
             currentState.lastAwaitResult = futureResult;
             currentState.lastAwaitError = null;
             currentState.lastAwaitStackTrace = null;
@@ -1179,28 +1194,27 @@ class InterpretedFunction implements Callable {
             if (currentState.pendingFinallyBlock != null) {
               Logger.debug(
                   "[StateMachine] Resuming after await, pending finally found. Executing finally block first.");
-              // Le prochain état est le début du bloc finally
+              // The next state is the beginning of the finally block
               final finallyBlock = currentState.pendingFinallyBlock!;
-              currentState.pendingFinallyBlock = null; // Consommé
+              currentState.pendingFinallyBlock = null; // Consumed
               currentState.nextStateIdentifier =
                   finallyBlock.statements.firstOrNull;
               if (currentState.nextStateIdentifier == null) {
-                // Le bloc finally est vide, trouver le noeud après le try
+                // The finally block is empty, find the node after the try
                 Logger.debug(
                     "[StateMachine] Pending finally block was empty. Finding node after TryStatement.");
                 if (currentState.activeTryStatement != null) {
                   currentState.nextStateIdentifier = _findNextSequentialNode(
                       visitor, currentState.activeTryStatement!);
-                  currentState.activeTryStatement =
-                      null; // Fin de la gestion du try
+                  currentState.activeTryStatement = null; // End of try handling
                 } else {
                   Logger.warn(
                       "[StateMachine] Cannot find node after empty finally block without active TryStatement.");
-                  currentState.nextStateIdentifier = null; // Arrêt prudent
+                  currentState.nextStateIdentifier = null; // Safe stop
                 }
               }
               _scheduleStateMachineRun(visitor, currentState);
-              return; // Ne pas déterminer le prochain nœud normalement
+              return; // Do not determine the next normal node
             }
 
             // Determine the next state based on the AST context
@@ -1210,34 +1224,34 @@ class InterpretedFunction implements Callable {
                 currentNode!); // The node that caused the suspension
             currentState.nextStateIdentifier = nextNodeAfterAwait;
 
-            // Replanifier l'exécution de la machine à états
+            // Reschedule the state machine execution
             _scheduleStateMachineRun(visitor, currentState);
           }).catchError((Object error, StackTrace stackTrace) {
             Logger.debug(
-                " [StateMachine] Future completed with ERROR: $error"); // Ne pas afficher stackTrace ici, trop long
-            // Stocker l'erreur et la stack trace dans l'état
-            currentState.lastAwaitError = error; // Pour info si qqn l'utilise
+                " [StateMachine] Future completed with ERROR: $error"); // Do not display stackTrace here, too long
+            // Store the error and stack trace in the state
+            currentState.lastAwaitError = error; // For info if someone uses it
             currentState.lastAwaitStackTrace = stackTrace;
-            currentState.currentError = error; // Erreur active à gérer
+            currentState.currentError = error; // Active error to handle
             currentState.currentStackTrace = stackTrace;
-            currentState.lastAwaitResult = null; // Pas de résultat valide
+            currentState.lastAwaitResult = null; // No valid result
 
-            // Essayer de gérer l'erreur (trouver catch/finally)
+            // Try to handle the error (find catch/finally)
             _handleAsyncError(visitor, currentState, currentNode!);
-            // _handleAsyncError se chargera soit de trouver un catch/finally et de replanifier,
-            // soit de compléter le completer avec l'erreur.
+            // _handleAsyncError will either find a catch/finally and reschedule,
+            // or complete the completer with the error.
           });
 
-          // IMPORTANT: Sortir de la fonction _runStateMachine.
-          // L'exécution reprendra dans le .then() ou _handleAsyncError
+          // IMPORTANT: Exit the _runStateMachine function.
+          // Execution will resume in the .then() or _handleAsyncError
           return;
         } else {
           // Clear error state if we executed successfully
           currentState.currentError = null;
           currentState.currentStackTrace = null;
 
-          // Déterminer le prochain état séquentiel normal
-          // Utiliser _findNextSequentialNode qui gère maintenant try/catch/finally
+          // Determine the next sequential normal state
+          // Use _findNextSequentialNode which now handles try/catch/finally
           final nextNode = _findNextSequentialNode(visitor, currentNode);
           Logger.debug(
               "[StateMachine] Sync execution finished. Next node from _findNext: ${nextNode?.runtimeType}");
@@ -1245,39 +1259,59 @@ class InterpretedFunction implements Callable {
           currentState.nextStateIdentifier = currentNode;
         }
       } on ReturnException catch (e) {
-        // La fonction a retourné une valeur
+        // The function returned a value
         Logger.debug(
             " [StateMachine] Caught ReturnException. Completing with: ${e.value}");
         TryStatement? currentTry =
-            currentState.activeTryStatement; // Utiliser currentState
+            currentState.activeTryStatement; // Use currentState
         if (currentTry != null && currentTry.finallyBlock != null) {
-          // Vérifier currentTry != null
+          // Check currentTry != null
           Logger.debug(
               "[StateMachine] Return caught inside try with finally. Executing finally first.");
-          currentState.returnAfterFinally = e.value; // Utiliser currentState
+          currentState.returnAfterFinally = e.value; // Use currentState
+          // Reset rethrow state if jumping to finally
+          currentState.isHandlingErrorForRethrow = false;
+          currentState.originalErrorForRethrow = null;
           currentNode =
-              currentTry.finallyBlock!.statements.firstOrNull; // Maintenant sûr
-          currentState.nextStateIdentifier =
-              currentNode; // Utiliser currentState
-          continue; // Exécuter le finally
+              currentTry.finallyBlock!.statements.firstOrNull; // Now sure
+          currentState.nextStateIdentifier = currentNode; // Use currentState
+          continue; // Execute the finally
         }
         if (!currentState.completer.isCompleted) {
           currentState.completer.complete(e.value);
         }
-        return; // Arrêter la machine à états
+        return; // Stop the state machine
       } catch (error, stackTrace) {
-        // Autre erreur pendant l'exécution de l'état (SYNCHRONE)
-        Logger.debug(
-            " [StateMachine] Caught SYNC Error during non-accept state execution: $error\n$stackTrace");
-        // Tenter de gérer via le mécanisme try/catch/finally standard
-        currentState.currentError = error; // Utiliser currentState
-        currentState.currentStackTrace = stackTrace;
-        _handleAsyncError(
-            visitor,
-            currentState,
-            currentNode ??
-                currentState.function._body); // Utiliser currentState
-        return; // Sortir, _handleAsyncError s'occupe de la suite
+        // Other error during state execution (SYNC)
+
+        // Check if the error comes from rethrow
+        if (error is InternalInterpreterException) {
+          // This is an exception rethrown by rethrow. Do not handle it here.
+          // Propagate it by completing the Future with the original error.
+          Logger.debug(
+              " [StateMachine] Caught InternalInterpreterException from rethrow. Propagating.");
+          // Reset rethrow state before completing with error
+          currentState.isHandlingErrorForRethrow = false;
+          currentState.originalErrorForRethrow = null;
+          if (!currentState.completer.isCompleted) {
+            // Propagate the original error and its associated stack trace (if available in the internal exception)
+            // or the current stack trace if the internal one does not have one.
+            // Note: InternalInterpreterException does not store the stack trace for now.
+            // Using the captured stackTrace here is the best choice.
+            currentState.completer
+                .completeError(error.originalThrownValue!, stackTrace);
+          }
+          return; // Stop the state machine execution
+        } else {
+          // Standard synchronous error: Try to handle via internal try/catch/finally
+          Logger.debug(
+              " [StateMachine] Caught standard SYNC Error during non-accept state execution: $error\\n$stackTrace");
+          currentState.currentError = error; // Utiliser currentState
+          currentState.currentStackTrace = stackTrace;
+          _handleAsyncError(visitor, currentState,
+              currentNode ?? currentState.function._body); // Use currentState
+          return; // Exit, _handleAsyncError will take care of the rest
+        }
       } finally {
         // Restore the visitor environment if it was changed
         visitor.environment = originalVisitorEnv;
@@ -1287,28 +1321,37 @@ class InterpretedFunction implements Callable {
       }
     }
 
-    // Gérer un retour qui a été suspendu par un finally
+    // Handle a return that was suspended by a finally
     if (currentState.returnAfterFinally != null &&
         !currentState.completer.isCompleted) {
       Logger.debug(
           " [StateMachine] Completing with stored return value after finally: ${currentState.returnAfterFinally}");
+      // Reset rethrow state before completing
+      currentState.isHandlingErrorForRethrow = false;
+      currentState.originalErrorForRethrow = null;
       currentState.completer.complete(currentState.returnAfterFinally);
       return;
     }
 
-    // Si la boucle se termine et qu'une erreur était en cours (non interceptée mais après un finally exécuté)
+    // If the loop ends and there was an error (not caught but after a finally executed)
     if (currentState.currentError != null &&
         !currentState.completer.isCompleted) {
       Logger.debug(
           " [StateMachine] Loop finished, propagating unhandled error after finally: ${currentState.currentError}");
+      // Reset rethrow state before completing with error
+      currentState.isHandlingErrorForRethrow = false;
+      currentState.originalErrorForRethrow = null;
       currentState.completer.completeError(
           currentState.currentError ?? Exception("Unknown error after finally"),
           currentState.currentStackTrace);
     }
-    // Si la boucle se termine normally (plus de nœuds à exécuter)
+    // If the loop ends normally (no more nodes to execute)
     else if (!currentState.completer.isCompleted) {
       Logger.debug(
           " [StateMachine] Loop finished normally. Completing with last result: $lastResult (State has await result: ${currentState.lastAwaitResult})");
+      // Reset rethrow state before completing normally
+      currentState.isHandlingErrorForRethrow = false;
+      currentState.originalErrorForRethrow = null;
 
       Object? finalCompletionValue = lastResult;
       if (lastResult == null && currentState.lastAwaitResult != null) {
@@ -1320,10 +1363,10 @@ class InterpretedFunction implements Callable {
     }
   }
 
-  // Planifie l'exécution de la machine à états via microtask
+  // Schedule the state machine execution via microtask
   static void _scheduleStateMachineRun(
       InterpreterVisitor visitor, AsyncExecutionState state) {
-    // Vérifier si le completer est déjà terminé pour éviter des exécutions inutiles
+    // Check if the completer is already completed to avoid unnecessary executions
     if (state.completer.isCompleted) {
       Logger.debug(
           " [_scheduleStateMachineRun] Completer already completed. Skipping schedule.");
@@ -1331,7 +1374,7 @@ class InterpretedFunction implements Callable {
     }
     Future.microtask(() => _runStateMachine(visitor, state))
         .catchError((error, stackTrace) {
-      // Catch errors non interceptées par la logique interne de _runStateMachine
+      // Catch errors not caught by the internal logic of _runStateMachine
       if (!state.completer.isCompleted) {
         Logger.error(
             "[StateMachine] Uncaught async error in microtask: $error\n$stackTrace");
@@ -1351,7 +1394,7 @@ class InterpretedFunction implements Callable {
     Logger.debug(
         "[_handleAsyncError] Handling error: $error from node: ${nodeWhereErrorOccurred.toSource()}");
 
-    // 1. Rechercher un TryStatement englobant
+    // 1. Find an enclosing TryStatement
     TryStatement? enclosingTry =
         _findEnclosingTryStatement(nodeWhereErrorOccurred);
 
@@ -1361,7 +1404,7 @@ class InterpretedFunction implements Callable {
           " [_handleAsyncError] Found enclosing TryStatement: ${enclosingTry.offset}");
       state.activeTryStatement = enclosingTry; // Marquer comme actif
 
-      // 2. Rechercher une clause Catch correspondante (simplifié: prend la première)
+      // 2. Find a matching CatchClause (simplified: take the first one)
       if (enclosingTry.catchClauses.isNotEmpty) {
         matchingCatchClause = enclosingTry.catchClauses.first;
         Logger.debug(
@@ -1373,23 +1416,27 @@ class InterpretedFunction implements Callable {
     }
 
     if (matchingCatchClause != null && enclosingTry != null) {
-      // 3. Erreur interceptée: Préparer le saut vers le bloc Catch
+      // 3. Error caught: Prepare the jump to the Catch block
       state.nextStateIdentifier = matchingCatchClause
-          .body.statements.firstOrNull; // Début du bloc catch
-      // state.pendingFinallyBlock =
-      //     enclosingTry.finallyBlock; // Marquer le finally si présent
+          .body.statements.firstOrNull; // Start of the catch block
 
-      // Définir la variable d'exception dans l'environnement du catch
-      // Pour l'instant, définissons dans l'environnement actuel (peut causer des collisions)
+      // Update the state for rethrow
+      final internalError = InternalInterpreterException(
+          error ?? Exception("Unknown error caught")); // Pass only the error
+      state.originalErrorForRethrow = internalError;
+      state.isHandlingErrorForRethrow = true;
+
+      // Define the exception variable in the catch environment
+      // For now, define in the current environment (can cause collisions)
       final exceptionParameter = matchingCatchClause.exceptionParameter;
       if (exceptionParameter != null) {
         final varName = exceptionParameter.name.lexeme;
-        // Utiliser l'environnement de l'état pour définir les variables du catch
+        // Use the state environment to define the catch variables
         state.environment.define(varName, error);
         Logger.debug(
             " [_handleAsyncError] Defined exception variable '$varName' in environment.");
 
-        // Gérer le paramètre de stack trace s'il existe
+        // Handle the stack trace parameter if it exists
         final stackTraceParameter = matchingCatchClause.stackTraceParameter;
         if (stackTraceParameter != null) {
           final stackVarName = stackTraceParameter.name.lexeme;
@@ -1399,30 +1446,38 @@ class InterpretedFunction implements Callable {
         }
       }
 
-      // Effacer l'état d'erreur car elle est gérée
+      // Clear the error state because it is handled
       state.currentError = null;
       state.currentStackTrace = null;
 
-      // Replanifier l'exécution pour commencer le bloc catch
+      // Reschedule the execution to start the catch block
       Logger.debug(
           " [_handleAsyncError] Scheduling run for CatchClause block.");
       _scheduleStateMachineRun(visitor, state);
     } else {
-      // 4. Erreur non interceptée ou pas de try:
-      //    a) Vérifier s'il y a un finally à exécuter malgré tout
+      // 4. Error not caught or no try:
+      //    a) Check if there is a finally to execute anyway
       if (enclosingTry != null && enclosingTry.finallyBlock != null) {
+        // Reset rethrow state if jumping to finally
+        state.isHandlingErrorForRethrow = false;
+        state.originalErrorForRethrow = null;
+
         Logger.debug(
             " [_handleAsyncError] Error not caught, but finally block exists. Jumping to finally.");
-        // Le prochain état est le début du bloc finally
+        // The next state is the start of the finally block
         state.nextStateIdentifier =
             enclosingTry.finallyBlock!.statements.firstOrNull;
 
-        // IMPORTANT: L'erreur reste dans state.currentError pour être relancée APRES le finally.
-        // _findNextSequentialNode gèrera la transition *après* le finally.
-        // La boucle principale de la machine à états vérifiera state.currentError à la fin.
+        // IMPORTANT: The error remains in state.currentError to be rethrown AFTER the finally.
+        // _findNextSequentialNode will handle the transition *after* the finally.
+        // The main loop of the state machine will check state.currentError at the end.
         _scheduleStateMachineRun(visitor, state);
       } else {
-        //    b) Propager l'erreur en complétant le Future principal
+        //    b) Propagate the error by completing the main Future
+        // Reset rethrow state before propagating
+        state.isHandlingErrorForRethrow = false;
+        state.originalErrorForRethrow = null;
+
         Logger.debug(
             " [_handleAsyncError] Error not caught and no finally block. Propagating error.");
         if (!state.completer.isCompleted) {
@@ -1439,7 +1494,7 @@ class InterpretedFunction implements Callable {
       if (current is TryStatement) {
         return current;
       }
-      // Ne pas chercher au-delà de la limite de la fonction actuelle
+      // Do not search beyond the current function's limit
       if (current is FunctionBody) {
         return null;
       }
@@ -1448,7 +1503,7 @@ class InterpretedFunction implements Callable {
     return null;
   }
 
-  // Détermine le prochain nœud AST à exécuter après la résolution d'un Future attendu.
+  // Determine the next AST node to execute after the resolution of an awaited Future.
   static AstNode? _determineNextNodeAfterAwait(InterpreterVisitor visitor,
       AsyncExecutionState state, AstNode nodeThatCausedSuspension) {
     Object? futureResult = state.lastAwaitResult;
@@ -1460,39 +1515,39 @@ class InterpretedFunction implements Callable {
     Logger.debug(
         "[_determineNextNodeAfterAwait] Resuming after await. Node causing suspension: ${nodeThatCausedSuspension.runtimeType}, Result: $futureResult");
 
-    // Le nœud qui a causé la suspension est soit l'AwaitExpression elle-même,
-    // soit un nœud parent (comme WhileStatement) si l'await était dans sa condition.
+    // The node that caused the suspension is either the AwaitExpression itself,
+    // or a parent node (like WhileStatement) if the await was in its condition.
 
-    // Déterminer le contexte réel de l'await.
+    // Determine the actual context of the await.
     AstNode awaitContextNode;
     Expression? awaitExpression;
 
     if (nodeThatCausedSuspension is AwaitExpression) {
       awaitExpression = nodeThatCausedSuspension;
       awaitContextNode = nodeThatCausedSuspension.parent ??
-          nodeThatCausedSuspension; // Utiliser le parent comme contexte
+          nodeThatCausedSuspension; // Use the parent as context
     } else if (nodeThatCausedSuspension is ExpressionStatement &&
         nodeThatCausedSuspension.expression is AwaitExpression) {
-      // Cas où l'await était directement l'expression d'une ExpressionStatement
+      // Case where the await was directly the expression of an ExpressionStatement
       awaitExpression = nodeThatCausedSuspension.expression as AwaitExpression;
       awaitContextNode = nodeThatCausedSuspension;
     } else if (nodeThatCausedSuspension is WhileStatement &&
         nodeThatCausedSuspension.condition is AwaitExpression) {
-      // Cas spécial: l'await était directement la condition du while
+      // Special case: the await was directly the condition of a WhileStatement
       awaitContextNode =
-          nodeThatCausedSuspension; // Le WhileStatement est le contexte
+          nodeThatCausedSuspension; // The WhileStatement is the context
       awaitExpression = nodeThatCausedSuspension.condition as AwaitExpression;
     } else if (nodeThatCausedSuspension is DoStatement &&
         nodeThatCausedSuspension.condition is AwaitExpression) {
-      // Cas spécial: l'await était directement la condition du do-while
+      // Special case: the await was directly the condition of a DoStatement
       awaitContextNode =
-          nodeThatCausedSuspension; // Le DoStatement est le contexte
+          nodeThatCausedSuspension; // The DoStatement is the context
       awaitExpression = nodeThatCausedSuspension.condition as AwaitExpression;
     } else {
-      // On ne sait pas comment extraire l'await, utiliser le nœud directement
-      // (peut mener à des erreurs si la logique ci-dessous ne gère pas ce nœud)
+      // We don't know how to extract the await, use the node directly
+      // (may lead to errors if the logic below does not handle this node)
       awaitContextNode = nodeThatCausedSuspension;
-      awaitExpression = null; // On ne sait pas où était l'await exact
+      awaitExpression = null; // We don't know where the await was exactly
       Logger.warn(
           "[_determineNextNodeAfterAwait] Could not determine exact await context for node type ${nodeThatCausedSuspension.runtimeType}. Using node as context.");
     }
@@ -1500,9 +1555,9 @@ class InterpretedFunction implements Callable {
     Logger.debug(
         "[_determineNextNodeAfterAwait] Determined await context: ${awaitContextNode.runtimeType}");
 
-    // Logique basée sur le type du nœud qui contenait l'await (awaitContextNode)
+    // Logic based on the type of node that contained the await (awaitContextNode)
 
-    // Cas 1: Déclaration de variable (var x = await f();)
+    // Case 1: Variable declaration (var x = await f();)
     if (awaitContextNode is VariableDeclarationStatement) {
       // This case handles when the await occurs directly in the initializer.
       // It's triggered when `visitVariableDeclarationList` returns the suspension.
@@ -1521,7 +1576,7 @@ class InterpretedFunction implements Callable {
       if (targetVar.initializer is PropertyAccess) {
         final propertyAccess = targetVar.initializer as PropertyAccess;
         if (propertyAccess.target is ParenthesizedExpression) {
-          // On veut accéder à la propriété sur la valeur résolue du Future
+          // We want to access the property on the resolved Future value
           final propertyName = propertyAccess.propertyName.name;
           final (bridgedInstance, isBridgedInstance) =
               visitor.toBridgedInstance(futureResult);
@@ -1559,17 +1614,17 @@ class InterpretedFunction implements Callable {
         visitor.environment = currentExecutionEnvironment;
       }
 
-      // Trouver le prochain nœud séquentiel à exécuter APRES le nœud de contexte de l'await.
+      // Find the next sequential node to execute AFTER the await context node.
       return _findNextSequentialNode(visitor, awaitContextNode);
     }
 
-    // NOUVEAU CAS 1.5: Reprise après await dans l'initialiseur d'une déclaration DANS un bloc.
-    // Ceci arrive quand le `nodeThatCausedSuspension` est l'ExpressionStatement ou le VariableDeclarationStatement lui-même,
-    // mais `_determineNextNodeAfterAwait` est appelé *après* que le Future se résolve.
+    // NEW CASE 1.5: Resume after await in the initializer of a declaration IN a block.
+    // This happens when `nodeThatCausedSuspension` is the ExpressionStatement or VariableDeclarationStatement itself,
+    // but `_determineNextNodeAfterAwait` is called *after* the Future resolves.
     else if (nodeThatCausedSuspension is VariableDeclarationStatement) {
       final varDeclStatement = nodeThatCausedSuspension;
       final varList = varDeclStatement.variables;
-      // Comme dans le Cas 1, trouver la variable qui attendait.
+      // Like in Case 1, find the variable that awaited.
       VariableDeclaration? targetVar = varList.variables.firstWhereOrNull(
           (v) => v.initializer is AwaitExpression
           // We need a better way to link the suspension back to the AwaitExpression node
@@ -1578,7 +1633,7 @@ class InterpretedFunction implements Callable {
       targetVar ??=
           varList.variables.first; // Fallback: assume it was the first variable
 
-      // Utiliser define() car la variable n'a pas été définie lors de la visite initiale
+      // Use define() because the variable was not defined during the initial visit
       currentExecutionEnvironment.define(targetVar.name.lexeme, futureResult);
       // SPECULATIVE FIX: Try assigning immediately after defining
       try {
@@ -1601,11 +1656,11 @@ class InterpretedFunction implements Callable {
       Logger.debug(
           " [_determineNextNodeAfterAwait] Defined/Assigned variable '${targetVar.name.lexeme}' = $futureResult (Case 1.5). Finding next node.");
 
-      // Trouver l'instruction suivante APRES cette déclaration
+      // Find the next instruction AFTER this declaration
       return _findNextSequentialNode(visitor, varDeclStatement);
     }
 
-    // Cas 2: Instruction d'expression (await f(); ou var x = await f(); ou x = await f(); etc.)
+    // Case 2: Expression statement (await f(); or var x = await f(); or x = await f(); etc.)
     else if (awaitContextNode is ExpressionStatement) {
       // Check the type of expression inside the statement
       final expression = awaitContextNode.expression;
@@ -1636,7 +1691,7 @@ class InterpretedFunction implements Callable {
         // Assign the result in the correct environment (the loop environment if inside one)
         final currentEnv =
             state.forLoopEnvironment ?? currentExecutionEnvironment;
-        // Utiliser define() car la variable n'a pas été définie lors de la visite initiale
+        // Use define() because the variable was not defined during the initial visit
         currentEnv.define(targetVar.name.lexeme, futureResult);
         // SPECULATIVE FIX: Try assigning immediately after defining
         try {
@@ -1645,7 +1700,6 @@ class InterpretedFunction implements Callable {
           Logger.warn(
               "[_determineNextNodeAfterAwait] Speculative assign after define failed (VarDeclList): $assignError");
         }
-        // ADD DEBUG:
         try {
           final checkValue2 = currentEnv.get(targetVar.name.lexeme);
           Logger.debug(
@@ -1654,7 +1708,6 @@ class InterpretedFunction implements Callable {
           Logger.debug(
               "[_determineNextNodeAfterAwait] Check after define+assign FAILED for '${targetVar.name.lexeme}': $e");
         }
-        // END ADD DEBUG
         Logger.debug(
             " [_determineNextNodeAfterAwait] Defined/Assigned variable '${targetVar.name.lexeme}' = $futureResult (Case 2 - VarDecl). Finding next node.");
 
@@ -1673,7 +1726,7 @@ class InterpretedFunction implements Callable {
         Logger.debug(
             " [_determineNextNodeAfterAwait] Resuming ExpressionStatement(AssignmentExpression Op: $operatorType). RHS: $resolvedRhs (${resolvedRhs?.runtimeType})");
 
-        // Déterminer le nœud suivant APRÈS l'ExpressionStatement
+        // Determine the next node AFTER the ExpressionStatement
         final AstNode? nextNode =
             _findNextSequentialNode(visitor, awaitContextNode);
 
@@ -1690,8 +1743,8 @@ class InterpretedFunction implements Callable {
           } else {
             Logger.warn(
                 "[_determineNextNodeAfterAwait] Resumption for simple assignment to complex LHS not implemented (Case 2).");
-            // Tentative: Ré-exécuter l'assignation maintenant que RHS est connu (peut échouer)
-            // Cette approche est risquée car elle ré-évalue le LHS.
+            // Attempt: Re-execute the assignment now that RHS is known (may fail)
+            // This approach is risky because it re-evaluates the LHS.
             final originalVisitorEnv = visitor.environment;
             try {
               visitor.environment = currentEnv;
@@ -1763,38 +1816,36 @@ class InterpretedFunction implements Callable {
       }
     }
 
-    // Cas 3: Instruction return (return await f();)
+    // Case 3: Return statement (return await f();)
     else if (awaitContextNode is ReturnStatement && awaitExpression != null) {
-      // ... (logique inchangée) ...
     }
 
-    // Cas 4: Corps de fonction expression (=> await f();)
+    // Case 4: Function body expression (=> await f();)
     else if (awaitContextNode is ExpressionFunctionBody &&
         awaitExpression != null) {
-      // ... (logique inchangée) ...
     }
 
-    // Cas 5: Assignation (x = await f(); ou x += await f();)
+    // Case 5: Assignment (x = await f(); or x += await f();)
     else if (awaitContextNode is AssignmentExpression) {
       final assignmentNode = awaitContextNode;
-      final resolvedRhs = state.lastAwaitResult; // La valeur résolue du Future
+      final resolvedRhs = state.lastAwaitResult; // The resolved Future value
       final operatorType = assignmentNode.operator.type;
       final lhs = assignmentNode.leftHandSide;
-      // Utiliser l'environnement correct (celui de la boucle si applicable)
+      // Use the correct environment (the loop environment if applicable)
       final currentEnv =
           state.forLoopEnvironment ?? currentExecutionEnvironment;
 
       Logger.debug(
           " [_determineNextNodeAfterAwait] Resuming AssignmentExpression (Operator: $operatorType). RHS resolved to: $resolvedRhs (${resolvedRhs?.runtimeType})");
 
-      // Déterminer le prochain nœud AVANT de faire l'assignation (car _findNext peut dépendre du parent)
+      // Determine the next node BEFORE making the assignment (because _findNext may depend on the parent)
       AstNode? parentStatement = assignmentNode;
       while (parentStatement != null && parentStatement is! Statement) {
         parentStatement = parentStatement.parent;
       }
       final AstNode? nextNode = (parentStatement is Statement)
           ? _findNextSequentialNode(visitor, parentStatement)
-          : null; // Si on ne trouve pas le statement parent, on arrêtera
+          : null; // If we don't find the parent statement, we'll stop
 
       if (operatorType == TokenType.EQ) {
         if (lhs is SimpleIdentifier) {
@@ -1877,11 +1928,11 @@ class InterpretedFunction implements Callable {
       return nextNode;
     }
 
-    // Cas 6: Condition If (if (await f()))
+    // Case 6: If condition (if (await f()))
     else if (awaitContextNode is IfStatement && awaitExpression != null) {
-      // ... (logique inchangée, mais s'assurer qu'elle utilise awaitContextNode) ...
+      // ... (unchanged logic, but ensure it uses awaitContextNode) ...
     } else if (awaitContextNode is WhileStatement) {
-      // L'await était dans la condition
+      // The await was in the condition
       final conditionResult = state.lastAwaitResult;
       Logger.debug(
           " [_determineNextNodeAfterAwait] Resuming While condition with awaited result: $conditionResult");
@@ -1896,7 +1947,7 @@ class InterpretedFunction implements Callable {
       }
 
       if (conditionResult) {
-        // Condition vraie: le prochain état est le corps de la boucle
+        // Condition true: the next state is the body of the loop
         Logger.debug(
             " [_determineNextNodeAfterAwait] While condition TRUE. Next node is body: ${awaitContextNode.body.runtimeType}");
         if (awaitContextNode.body is Block) {
@@ -1905,13 +1956,13 @@ class InterpretedFunction implements Callable {
           return awaitContextNode.body;
         }
       } else {
-        // Condition fausse: trouver l'instruction suivante après le while
+        // Condition false: find the next instruction after the while
         Logger.debug(
             " [_determineNextNodeAfterAwait] While condition FALSE. Finding node after while.");
         return _findNextSequentialNode(visitor, awaitContextNode);
       }
     } else if (awaitContextNode is DoStatement) {
-      // L'await était dans la condition
+      // The await was in the condition
       final conditionResult = state.lastAwaitResult;
       Logger.debug(
           " [_determineNextNodeAfterAwait] Resuming DoWhile condition with awaited result: $conditionResult");
@@ -1926,7 +1977,7 @@ class InterpretedFunction implements Callable {
       }
 
       if (conditionResult) {
-        // Condition vraie: le prochain état est le début du corps de la boucle
+        // Condition true: the next state is the beginning of the loop body
         Logger.debug(
             " [_determineNextNodeAfterAwait] DoWhile condition TRUE. Next node is body: ${awaitContextNode.body.runtimeType}");
         if (awaitContextNode.body is Block) {
@@ -1935,13 +1986,13 @@ class InterpretedFunction implements Callable {
           return awaitContextNode.body;
         }
       } else {
-        // Condition fausse: trouver l'instruction suivante après le do-while
+        // Condition false: find the next instruction after the do-while
         Logger.debug(
             " [_determineNextNodeAfterAwait] DoWhile condition FALSE. Finding node after do-while.");
         return _findNextSequentialNode(visitor, awaitContextNode);
       }
     } else if (awaitContextNode is IfStatement) {
-      // L'await était dans la condition
+      // The await was in the condition
       final ifNode = awaitContextNode;
       final conditionResult = state.lastAwaitResult;
       Logger.debug(
@@ -1957,7 +2008,7 @@ class InterpretedFunction implements Callable {
       }
 
       if (conditionResult) {
-        // Condition vraie: le prochain état est la branche 'then'
+        // Condition true: the next state is the 'then' branch
         Logger.debug(
             " [_determineNextNodeAfterAwait] If condition TRUE. Next node is thenBranch: ${ifNode.thenStatement.runtimeType}");
         if (ifNode.thenStatement is Block) {
@@ -1966,7 +2017,7 @@ class InterpretedFunction implements Callable {
           return ifNode.thenStatement;
         }
       } else {
-        // Condition fausse: vérifier la branche 'else'
+        // Condition false: check the 'else' branch
         if (ifNode.elseStatement != null) {
           Logger.debug(
               "[_determineNextNodeAfterAwait] If condition FALSE. Next node is elseBranch: ${ifNode.elseStatement?.runtimeType}");
@@ -1976,7 +2027,7 @@ class InterpretedFunction implements Callable {
             return ifNode.elseStatement;
           }
         } else {
-          // Pas de branche else, trouver l'instruction suivante après le if
+          // No else branch, find the next instruction after the if
           Logger.debug(
               "[_determineNextNodeAfterAwait] If condition FALSE, no else branch. Finding node after IfStatement.");
           return _findNextSequentialNode(visitor, ifNode);
@@ -1986,8 +2037,8 @@ class InterpretedFunction implements Callable {
         (awaitContextNode.forLoopParts is ForPartsWithDeclarations ||
             awaitContextNode.forLoopParts is ForPartsWithExpression)) {
       final forNode = awaitContextNode;
-      // Utiliser nodeThatCausedSuspension pour trouver où l'await s'est produit
-      // AstNode? nodeThatContainedAwait = nodeThatCausedSuspension; // Peut être AwaitExpression ou ForStatement si await dans condition/updater
+      // Use nodeThatCausedSuspension to find where the await occurred
+      // AstNode? nodeThatContainedAwait = nodeThatCausedSuspension; // Can be AwaitExpression or ForStatement if await in condition/updater
       final awaitResult = state.lastAwaitResult;
 
       Logger.debug(
@@ -2087,7 +2138,7 @@ class InterpretedFunction implements Callable {
             return null; // Arrêter
           }
           if (awaitResult) {
-            // Condition vraie -> Aller au corps
+            // Condition true -> Go to body
             Logger.debug(
                 " [_determineNextNodeAfterAwait] For condition TRUE. Next node is body.");
             if (forNode.body is Block) {
@@ -2096,10 +2147,10 @@ class InterpretedFunction implements Callable {
               return forNode.body;
             }
           } else {
-            // Condition fausse -> Sortir de la boucle
+            // Condition false -> Exit loop
             Logger.debug(
                 " [_determineNextNodeAfterAwait] For condition FALSE. Finding node after loop.");
-            state.forLoopInitialized = false; // Nettoyer état
+            state.forLoopInitialized = false; // Clean up state
             state.forLoopEnvironment = null;
             return _findNextSequentialNode(visitor, forNode);
           }
@@ -2159,20 +2210,20 @@ class InterpretedFunction implements Callable {
 
     Logger.warn(
         "_determineNextNodeAfterAwait - Unhandled await context: ${awaitContextNode.runtimeType} (suspension from: ${nodeThatCausedSuspension.runtimeType}). Stopping state machine.");
-    return null; // Arrête la machine par défaut
+    return null; // Default stop state machine
   }
 
-  // Implémentation de la logique pour trouver le prochain nœud séquentiel
+  // Implementation of the logic to find the next sequential node
   static AstNode? _findNextSequentialNode(
       InterpreterVisitor visitor, AstNode currentNode) {
     AstNode? parent = currentNode.parent;
     AsyncExecutionState? state =
-        visitor.currentAsyncState; // Peut être null si non async
+        visitor.currentAsyncState; // Can be null if not async
 
     Logger.debug(
         "[_findNextSequentialNode] Finding next node after: ${currentNode.runtimeType} (parent: ${parent?.runtimeType})");
 
-    // Gérer la fin d'une instruction dans un bloc
+    // Handle the end of an instruction in a block
     if (currentNode is Statement && parent is Block) {
       final block = parent;
       final index = block.statements.indexOf(currentNode);
@@ -2180,134 +2231,132 @@ class InterpretedFunction implements Callable {
           (index != -1 && index == block.statements.length - 1);
 
       if (!isLastStatement && index != -1) {
-        // Cas simple : instruction suivante dans le même bloc
+        // Simple case: next instruction in the same block
         Logger.debug(
             " [_findNextSequentialNode] Next sequential node in block: ${block.statements[index + 1].runtimeType}");
         return block.statements[index + 1];
       } else if (isLastStatement) {
-        // C'était la dernière instruction du bloc. Que faire ensuite ?
+        // It was the last instruction in the block. What next?
         Logger.debug(" [_findNextSequentialNode] Reached end of a Block.");
 
         AstNode? blockParent = block.parent;
 
-        // Cas 1: Fin d'un bloc Try
+        // Case 1: End of a Try block
         if (blockParent is TryStatement && blockParent.body == block) {
           Logger.debug("[_findNextSequentialNode] End of Try block.");
-          // Y a-t-il des clauses Catch ?
+          // Are there any catch clauses?
           if (blockParent.catchClauses.isNotEmpty) {
-            // S'il y a des clauses catch, l'exécution NORMALE les saute.
-            // Elles ne sont atteintes que par une exception gérée par _handleAsyncError.
-            // Donc, après le try, on cherche le finally ou le code suivant.
+            // If there are catch clauses, normal execution skips them.
+            // They are only reached by an exception handled by _handleAsyncError.
+            // So, after the try, we look for the finally or the next code.
             Logger.debug(
                 " [_findNextSequentialNode] Try block finished normally, skipping catches.");
           }
-          // Vérifier s'il y a un bloc finally
+          // Check if there is a finally block
           if (blockParent.finallyBlock != null) {
             Logger.debug(
                 " [_findNextSequentialNode] Found finally block after Try. Jumping to finally.");
-            // Prochain noeud est le début du finally
+            // The next node is the beginning of the finally block
             final firstFinallyStmt =
                 blockParent.finallyBlock!.statements.firstOrNull;
             if (firstFinallyStmt != null) {
               return firstFinallyStmt;
             } else {
-              // Bloc finally vide, trouver ce qui suit le TryStatement
+              // Finally block is empty, find what follows the TryStatement
               Logger.debug(
                   "[_findNextSequentialNode] Finally block is empty. Finding node after TryStatement.");
               if (state != null) {
-                state.activeTryStatement = null; // Fin de la gestion du try
+                state.activeTryStatement = null; // End of try handling
               }
               return _findNextSequentialNode(visitor, blockParent);
             }
           } else {
-            // Pas de catch (normalement sauté) et pas de finally, sauter après le TryStatement entier
+            // No catch (normally skipped) and no finally, skip after the TryStatement
             Logger.debug(
                 " [_findNextSequentialNode] No finally block after Try. Finding node after TryStatement.");
             if (state != null) {
-              state.activeTryStatement = null; // Fin de la gestion du try
+              state.activeTryStatement = null; // End of try handling
             }
             return _findNextSequentialNode(visitor, blockParent);
           }
         }
-        // Cas 2: Fin d'un bloc Catch
+        // Case 2: End of a Catch block
         else if (blockParent is CatchClause) {
           Logger.debug("[_findNextSequentialNode] End of Catch block.");
           TryStatement? tryStatement = _findEnclosingTryStatement(blockParent);
-          // Après un catch, on doit TOUJOURS exécuter le finally s'il existe
+          // After a catch, we must ALWAYS execute the finally if it exists
           if (tryStatement != null && tryStatement.finallyBlock != null) {
             Logger.debug(
                 " [_findNextSequentialNode] Found finally block after Catch. Jumping to finally.");
-            // Prochain noeud est le début du finally
+            // The next node is the beginning of the finally block
             final firstFinallyStmt =
                 tryStatement.finallyBlock!.statements.firstOrNull;
             if (firstFinallyStmt != null) {
               return firstFinallyStmt;
             } else {
-              // Bloc finally vide, trouver ce qui suit le TryStatement
+              // Finally block is empty, find what follows the TryStatement
               Logger.debug(
                   "[_findNextSequentialNode] Finally block is empty (after catch). Finding node after TryStatement.");
               if (state != null) {
-                state.activeTryStatement = null; // Fin de la gestion du try
+                state.activeTryStatement = null; // End of try handling
               }
               return _findNextSequentialNode(visitor, tryStatement);
             }
           } else {
-            // Pas de finally, sauter après le TryStatement entier
+            // No finally, skip after the TryStatement
             Logger.debug(
                 " [_findNextSequentialNode] No finally block after Catch. Finding node after TryStatement.");
             if (state != null) {
-              state.activeTryStatement = null; // Fin de la gestion du try
+              state.activeTryStatement = null; // End of try handling
             }
-            return _findNextSequentialNode(
-                visitor,
-                tryStatement ??
-                    blockParent); // Remonter depuis le Try ou le Catch
+            return _findNextSequentialNode(visitor,
+                tryStatement ?? blockParent); // Go back to the Try or Catch
           }
         }
-        // Cas 3: Fin d'un bloc Finally
+        // Case 3: End of a Finally block
         else if (blockParent is TryStatement &&
             blockParent.finallyBlock == block) {
           Logger.debug("[_findNextSequentialNode] End of Finally block.");
-          // Après un finally, on cherche le noeud suivant après le TryStatement entier
-          // Si une erreur était en cours, elle sera relancée par la boucle principale.
+          // After a finally, we look for the next node after the TryStatement
+          // If an error was in progress, it will be rethrown by the main loop.
           if (state != null) {
-            state.activeTryStatement = null; // Fin de la gestion du try
+            state.activeTryStatement = null; // End of try handling
           }
           return _findNextSequentialNode(visitor, blockParent);
         }
-        // Cas 4: Fin d'un bloc dans une boucle (While, DoWhile, For, ForIn)
+        // Case 4: End of a loop block (While, DoWhile, For, ForIn)
         else if (blockParent is WhileStatement && blockParent.body == block) {
           Logger.debug(
               "[_findNextSequentialNode] End of While body Block. Returning WhileStatement node.");
-          return blockParent; // Revenir au WhileStatement pour réévaluer la condition
+          return blockParent; // Go back to the WhileStatement to re-evaluate the condition
         } else if (blockParent is DoStatement && blockParent.body == block) {
           Logger.debug(
               "[_findNextSequentialNode] End of DoWhile body Block. Returning DoStatement node.");
-          return blockParent; // Revenir au DoStatement pour évaluer la condition
+          return blockParent; // Go back to the DoStatement to re-evaluate the condition
         } else if (blockParent is ForStatement && blockParent.body == block) {
-          // S'applique aux For standard et For-In
+          // Applies to both standard For and For-In
           Logger.debug(
               "[_findNextSequentialNode] End of For/For-In body Block. Returning ForStatement node.");
-          return blockParent; // Revenir au ForStatement pour l'itération/condition suivante
+          return blockParent; // Go back to the ForStatement to evaluate the next iteration/condition
         }
 
-        // Cas 5: Fin d'un bloc If/Else
+        // Case 5: End of an If/Else block
         else if (blockParent is IfStatement) {
-          // Que ce soit la fin du 'then' ou du 'else', on cherche après le IfStatement entier
+          // Whether it's the end of the 'then' or the 'else', we look after the entire IfStatement
           Logger.debug(
               "[_findNextSequentialNode] End of If/Else Block. Finding node after IfStatement.");
           return _findNextSequentialNode(visitor, blockParent);
         }
 
-        // Cas générique: fin d'un bloc non géré spécifiquement ci-dessus
+        // Generic case: end of an unhandled block
         else {
           Logger.debug(
               "[_findNextSequentialNode] End of generic Block (parent: ${blockParent?.runtimeType}). Finding node after parent Block.");
-          // Remonter au parent du bloc pour trouver la suite
+          // Go back to the parent of the block to find the next node
           return _findNextSequentialNode(visitor, block);
         }
       }
-      // Si index == -1 (ne devrait pas arriver sauf erreur interne), remonter
+      // If index == -1 (should not happen unless internal error), go back
       else {
         Logger.warn(
             "[_findNextSequentialNode] Statement not found in parent block? Finding node after parent block.");
@@ -2319,7 +2368,7 @@ class InterpretedFunction implements Callable {
     while (currentSearchNode != null) {
       parent = currentSearchNode.parent;
 
-      // Gérer la fin du corps (instruction unique) d'une boucle While
+      // Handle the end of the body (single statement) of a While loop
       if (currentSearchNode is Statement &&
           parent is WhileStatement &&
           parent.body == currentSearchNode) {
@@ -2328,7 +2377,7 @@ class InterpretedFunction implements Callable {
         return parent;
       }
 
-      // Gérer la fin du corps (instruction unique) d'une boucle DoWhile
+      // Handle the end of the body (single statement) of a DoWhile loop
       if (currentSearchNode is Statement &&
           parent is DoStatement &&
           parent.body == currentSearchNode) {
@@ -2337,7 +2386,7 @@ class InterpretedFunction implements Callable {
         return parent;
       }
 
-      // Gérer la fin du corps (instruction unique) d'une boucle For standard ou For-In
+      // Handle the end of the body (single statement) of a standard For loop or For-In loop
       if (currentSearchNode is Statement &&
           parent is ForStatement &&
           parent.body == currentSearchNode) {
@@ -2346,12 +2395,12 @@ class InterpretedFunction implements Callable {
         return parent;
       }
 
-      // Gérer la fin de la branche 'then' (instruction unique) d'un IfStatement
+      // Handle the end of the 'then' branch (single statement) of an IfStatement
       if (currentSearchNode is Statement &&
           parent is IfStatement &&
           parent.thenStatement == currentSearchNode) {
-        // S'il y a une branche 'else', on ne fait RIEN (l'exécution s'arrête là pour cette branche)
-        // S'il n'y a PAS de branche 'else', on cherche l'instruction APRÈS le IfStatement.
+        // If there is an 'else' branch, do nothing (execution stops here for this branch)
+        // If there is NO 'else' branch, find the node AFTER the IfStatement.
         if (parent.elseStatement == null) {
           Logger.debug(
               "[_findNextSequentialNode] End of If 'then' (single statement, no else). Finding node after IfStatement.");
@@ -2359,48 +2408,48 @@ class InterpretedFunction implements Callable {
         } else {
           Logger.debug(
               "[_findNextSequentialNode] End of If 'then' (single statement, with else). Stopping this path.");
-          // Il n'y a pas de "prochain noeud séquentiel" après le then s'il y a un else.
+          // There is no "next sequential node" after the then if there is an else.
           return null;
         }
       }
 
-      // Gérer la fin de la branche 'else' (instruction unique) d'un IfStatement
+      // Handle the end of the 'else' branch (single statement) of an IfStatement
       if (currentSearchNode is Statement &&
           parent is IfStatement &&
           parent.elseStatement == currentSearchNode) {
-        // Après le 'else', on cherche toujours l'instruction APRÈS le IfStatement entier.
+        // After the 'else', we always look for the node AFTER the entire IfStatement.
         Logger.debug(
             " [_findNextSequentialNode] End of If 'else' (single statement). Finding node after IfStatement.");
         return _findNextSequentialNode(visitor, parent);
       }
 
-      // Si on n'a pas trouvé de structure de contrôle parente spécifique,
-      // on regarde si le parent est une instruction qui peut être séquencée.
+      // If we didn't find a specific control structure parent,
+      // check if the parent is a statement that can be sequenced.
 
       if (parent is Block) {
-        // Si le parent est un Block, la logique au début (gestion de bloc) s'applique.
-        // On appelle récursivement pour que cette logique prenne le relais.
+        // If the parent is a Block, the logic at the beginning (block handling) applies.
+        // Call recursively so that this logic takes over.
         Logger.debug(
             " [_findNextSequentialNode] Ascending into a Block. Re-evaluating block logic for the parent Block.");
         return _findNextSequentialNode(visitor, parent);
       } else if (parent is Statement) {
-        // Si le parent est une autre instruction, on continue de remonter
-        // pour trouver le bloc ou la fonction englobante.
+        // If the parent is another statement, continue ascending
+        // to find the enclosing block or function.
         Logger.debug(
             " [_findNextSequentialNode] Ascending from Statement (${currentSearchNode.runtimeType}) to parent (${parent.runtimeType}).");
         currentSearchNode = parent;
       } else if (parent is FunctionBody || parent is CompilationUnit) {
-        // Atteint la limite de la fonction ou du fichier
+        // Reached the limit of the function or file
         Logger.debug(
             " [_findNextSequentialNode] Reached FunctionBody or CompilationUnit. Returning null.");
         return null;
       } else if (parent == null) {
-        // Atteint la racine de l'AST
+        // Reached the root of the AST
         Logger.debug(
             " [_findNextSequentialNode] Reached top level (null parent). Returning null.");
         return null;
       } else {
-        // Parent non géré (Expression, etc.) - remonter encore
+        // Unhandled parent (Expression, etc.) - continue ascending
         Logger.debug(
             " [_findNextSequentialNode] Ascending from non-statement parent (${parent.runtimeType}).");
         currentSearchNode = parent;
@@ -2412,7 +2461,7 @@ class InterpretedFunction implements Callable {
     return null; // Fallback
   }
 
-  // Remplacer l'ancien placeholder _startAsyncStateMachine
+  // Replace the old placeholder _startAsyncStateMachine
   void _startAsyncStateMachine(
       InterpreterVisitor visitor, AsyncExecutionState initialState) {
     Logger.debug(
@@ -2526,19 +2575,19 @@ class NativeFunction implements Callable, RuntimeType {
   String get name => _name;
 }
 
-// Représente une méthode d'instance d'une classe pontée qui a été liée à une instance spécifique.
+// Represents a bridged instance method that has been bound to a specific instance.
 class BridgedMethodCallable implements Callable {
-  final BridgedInstance _instance; // L'instance native cible
-  final BridgedMethodAdapter _adapter; // La fonction d'adaptation
+  final BridgedInstance _instance; // The native target instance
+  final BridgedMethodAdapter _adapter; // The adapter function
   final String _methodName;
 
   BridgedMethodCallable(this._instance, this._adapter, this._methodName);
 
   @override
   int get arity {
-    // L'arité est complexe à déterminer statiquement pour les adaptateurs natifs.
-    // Pour l'instant, on retourne 0, mais l'adaptateur lui-même fera la validation.
-    // On pourrait améliorer cela si les adaptateurs fournissent des métadonnées.
+    // The arity is complex to determine statically for native adapters.
+    // For now, return 0, but the adapter itself will do the validation.
+    // We could improve this if the adapters provide metadata.
     return 0;
   }
 
@@ -2547,15 +2596,15 @@ class BridgedMethodCallable implements Callable {
       [Map<String, Object?> namedArguments = const {},
       List<RuntimeType>? typeArguments]) {
     try {
-      // Appeler l'adaptateur avec l'objet natif de l'instance et les arguments
+      // Call the adapter with the native object of the instance and the arguments
       return _adapter(
           visitor, _instance.nativeObject, positionalArguments, namedArguments);
     } on ArgumentError catch (e) {
-      // Convertir ArgumentError natif en RuntimeError
+      // Convert native ArgumentError to RuntimeError
       throw RuntimeError(
           "Invalid arguments for bridged method '${_instance.bridgedClass.name}.$_methodName': ${e.message}");
     } catch (e, s) {
-      // Gérer d'autres erreurs natives
+      // Handle other native errors
       Logger.error(
           "[BridgedMethodCallable] Native exception during call to '${_instance.bridgedClass.name}.$_methodName': $e\n$s");
       throw RuntimeError(
@@ -2591,7 +2640,7 @@ class InterpretedExtensionMethod implements Callable {
   Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
       [Map<String, Object?> namedArguments = const {},
       List<RuntimeType>? typeArguments]) {
-    // 1. Extraire l'instance cible (premier argument)
+    // 1. Extract the target instance (first argument)
     if (positionalArguments.isEmpty) {
       throw RuntimeError(
           "Internal error: Extension method '${declaration.name.lexeme}' called without target instance ('this').");
@@ -2599,14 +2648,14 @@ class InterpretedExtensionMethod implements Callable {
     final targetInstance =
         positionalArguments.removeAt(0); // Consomme le premier argument
 
-    // 2. Créer l'environnement d'exécution
+    // 2. Create the execution environment
     final executionEnvironment = Environment(enclosing: closure);
-    // Définir 'this' dans cet environnement
+    // Define 'this' in this environment
     executionEnvironment.define('this', targetInstance);
     Logger.debug(
         "[InterpretedExtensionMethod.call] Created execution env (${executionEnvironment.hashCode}) for '${declaration.name.lexeme}', defining 'this'=${targetInstance?.runtimeType}");
 
-    // 3. Lier les paramètres déclarés (arguments explicites)
+    // 3. Bind the declared parameters (explicit arguments)
     final params = declaration.parameters?.parameters;
     int positionalArgIndex = 0;
     final providedNamedArgs = namedArguments;
@@ -2621,7 +2670,7 @@ class InterpretedExtensionMethod implements Callable {
         bool isNamed = false;
         bool isRequiredNamed = false;
 
-        // Déterminer les infos du paramètre (copié depuis InterpretedFunction)
+        // Determine the parameter info (copied from InterpretedFunction)
         FormalParameter actualParam = param;
         if (param is DefaultFormalParameter) {
           defaultValueExpr = param.defaultValue;
@@ -2642,7 +2691,7 @@ class InterpretedExtensionMethod implements Callable {
         }
         processedParamNames.add(paramName);
 
-        // Trouver l'argument correspondant et la valeur
+        // Find the corresponding argument and value
         Object? valueToDefine;
         bool argumentProvided = false;
         if (isOptionalPositional || isRequired) {
@@ -2657,7 +2706,7 @@ class InterpretedExtensionMethod implements Callable {
           }
         }
 
-        // Gérer les valeurs par défaut et les vérifications required
+        // Handle default values and required checks
         if (!argumentProvided) {
           if (defaultValueExpr != null) {
             final previousVisitorEnv = visitor.environment;
@@ -2675,13 +2724,13 @@ class InterpretedExtensionMethod implements Callable {
             valueToDefine = null;
           }
         }
-        // Définir la variable dans l'environnement d'exécution
+        // Define the variable in the execution environment
         executionEnvironment.define(paramName, valueToDefine);
         Logger.debug(
             " [InterpretedExtensionMethod.call] Bound param '$paramName' = $valueToDefine");
       }
 
-      // Vérifications finales des arguments (copiées depuis InterpretedFunction)
+      // Final argument checks (copied from InterpretedFunction)
       final int totalPositionalDeclared =
           params.where((p) => p.isPositional).length;
       if (positionalArgIndex < positionalArguments.length) {
@@ -2699,25 +2748,24 @@ class InterpretedExtensionMethod implements Callable {
           "Extension method '${declaration.name.lexeme}' takes no arguments (besides 'this'), but arguments were provided.");
     }
 
-    // 4. Exécuter le corps dans le nouvel environnement
+    // 4. Execute the body in the new environment
     final previousEnvironment = visitor.environment;
     final previousFunction = visitor.currentFunction;
     // visitor.currentFunction = ???;
-    visitor.environment =
-        executionEnvironment; // UTILISER LE NOUVEL ENVIRONNEMENT
+    visitor.environment = executionEnvironment; // USE THE NEW ENVIRONMENT
     Logger.debug(
         "[InterpretedExtensionMethod.call] Set visitor environment to executionEnvironment (${executionEnvironment.hashCode}) before executing body.");
 
     try {
       final body = declaration.body;
       if (body is BlockFunctionBody) {
-        // executeBlock gère déjà ReturnException correctement
+        // executeBlock already handles ReturnException correctly
         return visitor.executeBlock(
             body.block.statements, executionEnvironment);
       } else if (body is ExpressionFunctionBody) {
-        // Pour un corps d'expression, évaluer et retourner la valeur
+        // For an expression body, evaluate and return the value
         final result = body.expression.accept<Object?>(visitor);
-        // Pas besoin de lever ReturnException ici, on retourne directement
+        // No need to raise ReturnException here, we return directly
         return result;
       } else if (body is EmptyFunctionBody) {
         throw RuntimeError(
@@ -2727,7 +2775,7 @@ class InterpretedExtensionMethod implements Callable {
             'Function body type not handled in extension method: ${body.runtimeType}');
       }
     } on ReturnException catch (e) {
-      // Attraper au cas où executeBlock (ou autre) lèverait encore ReturnException
+      // Catch in case executeBlock (or other) still raises ReturnException
       Logger.debug(
           " [InterpretedExtensionMethod.call] Caught ReturnException, returning value: ${e.value}");
       return e.value;
@@ -2741,18 +2789,18 @@ class InterpretedExtensionMethod implements Callable {
   }
 }
 
-/// Représente une méthode d'extension liée à une instance cible.
+/// Represents an extension method bound to a target instance.
 ///
-/// Stocke l'instance (`target`) et la méthode d'extension (`extensionMethod`).
-/// Lorsque `call` est invoqué, elle appelle la méthode d'extension sous-jacente,
-/// en insérant automatiquement l'instance cible comme premier argument positionnel.
+/// Stores the instance (`target`) and the extension method (`extensionMethod`).
+/// When `call` is invoked, it calls the underlying extension method,
+/// automatically inserting the target instance as the first positional argument.
 class BoundExtensionMethodCallable implements Callable {
-  final Object? target; // L'instance 'this' à laquelle la méthode est liée.
+  final Object? target; // The 'this' instance to which the method is bound.
   final InterpretedExtensionMethod extensionMethod;
 
   BoundExtensionMethodCallable(this.target, this.extensionMethod);
 
-  // L'arité de la méthode liée est l'arité de la méthode d'extension originale.
+  // The arity of the bound method is the arity of the original extension method.
   @override
   int get arity => extensionMethod.arity;
 
@@ -2760,15 +2808,15 @@ class BoundExtensionMethodCallable implements Callable {
   Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
       [Map<String, Object?> namedArguments = const {},
       List<RuntimeType>? typeArguments = const []]) {
-    // Préparer les arguments pour l'appel réel à l'InterpretedExtensionMethod:
-    // Le premier argument est TOUJOURS l'instance cible.
+    // Prepare the arguments for the actual call to the InterpretedExtensionMethod:
+    // The first argument is ALWAYS the target instance.
     final actualPositionalArgs = [target, ...positionalArguments];
 
     Logger.debug(
         "[BoundExtensionMethodCallable] Calling extension method '${extensionMethod.declaration.name.lexeme}' bound to ${target?.runtimeType}");
 
-    // Appeler la méthode d'extension originale avec les arguments ajustés.
-    // Elle gérera les exceptions ReturnException, etc.
+    // Call the original extension method with the adjusted arguments.
+    // It will handle ReturnException, etc.
     return extensionMethod.call(
         visitor, actualPositionalArgs, namedArguments, typeArguments);
   }
