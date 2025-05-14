@@ -1717,7 +1717,7 @@ class InterpretedFunction implements Callable {
         // Case: x += await f(); or x = await f();
         // This is the primary handler now as the context is the ExpressionStatement.
         final assignmentNode = expression; // Already cast
-        final resolvedRhs = state.lastAwaitResult; // La valeur résolue
+        Object? resolvedRhs = state.lastAwaitResult; // La valeur résolue
         final operatorType = assignmentNode.operator.type;
         final lhs = assignmentNode.leftHandSide;
         final currentEnv =
@@ -1732,6 +1732,35 @@ class InterpretedFunction implements Callable {
 
         if (operatorType == TokenType.EQ) {
           if (lhs is SimpleIdentifier) {
+            final propertyAccess = expression.childEntities.lastOrNull;
+            if (propertyAccess != null && propertyAccess is PropertyAccess) {
+              if (propertyAccess.target is ParenthesizedExpression) {
+                // We want to access the property on the resolved Future value
+                final propertyName = propertyAccess.propertyName.name;
+                final (bridgedInstance, isBridgedInstance) =
+                    visitor.toBridgedInstance(resolvedRhs);
+                if (isBridgedInstance) {
+                  final getterAdapter = bridgedInstance!.bridgedClass
+                      .findInstanceGetterAdapter(propertyName);
+                  if (getterAdapter != null) {
+                    final getterResult =
+                        getterAdapter(visitor, bridgedInstance.nativeObject);
+
+                    resolvedRhs = getterResult;
+                  }
+
+                  final methodAdapter = bridgedInstance.bridgedClass
+                      .findInstanceMethodAdapter(propertyName);
+                  if (methodAdapter != null) {
+                    // Return a callable bound to the instance
+                    final boundCallable = BridgedMethodCallable(
+                        bridgedInstance, methodAdapter, propertyName);
+
+                    resolvedRhs = boundCallable;
+                  }
+                }
+              }
+            }
             final varName = lhs.name;
             try {
               currentEnv.assign(varName, resolvedRhs);
