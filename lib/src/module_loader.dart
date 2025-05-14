@@ -226,36 +226,40 @@ class ModuleLoader {
             "Dart library '${uri.toString()}' not supported.");
       }
     }
-    for (var bridgedEnumDefinition in bridgedEnumDefinitions) {
-      if (bridgedEnumDefinition.containsKey(uriString)) {
-        final definition = bridgedEnumDefinition[uriString]!;
-        try {
-          final bridgedEnum = definition.buildBridgedEnum();
-          globalEnvironment.defineBridgedEnum(bridgedEnum);
-          Logger.debug(
-              " [execute] Registered bridged enum: ${definition.name}");
-          return '';
-        } catch (e) {
-          Logger.error("registering bridged enum '${definition.name}': $e");
-          throw Exception(
-              "Failed to register bridged enum '${definition.name}': $e");
+    if (bridgedEnumDefinitions.isNotEmpty) {
+      for (var bridgedEnumDefinition in bridgedEnumDefinitions) {
+        if (bridgedEnumDefinition.containsKey(uriString)) {
+          final definition = bridgedEnumDefinition[uriString]!;
+          try {
+            final bridgedEnum = definition.buildBridgedEnum();
+            globalEnvironment.defineBridgedEnum(bridgedEnum);
+            Logger.debug(
+                " [execute] Registered bridged enum: ${definition.name}");
+          } catch (e) {
+            Logger.error("registering bridged enum '${definition.name}': $e");
+            throw Exception(
+                "Failed to register bridged enum '${definition.name}': $e");
+          }
         }
       }
+      return '';
     }
-    for (var bridgedClassDefinition in bridgedClassDefinitions) {
-      if (bridgedClassDefinition.containsKey(uriString)) {
-        final definition = bridgedClassDefinition[uriString]!;
-        try {
-          globalEnvironment.defineBridge(definition);
-          Logger.debug(
-              " [execute] Registered bridged class: ${definition.name}");
-          return '';
-        } catch (e) {
-          Logger.error("registering bridged class '${definition.name}': $e");
-          throw Exception(
-              "Failed to register bridged class '${definition.name}': $e");
+    if (bridgedClassDefinitions.isNotEmpty) {
+      for (var bridgedClassDefinition in bridgedClassDefinitions) {
+        if (bridgedClassDefinition.containsKey(uriString)) {
+          final definition = bridgedClassDefinition[uriString]!;
+          try {
+            globalEnvironment.defineBridge(definition);
+            Logger.debug(
+                " [execute] Registered bridged class: ${definition.name}");
+          } catch (e) {
+            Logger.error("registering bridged class '${definition.name}': $e");
+            throw Exception(
+                "Failed to register bridged class '${definition.name}': $e");
+          }
         }
       }
+      return '';
     }
 
     // If it's neither explicitly preloaded nor a known Dart library, it's an error.
