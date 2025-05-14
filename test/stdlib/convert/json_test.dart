@@ -5,6 +5,7 @@ void main() {
   group('Json tests', () {
     test('JsonCodec encode and decode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         JsonCodec codec = JsonCodec();
         Map<String, dynamic> data = {"key": "value", "number": 42};
@@ -20,6 +21,7 @@ void main() {
 
     test('JsonEncoder convert', () {
       const source = '''
+      import 'dart:convert';
       main() {
         JsonEncoder encoder = JsonEncoder();
         Map<String, dynamic> data = {"key": "value", "number": 42};
@@ -32,6 +34,7 @@ void main() {
 
     test('JsonDecoder convert', () {
       const source = '''
+      import 'dart:convert';
       main() {
         JsonDecoder decoder = JsonDecoder();
         String json = '{"key":"value","number":42}';
@@ -44,6 +47,7 @@ void main() {
 
     test('jsonEncode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Map<String, dynamic> data = {"key": "value", "number": 42};
         String encoded = jsonEncode(data);
@@ -55,6 +59,7 @@ void main() {
 
     test('jsonDecode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         String json = '{"key":"value","number":42}';
         Map<String, dynamic> decoded = jsonDecode(json);
@@ -66,6 +71,7 @@ void main() {
 
     test('jsonEncode with toEncodable', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Map<String, dynamic> data = {"key": "value", "date": DateTime(2023, 1, 1)};
         String encoded = jsonEncode(data, toEncodable: (nonEncodable) {
@@ -83,6 +89,7 @@ void main() {
 
     test('jsonDecode with reviver', () {
       const source = '''
+      import 'dart:convert';
       main() {
         String json = '{"key":"value","date":"2023-01-01T00:00:00.000Z"}';
         Map<String, dynamic> decoded = jsonDecode(json, reviver: (key, value) {
@@ -103,6 +110,7 @@ void main() {
 
     test('JsonCodec with toEncodable and reviver', () {
       const source = '''
+      import 'dart:convert';
       main() {
         JsonCodec codec = JsonCodec(
           toEncodable: (nonEncodable) {

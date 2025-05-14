@@ -6,6 +6,7 @@ void main() {
   group('File methods - comprehensive', () {
     test('existsSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -20,6 +21,7 @@ void main() {
 
     test('writeAsStringSync and readAsStringSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -33,6 +35,7 @@ void main() {
 
     test('deleteSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -45,6 +48,7 @@ void main() {
 
     test('renameSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -59,6 +63,7 @@ void main() {
 
     test('copySync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -74,6 +79,7 @@ void main() {
 
     test('lengthSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -87,6 +93,7 @@ void main() {
 
     test('lastModifiedSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -100,6 +107,7 @@ void main() {
 
     test('resolveSymbolicLinksSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -113,6 +121,7 @@ void main() {
 
     test('absolute', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -127,6 +136,7 @@ void main() {
 
     test('parent', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");

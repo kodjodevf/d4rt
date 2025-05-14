@@ -6,6 +6,7 @@ void main() {
   group('Directory methods - comprehensive', () {
     test('existsSync', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         var result1, result2;
@@ -24,6 +25,7 @@ void main() {
 
     test('createSync', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         Directory newDir = Directory(dir.path + "/newDir");
@@ -43,6 +45,7 @@ void main() {
 
     test('deleteSync', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         var existsAfterDelete;
@@ -60,6 +63,7 @@ void main() {
 
     test('listSync', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         List<String> paths = [];
@@ -85,6 +89,7 @@ void main() {
 
     test('renameSync', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         Directory renamedDir = Directory(dir.path + "_renamed");
@@ -104,6 +109,7 @@ void main() {
 
     test('absolute', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         String? path;
@@ -123,6 +129,7 @@ void main() {
 
     test('parent', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         String? path;
@@ -142,6 +149,7 @@ void main() {
 
     test('resolveSymbolicLinksSync', () {
       const source = '''
+      import 'dart:io';
       main() {
         Directory dir = Directory.systemTemp.createTempSync();
         String? path;

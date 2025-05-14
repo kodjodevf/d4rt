@@ -49,9 +49,11 @@ final userBridge = BridgedClassDefinition(
 
 void main() async {
   final interpreter = D4rt();
-  interpreter.registerBridgedClass(userBridge);
+  interpreter.registerBridgedClass(
+      userBridge, 'package:d4rt_example/d4rt_example.dart');
 
   final code = '''
+    import 'package:d4rt_example/d4rt_example.dart';
     main() async {
       var u = User('Alice', 30);
       u.age = 31;
@@ -63,6 +65,6 @@ void main() async {
     }
   ''';
 
-  final result = await interpreter.execute(code);
+  final result = await interpreter.execute(source: code);
   print(result); // [Hello, Alice!, Profile of Alice, Guest, Hello from static!]
 }

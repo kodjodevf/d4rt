@@ -5,6 +5,7 @@ void main() {
   group('RandomCore tests', () {
     test('Random.nextInt', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random = Random(42);
         return [random.nextInt(100), random.nextInt(100), random.nextInt(100)];
@@ -16,6 +17,7 @@ void main() {
 
     test('Random.nextDouble', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random = Random(42);
         return [random.nextDouble(), random.nextDouble(), random.nextDouble()];
@@ -30,6 +32,7 @@ void main() {
 
     test('Random.nextBool', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random = Random(42);
         return [random.nextBool(), random.nextBool(), random.nextBool()];
@@ -41,6 +44,7 @@ void main() {
 
     test('Random with no seed', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random = Random();
         return random.nextInt(100);
@@ -52,6 +56,7 @@ void main() {
 
     test('Random.toString', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random = Random(42);
         return random.toString();
@@ -64,6 +69,7 @@ void main() {
 
     test('Random.hashCode', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random1 = Random(42);
         Random random2 = Random(42);

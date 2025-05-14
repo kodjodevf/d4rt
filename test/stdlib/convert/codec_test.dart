@@ -5,6 +5,7 @@ void main() {
   group('Codec tests', () {
     test('Codec encode and decode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Codec<String, List<int>> codec = Utf8Codec();
         List<int> encoded = codec.encode("hello");
@@ -22,6 +23,7 @@ void main() {
 
     test('Codec fuse', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Codec<String, String> codec = Utf8Codec().fuse(Base64Codec());
         String encoded = codec.encode("hello");
@@ -34,6 +36,7 @@ void main() {
 
     test('Codec encoder and decoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Codec<String, List<int>> codec = Utf8Codec();
         Converter<String, List<int>> encoder = codec.encoder;

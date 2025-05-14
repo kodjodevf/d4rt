@@ -5,6 +5,7 @@ void main() {
   group('RectangleCore tests', () {
     test('Rectangle properties', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r = Rectangle(0, 0, 10, 20);
         return [r.left, r.top, r.width, r.height, r.right, r.bottom];
@@ -15,6 +16,7 @@ void main() {
 
     test('Rectangle containsPoint', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r = Rectangle(0, 0, 10, 20);
         return [r.containsPoint(Point(5, 5)), r.containsPoint(Point(15, 5))];
@@ -25,6 +27,7 @@ void main() {
 
     test('Rectangle containsRectangle', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r1 = Rectangle(0, 0, 10, 20);
         Rectangle r2 = Rectangle(1, 1, 5, 5);
@@ -37,6 +40,7 @@ void main() {
 
     test('Rectangle intersects', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r1 = Rectangle(0, 0, 10, 20);
         Rectangle r2 = Rectangle(5, 5, 10, 10);
@@ -49,6 +53,7 @@ void main() {
 
     test('Rectangle intersection', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r1 = Rectangle(0, 0, 10, 20);
         Rectangle r2 = Rectangle(5, 5, 10, 10);
@@ -71,6 +76,7 @@ void main() {
 
     test('Rectangle toString', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r = Rectangle(0, 0, 10, 20);
         return r.toString();
@@ -81,6 +87,7 @@ void main() {
 
     test('Rectangle equality and hashCode', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r1 = Rectangle(0, 0, 10, 20);
         Rectangle r2 = Rectangle(0, 0, 10, 20);

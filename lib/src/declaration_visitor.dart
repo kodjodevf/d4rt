@@ -108,12 +108,79 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
   // Ignore other declaration types in this pass
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    // Does nothing for functions in this pass (handled by InterpreterVisitor)
+    final functionName = node.name.lexeme;
+    Logger.debug(
+        "[DeclarationVisitor.visitFunctionDeclaration] Processing function: $functionName");
+
+    if (environment.isDefinedLocally(functionName)) {
+      return;
+    }
+
+    // Similar to InterpreterVisitor.visitFunctionDeclaration
+    // We need to resolve the return type placeholder for now.
+    // The actual type resolution might be more complex if it involves imported types not yet processed.
+    // For now, let's assume a simple placeholder based on the AST node.
+    final returnTypeNode = node.returnType;
+    // Simplified type resolution for declaration pass - might need refinement
+    RuntimeType declaredReturnType;
+    if (returnTypeNode is NamedType) {
+      final typeName = returnTypeNode.name2.lexeme;
+      Logger.debug(
+          "[DeclarationVisitor.visitFunctionDeclaration]   Return type node name: $typeName");
+
+      try {
+        final resolvedType = environment.get(typeName);
+        Logger.debug(
+            "[DeclarationVisitor.visitFunctionDeclaration]     environment.get('$typeName') resolved to: ${resolvedType?.runtimeType} with name: ${(resolvedType is RuntimeType ? resolvedType.name : 'N/A')}");
+
+        if (resolvedType is RuntimeType) {
+          declaredReturnType = resolvedType;
+        } else {
+          Logger.warn(
+              "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeName' resolved to non-RuntimeType: $resolvedType. Using placeholder.");
+          declaredReturnType = BridgedClass(Object, name: typeName);
+        }
+      } on RuntimeError catch (e) {
+        Logger.warn(
+            "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeName' not found in environment (RuntimeError: ${e.message}). Using placeholder.");
+        declaredReturnType = BridgedClass(Object, name: typeName);
+      }
+    } else if (returnTypeNode == null) {
+      declaredReturnType = BridgedClass(Object,
+          name: 'dynamic'); // Default to dynamic if no type
+    } else {
+      // For other TypeAnnotation types, use a generic placeholder
+      declaredReturnType =
+          BridgedClass(Object, name: 'unknown_type_placeholder');
+    }
+    bool isNullable = returnTypeNode?.question != null; // Check for 'A?'
+
+    final function = InterpretedFunction.declaration(
+        node,
+        environment, // The function captures the environment it's declared in
+        declaredReturnType,
+        isNullable);
+    Logger.debug(
+        "[DeclarationVisitor.visitFunctionDeclaration]   Defining function '$functionName' with declaredReturnType: ${declaredReturnType.name} (Hash: ${declaredReturnType.hashCode})");
+    environment.define(functionName, function);
   }
 
   @override
   void visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
     // Does nothing for global variables in this pass (handled by InterpreterVisitor)
+    for (final variable in node.variables.variables) {
+      if (variable.name.lexeme == '_') {
+        // Ignore wildcard variables
+        continue;
+      }
+      // For now, just define the variable name with null.
+      // The actual initialization will happen in InterpreterVisitor.
+      if (!environment.isDefinedLocally(variable.name.lexeme)) {
+        environment.define(variable.name.lexeme, null);
+        Logger.debug(
+            "[DeclarationVisitor] Defined top-level variable placeholder '${variable.name.lexeme}' in env: ${environment.hashCode}");
+      }
+    }
   }
 
   // Add other visit... if needed to ignore other declaration types

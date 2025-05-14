@@ -18,26 +18,8 @@ class Stdlib {
   Stdlib(this.environment);
 
   void register() {
-    environment.define(
-        'Object',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return Object;
-        }, arity: 0, name: 'Object'));
-    environment.define(
-        'Null',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return Null;
-        }, arity: 0, name: 'Null'));
-    environment.define(
-        'dynamic',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return dynamic;
-        }, arity: 0, name: 'dynamic'));
     registerCoreLibs(environment);
-    registerMathLibs(environment);
-    registerConvertLibs(environment);
     registerAsyncLibs(environment);
-    StdlibIo.registerStdIoLibs(environment);
   }
 
   Object? evalMethod(

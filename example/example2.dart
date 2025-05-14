@@ -26,15 +26,17 @@ final statusEnumBridge = BridgedEnumDefinition<Status>(
 
 void main() {
   final interpreter = D4rt();
-  interpreter.registerBridgedEnum(statusEnumBridge);
+  interpreter.registerBridgedEnum(
+      statusEnumBridge, 'package:d4rt_example/example2.dart');
 
   final code = '''
+    import 'package:d4rt_example/example2.dart';
     main() {
       var s = Status.error;
       return [s.code, s.isError, s.describe()];
     }
   ''';
 
-  final result = interpreter.execute(code);
+  final result = interpreter.execute(source: code);
   print(result); // [500, true, Status error (500)]
 }

@@ -5,6 +5,7 @@ void main() {
   group('Utf8 tests', () {
     test('Utf8Codec encode and decode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Utf8Codec codec = Utf8Codec();
         String original = "Hello, UTF-8!";
@@ -23,6 +24,7 @@ void main() {
 
     test('Utf8Encoder convert', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Utf8Encoder encoder = Utf8Encoder();
         String original = "Encode this!";
@@ -36,6 +38,7 @@ void main() {
 
     test('Utf8Decoder convert', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Utf8Decoder decoder = Utf8Decoder();
         List<int> encoded = [68, 101, 99, 111, 100, 101, 32, 116, 104, 105, 115, 33];

@@ -6,9 +6,12 @@ Matcher throwsRuntimeError(dynamic messageMatcher) {
       isA<RuntimeError>().having((e) => e.message, 'message', messageMatcher));
 }
 
-dynamic execute(String source) {
+dynamic execute(String source, {Object? args}) {
   final d4rt = D4rt()..setDebug(false);
-  return d4rt.execute(source);
+  return d4rt.execute(
+      library: 'package:test/main.dart',
+      args: args,
+      sources: {'package:test/main.dart': source});
 }
 
 void main() {
@@ -121,30 +124,28 @@ void main() {
     });
 
     test('Main function with arguments', () {
-      final interpreter = D4rt();
       final source = '''
         main(List<String> args) {
           return args.length.toString() + ":" + args[0];
         }
       ''';
-      final result = interpreter.execute(
+      final result = execute(
         source,
-        mainArgs: ['arg1', 'test', 'more'], // Pass arguments
+        args: ['arg1', 'test', 'more'], // Pass arguments
       );
       expect(result, equals('3:arg1')); // Length 3, first argument 'arg1'
     });
 
     test('Main function without arguments called with args (should throw)', () {
-      final interpreter = D4rt();
       final source = '''
         main() { // Ne prend pas d'arguments
           return 10;
         }
       ''';
       expect(
-        () => interpreter.execute(
+        () => execute(
           source,
-          mainArgs: ['fail'], // Passer des arguments quand même
+          args: ['fail'], // Passer des arguments quand même
         ),
         throwsRuntimeError(
             contains("'main' function does not accept arguments")),
@@ -154,13 +155,12 @@ void main() {
     test(
         'Main function with arguments called without args (should pass empty list)',
         () {
-      final interpreter = D4rt();
       final source = '''
         main(List<String> args) { // Prend des arguments
           return args.length; // Doit être 0
         }
       ''';
-      final result = interpreter.execute(source);
+      final result = execute(source);
       expect(result, equals(0));
     });
   });
@@ -3189,19 +3189,21 @@ void main() {
 
     setUp(() {
       interpreter = D4rt();
-      interpreter.registerBridgedClass(BridgedClassDefinition(
-        nativeType: DummyNative,
-        name: 'Dummy',
-        constructors: {'': (v, p, n) => DummyNative()},
-        methods: {
-          'nativeMethod': (v, t, p, n) => (t as DummyNative).nativeMethod(),
-        },
-        getters: {},
-        setters: {},
-        staticGetters: {},
-        staticSetters: {},
-        staticMethods: {},
-      ));
+      interpreter.registerBridgedClass(
+          BridgedClassDefinition(
+            nativeType: DummyNative,
+            name: 'Dummy',
+            constructors: {'': (v, p, n) => DummyNative()},
+            methods: {
+              'nativeMethod': (v, t, p, n) => (t as DummyNative).nativeMethod(),
+            },
+            getters: {},
+            setters: {},
+            staticGetters: {},
+            staticSetters: {},
+            staticMethods: {},
+          ),
+          'package:test/dummy.dart');
     });
 
     test('Correct return type (int)', () {
@@ -3325,7 +3327,7 @@ void main() {
         main() => getObjectWrong();
       ''';
       expect(
-          () => interpreter.execute(source),
+          () => execute(source),
           throwsRuntimeError(contains(
               "A value of type 'Null' can't be returned from the function 'getObjectWrong' because it has a return type of 'Object'.")));
     });
@@ -3399,6 +3401,7 @@ void main() {
     test('Correct return type (Bridged type)', () {
       // Requires DummyNative and its bridge definition
       final source = '''
+        import 'package:test/dummy.dart';
          Dummy getDummy() {
            return Dummy();
          }
@@ -3407,30 +3410,33 @@ void main() {
            return d.nativeMethod(); // Call method to ensure it's the right type
          }
        ''';
-      expect(interpreter.execute(source), equals('DummyNative method result'));
+      expect(interpreter.execute(source: source),
+          equals('DummyNative method result'));
     });
 
     test('Incorrect return type (int for Bridged type)', () {
       final source = '''
+        import 'package:test/dummy.dart';
          Dummy getDummyWrong() {
            return 123; // Error
          }
          main() => getDummyWrong();
        ''';
       expect(
-          () => interpreter.execute(source),
+          () => interpreter.execute(source: source),
           throwsRuntimeError(contains(
               "A value of type 'int' can't be returned from the function 'getDummyWrong' because it has a return type of 'Dummy'.")));
     });
 
     test('Correct return type (null for Bridged type nullable)', () {
       final source = '''
+        import 'package:test/dummy.dart';
          Dummy? getNullableDummy() {
            return null;
          }
          main() => getNullableDummy();
        ''';
-      expect(interpreter.execute(source), isNull);
+      expect(interpreter.execute(source: source), isNull);
     });
   });
 }

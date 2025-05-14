@@ -1,4 +1,4 @@
-import 'package:d4rt/src/environment.dart';
+import 'package:d4rt/d4rt.dart';
 import 'package:d4rt/src/stdlib/core/double.dart';
 import 'package:d4rt/src/stdlib/core/exceptions.dart';
 import 'package:d4rt/src/stdlib/core/int.dart';
@@ -72,4 +72,25 @@ void registerCoreLibs(Environment environment) {
   FunctionCore().setEnvironment(environment);
   FormatExceptionCore().setEnvironment(environment);
   ExceptionCore().setEnvironment(environment);
+  environment.define(
+      'Object',
+      NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+        return Object;
+      }, arity: 0, name: 'Object'));
+  environment.define(
+      'Null',
+      NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+        return Null;
+      }, arity: 0, name: 'Null'));
+  environment.define(
+      'dynamic',
+      NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+        return dynamic;
+      }, arity: 0, name: 'dynamic'));
+  environment.define(
+      'print',
+      NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+        print(arguments[0]);
+        return null;
+      }, arity: 1, name: 'print'));
 }

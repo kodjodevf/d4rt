@@ -6,6 +6,7 @@ void main() {
   group('FileSystemEntity methods - comprehensive', () {
     test('existsSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -20,6 +21,7 @@ void main() {
 
     test('deleteSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -32,6 +34,7 @@ void main() {
 
     test('renameSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -46,6 +49,7 @@ void main() {
 
     test('absolute', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -59,6 +63,7 @@ void main() {
 
     test('parent', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -73,6 +78,7 @@ void main() {
 
     test('statSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");
@@ -86,6 +92,7 @@ void main() {
 
     test('resolveSymbolicLinksSync', () {
       const source = '''
+     import 'dart:io';
      main() {
         File file = File(Directory.systemTemp.path + "/test.txt");
         file.writeAsStringSync("Hello, world!");

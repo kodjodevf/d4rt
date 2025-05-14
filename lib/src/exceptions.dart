@@ -31,6 +31,17 @@ class ContinueException implements Exception {
   String toString() => 'ContinueException(label: $label)';
 }
 
+/// Exception thrown when there's an issue with the source code itself,
+/// like parsing errors or missing files.
+class SourceCodeException implements Exception {
+  final String message;
+
+  SourceCodeException(this.message);
+
+  @override
+  String toString() => 'SourceCodeException: $message';
+}
+
 // This helps us distinguish between 'throw x' user exceptions and internal interpreter errors
 // or control flow exceptions like Return/Break/Continue.
 class InternalInterpreterException implements Exception {
@@ -46,4 +57,13 @@ class InternalInterpreterException implements Exception {
     // but primarily used internally.
     return 'InternalInterpreterException(originalThrownValue: $originalThrownValue)';
   }
+}
+
+/// Exception specifically for pattern matching failures.
+class PatternMatchException implements Exception {
+  final String message;
+  PatternMatchException(this.message);
+
+  @override
+  String toString() => "PatternMatchException: $message";
 }

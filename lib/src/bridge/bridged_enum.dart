@@ -1,4 +1,5 @@
 import 'package:d4rt/d4rt.dart';
+import 'package:d4rt/src/module_loader.dart';
 
 /// Represents an enum type defined in the host Dart environment and bridged into the interpreter.
 /// It holds the definition and provides access to its values.
@@ -106,8 +107,12 @@ class BridgedEnumValue implements RuntimeValue {
             try {
               // Try to call the toString adapter (which should not need args)
               return methodAdapter(
-                  InterpreterVisitor(globalEnvironment: Environment()),
-                  nativeValue, [], {});
+                  InterpreterVisitor(
+                      globalEnvironment: Environment(),
+                      moduleLoader: ModuleLoader(Environment(), {}, [], [])),
+                  nativeValue,
+                  [],
+                  {});
             } catch (_) {
               // Fallback if the adapter does not exist or fails
               return '${enumType.name}.$name';
@@ -169,8 +174,12 @@ class BridgedEnumValue implements RuntimeValue {
       try {
         // Call without specific visitor or argument here, as it's just for representation
         return toStringAdapter(
-            InterpreterVisitor(globalEnvironment: Environment()),
-            nativeValue, [], {}).toString();
+            InterpreterVisitor(
+                globalEnvironment: Environment(),
+                moduleLoader: ModuleLoader(Environment(), {}, [], [])),
+            nativeValue,
+            [],
+            {}).toString();
       } catch (_) {
         // Fallback if the adapter fails
         return '${enumType.name}.$name (native toString failed)';

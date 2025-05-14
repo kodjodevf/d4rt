@@ -6,6 +6,7 @@ void main() {
   group('MathCore tests', () {
     test('Math constants', () {
       const source = '''
+      import 'dart:math';
       main() {
         return [pi, e, sqrt2, sqrt1_2];
       }
@@ -19,6 +20,7 @@ void main() {
 
     test('Math functions', () {
       const source = '''
+      import 'dart:math';
       main() {
         return [
           cos(0),
@@ -49,6 +51,7 @@ void main() {
   group('PointCore tests', () {
     test('Point properties and methods', () {
       const source = '''
+      import 'dart:math';
       main() {
         Point p = Point(3, 4);
         return [p.x, p.y, p.magnitude, p.distanceTo(Point(0, 0))];
@@ -61,6 +64,7 @@ void main() {
   group('RectangleCore tests', () {
     test('Rectangle properties and methods', () {
       const source = '''
+      import 'dart:math';
       main() {
         Rectangle r = Rectangle(0, 0, 10, 20);
         Rectangle intersection = r.intersection(Rectangle(5, 5, 10, 10));
@@ -98,6 +102,7 @@ void main() {
   group('RandomCore tests', () {
     test('Random methods', () {
       const source = '''
+      import 'dart:math';
       main() {
         Random random = Random(42);
         return [random.nextInt(100), random.nextDouble(), random.nextBool()];

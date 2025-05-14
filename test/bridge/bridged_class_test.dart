@@ -2,17 +2,17 @@ import 'package:d4rt/src/utils/extensions/interpreted_instance.dart';
 import 'package:test/test.dart';
 import 'package:d4rt/d4rt.dart';
 
-// 1. Classe Native pour les tests
+// 1. Class Native for tests
 class NativeCounter {
   static int _staticCounter = 0;
   int _value;
   final String id;
   bool _isDisposed = false; // Pour tester les méthodes sur état détruit
 
-  // Constructeur par défaut
+  // Default constructor
   NativeCounter(this._value, [this.id = 'default']);
 
-  // Constructeur nommé
+  // Named constructor
   NativeCounter.withId(this.id, {int initialValue = 0}) : _value = initialValue;
 
   // ignore: unnecessary_getters_setters
@@ -47,20 +47,20 @@ class NativeCounter {
     _value += amount;
   }
 
-  // Méthode pour tester les arguments
+  // Method to test arguments
   int add(int otherValue, {InterpretedInstance? instance}) {
     if (_isDisposed) throw StateError('Instance disposed');
     final result = _value + otherValue;
     return result;
   }
 
-  // Méthode pour tester le passage d'instance pontée
+  // Method to test passing a bridged instance
   bool isSame(NativeCounter other) {
     if (_isDisposed) throw StateError('Instance disposed');
     return id == other.id && _value == other._value;
   }
 
-  // Méthode pour simuler la libération de ressources
+  // Method to simulate resource disposal
   void dispose() {
     _isDisposed = true;
   }
@@ -110,66 +110,66 @@ void main() {
     setUp(() {
       interpreter = D4rt();
 
-      // Réinitialiser le compteur statique avant chaque test
+      // Reset the static counter before each test
       NativeCounter._staticCounter = 0;
 
-      // 2. Définition de la classe pontée pour NativeCounter
+      // 2. Definition of the bridged class for NativeCounter
       final counterDefinition = BridgedClassDefinition(
         nativeType: NativeCounter,
-        name: 'Counter', // Nom dans l'interpréteur
+        name: 'Counter', // Name in the interpreter
         constructors: {
-          // Constructeur par défaut: Counter(value, [id])
+          // Default constructor: Counter(value, [id])
           '': (InterpreterVisitor visitor, List<Object?> positionalArgs,
               Map<String, Object?> namedArgs) {
-            // Vérifier le nombre d'arguments
+            // Check the number of arguments
             if (positionalArgs.isEmpty || positionalArgs.length > 2) {
               throw ArgumentError(
                   'Default constructor requires 1 or 2 positional arguments, got ${positionalArgs.length}');
             }
-            // Vérifier le type du premier argument (value)
+            // Check the type of the first argument (value)
             if (positionalArgs[0] is! int) {
               throw ArgumentError(
                   'Default constructor first argument (value) must be an integer, got ${positionalArgs[0]?.runtimeType}');
             }
             final value = positionalArgs[0] as int;
 
-            // Gérer l'argument optionnel (id)
+            // Handle the optional argument (id)
             String id = 'default';
             if (positionalArgs.length > 1) {
-              // Vérifier que l'argument est bien un String ou null
+              // Check that the argument is a String or null
               if (positionalArgs[1] != null && positionalArgs[1] is! String) {
                 throw ArgumentError(
                     'Default constructor second argument (id) must be a string or null, got ${positionalArgs[1]?.runtimeType}');
               }
-              // Assigner si non null, sinon garder 'default'
+              // Assign if not null, otherwise keep 'default'
               if (positionalArgs[1] != null) {
                 id = positionalArgs[1] as String;
               }
             }
-            // Appeler le constructeur natif
+            // Call the native constructor
             return NativeCounter(value, id);
           },
-          // Constructeur nommé: Counter.withId(id, initialValue: 0)
+          // Named constructor: Counter.withId(id, initialValue: 0)
           'withId': (InterpreterVisitor visitor, List<Object?> positionalArgs,
               Map<String, Object?> namedArgs) {
-            // Vérifier l'argument positionnel (id)
+            // Check the positional argument (id)
             if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
               throw ArgumentError(
                   'Named constructor \'withId\' expects exactly 1 positional string argument (id), got ${positionalArgs.isNotEmpty ? positionalArgs[0]?.runtimeType : 'none'}');
             }
             final id = positionalArgs[0] as String;
 
-            // Vérifier l'argument nommé optionnel (initialValue)
+            // Check the optional named argument (initialValue)
             int initialValue = 0;
             if (namedArgs.containsKey('initialValue')) {
               if (namedArgs['initialValue'] is! int?) {
                 throw ArgumentError(
                     'Named argument \'initialValue\' for constructor \'withId\' must be an int?, got ${namedArgs['initialValue']?.runtimeType}');
               }
-              // Accepter null comme initialValue et le traiter comme 0
+              // Accept null as initialValue and treat it as 0
               initialValue = namedArgs['initialValue'] as int? ?? 0;
             }
-            // Appeler le constructeur natif nommé
+            // Call the native named constructor
             return NativeCounter.withId(id, initialValue: initialValue);
           }
         },
@@ -304,15 +304,16 @@ void main() {
         },
       );
 
-      // Enregistrer la classe pontée
-      interpreter.registerBridgedClass(counterDefinition);
+      // Register the bridged class
+      interpreter.registerBridgedClass(
+          counterDefinition, 'package:test/counter.dart');
 
-      // 3. Définition du pont pour AsyncProcessor
+      // 3. Definition of the bridge for AsyncProcessor
       final asyncProcessorDefinition = BridgedClassDefinition(
         nativeType: AsyncProcessor,
-        name: 'AsyncProcessor', // Nom dans l'interpréteur
+        name: 'AsyncProcessor', // Name in the interpreter
         constructors: {
-          // Constructeur: AsyncProcessor(id)
+          // Constructor: AsyncProcessor(id)
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 && positionalArgs[0] is String) {
               return AsyncProcessor(positionalArgs[0] as String);
@@ -328,7 +329,7 @@ void main() {
                 positionalArgs.length == 2 &&
                 positionalArgs[0] is String &&
                 positionalArgs[1] is Duration) {
-              // Assumons que Duration est ponté ou natif
+              // Assume that Duration is bridged or native
               return target.delayedSuccess(
                   positionalArgs[0] as String, positionalArgs[1] as Duration);
             }
@@ -356,8 +357,8 @@ void main() {
                 positionalArgs.length == 2 &&
                 positionalArgs[0] is int &&
                 positionalArgs[1] is String) {
-              // L'adaptateur retourne directement le Future<NativeCounter>.
-              // L'interpréteur devra gérer l'attente et le pontage du résultat NativeCounter.
+              // The adapter returns directly the Future<NativeCounter>.
+              // The interpreter will handle the waiting and bridging of the NativeCounter result.
               return target
                   .createCounterAsync(
                       positionalArgs[0] as int, positionalArgs[1] as String)
@@ -367,7 +368,7 @@ void main() {
             }
             throw ArgumentError('Invalid arguments for createCounterAsync');
           },
-          // processor.alwaysFail(message) -> Future<String> (qui échoue)
+          // processor.alwaysFail(message) -> Future<String> (which fails)
           'alwaysFail': (visitor, target, positionalArgs, namedArgs) {
             if (target is AsyncProcessor &&
                 positionalArgs.length == 1 &&
@@ -382,14 +383,14 @@ void main() {
                 positionalArgs.length == 2 &&
                 positionalArgs[0] is int &&
                 positionalArgs[1] is String) {
-              // Appelle la méthode native synchrone
+              // Call the native synchronous method
               return target.createCounterSync(
                   positionalArgs[0] as int, positionalArgs[1] as String);
             }
             throw ArgumentError('Invalid arguments for createCounterSync');
           }
         },
-        // Pas de membres statiques ou de getters/setters pour cet exemple
+        // No static members or getters/setters for this example
         staticGetters: {},
         staticSetters: {},
         staticMethods: {},
@@ -397,66 +398,73 @@ void main() {
         setters: {},
       );
 
-      // Enregistrer AsyncProcessor
-      interpreter.registerBridgedClass(asyncProcessorDefinition);
+      // Register AsyncProcessor
+      interpreter.registerBridgedClass(
+          asyncProcessorDefinition, 'package:test/async_processor.dart');
     });
 
     test('Call default constructor', () {
       final code = '''
+        import 'package:test/counter.dart';
         main() {
           var c = Counter(10);
           return c.value;
         }
       ''';
-      expect(interpreter.execute(code), equals(10));
+      expect(interpreter.execute(source: code), equals(10));
     });
 
     test('Call default constructor with optional ID', () {
       final code = '''
+        import 'package:test/counter.dart';
         main() {
           var c = Counter(20, 'my-counter');
           return c.id;
         }
       ''';
-      expect(interpreter.execute(code), equals('my-counter'));
+      expect(interpreter.execute(source: code), equals('my-counter'));
     });
 
     test('Call named constructor', () {
       final code = '''
+        import 'package:test/counter.dart';
         main() {
           var c = Counter.withId('specific-id');
           return [c.id, c.value];
         }
       ''';
-      expect(interpreter.execute(code), equals(['specific-id', 0]));
+      expect(interpreter.execute(source: code), equals(['specific-id', 0]));
     });
 
     test('Call named constructor with named argument', () {
       final code = '''
+        import 'package:test/counter.dart';
         main() {
           var c = Counter.withId('other-id', initialValue: 55);
            return [c.id, c.value];
         }
       ''';
-      expect(interpreter.execute(code), equals(['other-id', 55]));
+      expect(interpreter.execute(source: code), equals(['other-id', 55]));
     });
 
     test('Access static getter', () {
       NativeCounter.staticValue = 99; // Set native value directly
       final code = '''
+        import 'package:test/counter.dart';
         main() { return Counter.staticValue; }
       ''';
-      expect(interpreter.execute(code), equals(99));
+      expect(interpreter.execute(source: code), equals(99));
     });
 
     test('Use static setter', () {
       final code = '''
+        import 'package:test/counter.dart';
         main() {
            Counter.staticValue = 123;
            return Counter.staticValue;
          }
       ''';
-      expect(interpreter.execute(code), equals(123));
+      expect(interpreter.execute(source: code), equals(123));
       expect(
           NativeCounter.staticValue, equals(123)); // Verify native side effect
     });
@@ -464,51 +472,56 @@ void main() {
     test('Call static method', () {
       NativeCounter.staticValue = 0; // Reset static counter
       final code = '''
+        import 'package:test/counter.dart';
         main() {
           var r1 = Counter.staticMethod('prefix1');
           var r2 = Counter.staticMethod('prefix2');
           return [r1, r2, Counter.staticValue];
         }
       ''';
-      expect(interpreter.execute(code),
+      expect(interpreter.execute(source: code),
           equals(['prefix1:static:1', 'prefix2:static:2', 2]));
     });
 
     test('Access instance getter', () {
       final code = '''
+        import 'package:test/counter.dart';
         main() {
           var c = Counter(7, 'getter-test');
           return [c.value, c.id, c.description];
         }
       ''';
-      expect(interpreter.execute(code),
+      expect(interpreter.execute(source: code),
           equals([7, 'getter-test', 'Counter(getter-test):7']));
     });
 
     test('Use instance setter', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(5);
            c.value = 25;
            return c.value;
          }
        ''';
-      expect(interpreter.execute(code), equals(25));
+      expect(interpreter.execute(source: code), equals(25));
     });
 
     test('Call instance method (no args)', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(100);
            c.increment();
            return c.value;
          }
        ''';
-      expect(interpreter.execute(code), equals(101));
+      expect(interpreter.execute(source: code), equals(101));
     });
 
     test('Call instance method (with args)', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(10);
            c.increment(5);
@@ -516,11 +529,12 @@ void main() {
            return [c.value, sum];
          }
        ''';
-      expect(interpreter.execute(code), equals([15, 18]));
+      expect(interpreter.execute(source: code), equals([15, 18]));
     });
 
     test('Pass bridged instance as argument', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c1 = Counter(50, 'ID-A');
            var c2 = Counter(50, 'ID-A');
@@ -529,13 +543,16 @@ void main() {
            return [c1.isSame(c2), c1.isSame(c3), c1.isSame(c4)];
          }
        ''';
-      expect(interpreter.execute(code), equals([true, false, false]));
+      expect(interpreter.execute(source: code), equals([true, false, false]));
     });
 
     test('Error: Call non-existent constructor', () {
-      final code = "main() { return Counter.nonExistent(); }";
+      final code = '''
+        import 'package:test/counter.dart';
+        main() { return Counter.nonExistent(); }
+      ''';
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having(
               (e) => e.message,
               'message',
@@ -544,9 +561,12 @@ void main() {
     });
 
     test('Error: Call default constructor with wrong arg type', () {
-      final code = "main() { return Counter('wrong'); }"; // Expects int
+      final code = '''
+        import 'package:test/counter.dart';
+        main() { return Counter('wrong'); }
+      '''; // Expects int
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having(
               (e) => e.message,
               'message',
@@ -555,25 +575,34 @@ void main() {
     });
 
     test('Error: Call named constructor with wrong arg type', () {
-      final code = "main() { return Counter.withId(123); }"; // Expects String
+      final code = '''
+        import 'package:test/counter.dart';
+        main() { return Counter.withId(123); }
+      '''; // Expects String
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
               contains("Native error during bridged constructor"))));
     });
 
     test('Error: Access non-existent static member', () {
-      final code = "main() { return Counter.nonExistentStatic; }";
+      final code = '''
+        import 'package:test/counter.dart';
+        main() { return Counter.nonExistentStatic; }
+      ''';
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
               contains("Undefined static member 'nonExistentStatic'"))));
     });
 
     test('Error: Call non-existent static method', () {
-      final code = "main() { return Counter.nonExistentStaticMethod(); }";
+      final code = '''
+        import 'package:test/counter.dart';
+        main() { return Counter.nonExistentStaticMethod(); }
+      ''';
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having(
               (e) => e.message,
               'message',
@@ -583,6 +612,7 @@ void main() {
 
     test('Error: Access non-existent instance member', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(1);
            return c.nonExistentMember;
@@ -590,7 +620,7 @@ void main() {
        ''';
       // This error comes from the fallback mechanism after bridge check fails
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having(
               (e) => e.message,
               'message',
@@ -600,13 +630,14 @@ void main() {
 
     test('Error: Call non-existent instance method', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(1);
            return c.nonExistentMethod();
          }
        ''';
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having(
               (e) => e.message,
               'message',
@@ -616,19 +647,21 @@ void main() {
 
     test('Error: Call instance method with wrong args', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(1);
            return c.add('wrong'); // Expects int
          }
        ''';
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
               contains("Native error during bridged method call 'add'"))));
     });
 
     test('Error: Call method on disposed instance', () {
       final code = '''
+        import 'package:test/counter.dart';
          main() {
            var c = Counter(1);
            c.dispose();
@@ -636,26 +669,27 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(code),
+          () => interpreter.execute(source: code),
           throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
               contains("Unexpected error: Bad state: Instance disposed"))));
     });
 
     test('Dart class inheriting from bridged class', () {
       final source = '''
+        import 'package:test/counter.dart';
         class Employee extends Counter {
           String department;
 
-          // Constructeur appelant super() par défaut
+          // Constructor calling super() by default
           Employee(int initialValue, String id, this.department)
-              : super(initialValue, id); // Appelle Counter(value, id)
+              : super(initialValue, id); // Calls Counter(value, id)
 
-          // Constructeur appelant super.withId()
+          // Constructor calling super.withId()
           Employee.withIdDept(String id, this.department, {int initialValue = 5})
-              : super.withId(id, initialValue: initialValue); // Appelle Counter.withId(id, initialValue: x)
+              : super.withId(id, initialValue: initialValue); // Calls Counter.withId(id, initialValue: x)
 
           String getEmployeeInfo() {
-            // Accès à 'id' et 'value' (hérités) et 'department' (dérivé)
+            // Access to 'id' and 'value' (inherited) and 'department' (derived)
             return "Employee \$id in \$department, value: \$value";
           }
         }
@@ -664,14 +698,14 @@ void main() {
          final emp1 = Employee(10, 'emp1', 'Sales');
         final emp2 = Employee.withIdDept('emp2', 'Tech', initialValue: 25);
 
-        emp1.increment(); // Méthode héritée
-        final emp1Value = emp1.value; // Getter hérité
-        final emp1Info = emp1.getEmployeeInfo(); // Méthode dérivée
+        emp1.increment(); // Inherited method
+        final emp1Value = emp1.value; // Inherited getter
+        final emp1Info = emp1.getEmployeeInfo(); // Derived method
 
         final emp2Value = emp2.value;
         final emp2Info = emp2.getEmployeeInfo();
 
-        // Retourner les résultats pour vérification
+        // Return the results for verification
         return {
           'emp1_id': emp1.id,
           'emp1_value_after_inc': emp1Value,
@@ -685,9 +719,9 @@ void main() {
         }
       ''';
 
-      final result = interpreter.execute(source);
+      final result = interpreter.execute(source: source);
 
-      // Vérifications
+      // Verifications
       expect(result, isNotNull);
       final resultMap = result as Map;
 
@@ -705,48 +739,49 @@ void main() {
 
     test('Await bridged method returning Future<String>', () async {
       final code = '''
-        import 'dart:async'; // Import nécessaire pour Duration
-
+        import 'package:test/async_processor.dart';
         main() async {
           final processor = AsyncProcessor('p1');
           final result = await processor.delayedSuccess('hello', Duration(milliseconds: 20));
           return result;
         }
       ''';
-      // Utiliser execute pour les fonctions main async
-      final result = await interpreter.execute(code);
+      // Use execute for async main functions
+      final result = await interpreter.execute(source: code);
       expect(result, equals('Processed (p1): hello'));
     });
 
     test('Await bridged method returning Future<int> with args', () async {
       final code = '''
+        import 'package:test/async_processor.dart';
         main() async {
           final processor = AsyncProcessor('p2');
           final value = await processor.calculateAsync(15);
           return value;
         }
       ''';
-      final result = await interpreter.execute(code);
+      final result = await interpreter.execute(source: code);
       expect(result, equals(30));
     });
 
     test('Await bridged method returning Future', () async {
       final code = '''
+        import 'package:test/async_processor.dart';
         main() async {
           final processor = AsyncProcessor('p3');
           await processor.doSomethingAsync();
           return 'done'; // Retourne quelque chose pour vérifier que l'await a terminé
         }
       ''';
-      final result = await interpreter.execute(code);
+      final result = await interpreter.execute(source: code);
       expect(result, equals('done'));
-      // On peut aussi vérifier les logs de la console si nécessaire
+      // We can also check the console logs if necessary
     });
 
     test('Await bridged method returning Future<BridgedInstance>', () async {
       final code = '''
-         import 'dart:async';
-
+        import 'package:test/async_processor.dart';
+        import 'package:test/counter.dart';
          main() async {
            final processor = AsyncProcessor('p4');
            // Attend que le Future<NativeCounter> se résolve.
@@ -758,12 +793,13 @@ void main() {
            return val;
          }
        ''';
-      final result = await interpreter.execute(code);
+      final result = await interpreter.execute(source: code);
       expect(result, equals(105));
     });
 
     test('Try/catch await on bridged method returning Future.error', () async {
       final code = '''
+        import 'package:test/async_processor.dart';
          main() async {
            final processor = AsyncProcessor('p5');
            String errorMessage = 'initial';
@@ -777,7 +813,7 @@ void main() {
            return errorMessage;
          }
        ''';
-      final result = await interpreter.execute(code);
+      final result = await interpreter.execute(source: code);
       expect(
           result,
           contains(
@@ -786,6 +822,8 @@ void main() {
 
     test('Sync bridged method returning BridgedInstance', () {
       final source = '''
+        import 'package:test/async_processor.dart';
+        import 'package:test/counter.dart';
          main() {
            final processor = AsyncProcessor('p-sync');
            // Appelle la méthode sync. On s'attend à ce que le résultat soit
@@ -798,14 +836,15 @@ void main() {
            return val; // Doit être 200 + 10 = 210
          }
        ''';
-      // Fin de la chaîne multi-lignes
-      // Utiliser execute (synchrone)
-      final result = interpreter.execute(source);
+      // End of multi-line string
+      // Use execute (synchronous)
+      final result = interpreter.execute(source: source);
       expect(result, equals(210));
     });
 
     test('Override bridged class methods', () {
       final source = '''
+        import 'package:test/counter.dart';
         // Interpreted class that inherits from the native bridged class 'Counter'
         class OverridenCounter extends Counter {
 
@@ -848,7 +887,7 @@ void main() {
         }
       ''';
 
-      final result = interpreter.execute(source);
+      final result = interpreter.execute(source: source);
 
       // Check that the results match the overridden logic
       expect(result, equals([20, 50]));
@@ -856,59 +895,61 @@ void main() {
 
     test('Call native methods on extracted native object', () {
       final source = '''
-        // Classe interprétée héritant de classe pontée
+        import 'package:test/counter.dart';
+        // Interpreted class inheriting from the bridged class
         class OverridenCounter extends Counter {
           OverridenCounter(int initialValue, String id) : super(initialValue, id);
 
-          // Surcharge (ne sera PAS appelée par le test Dart natif)
+          // Overload (will NOT be called by the native Dart test)
           @override
           void increment([int amount = 1]) {
-            super.value = super.value + super.value * amount; // Logique différente
+            super.value = super.value + super.value * amount; // Different logic
           }
 
-          // Surcharge (ne sera PAS appelée par le test Dart natif)
+          // Overload (will NOT be called by the native Dart test)
           @override
           int add(int otherValue) {
-            return (super.value + otherValue) * 2; // Logique différente
+            return (super.value + otherValue) * 2; // Different logic
           }
         }
 
         main() {
-          // Retourne l'instance interprétée
+          // Return the interpreted instance
           return OverridenCounter(10, 'native-call-test');
         }
       ''';
 
-      // Exécuter le code interprété
-      final result = interpreter.execute(source);
+      // Execute the interpreted code
+      final result = interpreter.execute(source: source);
 
-      // Vérifier que le résultat est une instance interprétée
+      // Check that the result is an interpreted instance
       expect(result, isA<InterpretedInstance>());
       final interpretedInstance = result as InterpretedInstance;
 
-      // Vérifier que l'objet super ponté est bien un NativeCounter
+      // Check that the super bridged object is a NativeCounter
       expect(interpretedInstance.bridgedSuperObject, isA<NativeCounter>());
       final nativeCounter =
           interpretedInstance.bridgedSuperObject as NativeCounter;
 
-      // Appeler increment() DIRECTEMENT sur l'objet NATIVECOUNTER
+      // Call increment() DIRECTLY on the NativeCounter object
       nativeCounter
-          .increment(2); // Doit utiliser NativeCounter.increment: 10 + 2 = 12
+          .increment(2); // Must use NativeCounter.increment: 10 + 2 = 12
       expect(nativeCounter.value, equals(12),
           reason: 'Native increment(2) should result in 12');
 
-      // Appeler add() DIRECTEMENT sur l'objet NATIVECOUNTER
+      // Call add() DIRECTLY on the NativeCounter object
       final addResult =
-          nativeCounter.add(5); // Doit utiliser NativeCounter.add: 12 + 5 = 17
+          nativeCounter.add(5); // Must use NativeCounter.add: 12 + 5 = 17
       expect(addResult, equals(17),
           reason: 'Native add(5) should result in 17');
       expect(nativeCounter.value,
-          equals(12), // La valeur ne change pas avec add() natif
+          equals(12), // The value should not change with native add()
           reason: 'Value should still be 12 after native add()');
     });
 
     test('Invoke overridden methods via interpreter.invoke', () {
       final source = '''
+        import 'package:test/counter.dart';
         class OverridenCounter extends Counter {
           OverridenCounter(int initialValue, String id) : super(initialValue, id);
 
@@ -932,7 +973,7 @@ void main() {
       ''';
 
       // Get the interpreted instance
-      final result = interpreter.execute(source);
+      final result = interpreter.execute(source: source);
       expect(result, isA<InterpretedInstance>(),
           reason: 'Interpreter should return InterpretedInstance');
       final interpretedInstance = result as InterpretedInstance;
@@ -956,16 +997,16 @@ void main() {
       expect(valueAfterIncrement, equals(30),
           reason: 'Value should be 30 after overridden increment(2)');
 
-      // Appeler 'add(5)' via invoke - DOIT utiliser la surcharge
-      // Valeur courante = 30. Logique: (30 + 5) * 2 = 70
+      // Call 'add(5)' via invoke - MUST use the overload
+      // Current value = 30. Logic: (30 + 5) * 2 = 70
       final addResult = interpreter.invoke(
         'add',
-        [5], // Argument positionnel
+        [5], // Positional argument
       );
       expect(addResult, equals(70),
           reason: 'add(5) should return 70 based on overridden logic');
 
-      // Revérifier la valeur - elle ne devrait pas changer à cause de add()
+      // Re-check the value - it should not change due to add()
       final valueAfterAdd = interpreter.invoke(
         'value',
         [],
@@ -976,6 +1017,7 @@ void main() {
 
     test('invoke on simple interpreted instance method', () {
       final source = '''
+        import 'package:test/counter.dart';
         class Simple {
           String message = "initial";
           String doWork(String prefix) {
@@ -983,37 +1025,40 @@ void main() {
             return message;
           }
         }
-        main() => Simple(); // Retourne l'instance
+        main() => Simple(); // Returns the instance
       ''';
 
-      final instance = interpreter.execute(source) as InterpretedInstance;
+      final instance =
+          interpreter.execute(source: source) as InterpretedInstance;
       expect(instance, isNotNull);
 
       final result = interpreter.invoke('doWork', ['TestPrefix']);
       expect(result, equals('TestPrefix: worked'));
 
-      // Vérifier que l'état a été modifié
-      // (nécessite un getter ou un autre appel invoke)
-      // Ajoutons un getter pour vérifier
+      // Check that the state has been modified
+      // (requires a getter or another invoke call)
+      // Let's add a getter to verify
     });
 
     test('invoke on simple interpreted instance getter', () {
       final source = '''
+        import 'package:test/counter.dart';
         class Simple {
           String _data = "secret";
           String get data => _data;
           void setData(String val) { _data = val; }
         }
-        main() => Simple(); // Retourne l'instance
+        main() => Simple(); // Returns the instance
       ''';
-      final instance = interpreter.execute(source) as InterpretedInstance;
+      final instance =
+          interpreter.execute(source: source) as InterpretedInstance;
       expect(instance, isNotNull);
 
-      // Appeler le getter
+      // Call the getter
       var result = interpreter.invoke('data', []);
       expect(result, equals('secret'));
 
-      // Modifier la donnée via une méthode pour prouver que le getter lit l'état actuel
+      // Modify the data via a method to prove that the getter reads the current state
       interpreter.invoke('setData', ['new_value']);
       result = interpreter.invoke('data', []);
       expect(result, equals('new_value'));
@@ -1030,7 +1075,8 @@ void main() {
         }
         main() => Derived();
       ''';
-      final instance = interpreter.execute(source) as InterpretedInstance;
+      final instance =
+          interpreter.execute(source: source) as InterpretedInstance;
       expect(instance, isNotNull);
 
       final result = interpreter.invoke('work', ['data']);
@@ -1042,7 +1088,8 @@ void main() {
         class Empty {}
         main() => Empty();
       ''';
-      final instance = interpreter.execute(source) as InterpretedInstance;
+      final instance =
+          interpreter.execute(source: source) as InterpretedInstance;
       expect(instance, isNotNull);
 
       expect(
@@ -1058,6 +1105,7 @@ void main() {
     test('Invoke overridden methods on instance with extra field via invoke',
         () {
       final source = '''
+        import 'package:test/counter.dart';
         class OverridenCounter extends Counter {
           final String stock;
           // Constructor using the bridged constructor of the superclass
@@ -1090,41 +1138,42 @@ void main() {
         }
       ''';
 
-      interpreter.execute(source);
-      // final instance = interpreter.execute(source) as InterpretedInstance;
+      interpreter.execute(source: source);
+      // final instance = interpreter.execute(source: source) as InterpretedInstance;
 
-      // 1. Vérifier l'état initial (via invoke sur le getter 'value' de Counter)
+      // 1. Check the initial state (via invoke on the 'value' getter of Counter)
       var currentValue = interpreter.invoke('value', []);
       expect(currentValue, equals(10), reason: "Initial value should be 10");
 
-      // 2. Appeler 'increment' surchargé
-      // La logique est: super.value = super.value + super.value * amount
+      // 2. Call the overloaded 'increment'
+      // The logic is: super.value = super.value + super.value * amount
       // 10 + 10 * 2 = 30
       interpreter.invoke('increment', [2]);
       currentValue = interpreter.invoke('value', []);
       expect(currentValue, equals(30),
           reason: "Value should be 30 after overridden increment(2)");
 
-      // 3. Appeler 'add' surchargé
-      // La logique est: (super.value + otherValue) * 2
+      // 3. Call the overloaded 'add'
+      // The logic is: (super.value + otherValue) * 2
       // (30 + 5) * 2 = 70
       final addResult = interpreter.invoke('add', [5]);
       expect(addResult, equals(70),
           reason: "Result of overridden add(5) should be 70");
 
-      // Vérifier que 'value' n'a pas été modifié par 'add' (car add ne fait pas super.value = ...)
+      // Check that 'value' has not been modified by 'add' (since add does not do super.value = ...)
       currentValue = interpreter.invoke('value', []);
       expect(currentValue, equals(30),
           reason:
               "Value should still be 30 after add(), as add is non-mutating for value");
 
-      // 4. Vérifier l'accès au champ 'stock' via le getter 'myStock'
+      // 4. Check the access to the 'stock' field via the 'myStock' getter
       final stockValue = interpreter.invoke('myStock', []);
       expect(stockValue, equals('stockXYZ'),
           reason: "Stock value should be 'stockXYZ'");
     });
     test('Invoke static method on instance with extra field via invoke', () {
       final source = '''
+        import 'package:test/counter.dart';
         class OverridenCounter extends Counter {
           final String stock;
           OverridenCounter(int initialValue, String id, this.stock) : super(initialValue, id);
@@ -1139,7 +1188,7 @@ void main() {
         }
       ''';
 
-      expect(interpreter.execute(source), equals('test1'));
+      expect(interpreter.execute(source: source), equals('test1'));
     });
   });
 }

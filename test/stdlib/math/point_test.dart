@@ -5,6 +5,7 @@ void main() {
   group('PointCore tests', () {
     test('Point properties', () {
       const source = '''
+      import 'dart:math';
       main() {
         Point p = Point(3, 4);
         return [p.x, p.y, p.magnitude];
@@ -15,6 +16,7 @@ void main() {
 
     test('Point distanceTo', () {
       const source = '''
+      import 'dart:math';
       main() {
         Point p1 = Point(3, 4);
         Point p2 = Point(0, 0);
@@ -26,6 +28,7 @@ void main() {
 
     test('Point squaredDistanceTo', () {
       const source = '''
+      import 'dart:math';
       main() {
         Point p1 = Point(3, 4);
         Point p2 = Point(0, 0);
@@ -37,6 +40,7 @@ void main() {
 
     test('Point toString', () {
       const source = '''
+      import 'dart:math';
       main() {
         Point p = Point(3, 4);
         return p.toString();
@@ -47,6 +51,7 @@ void main() {
 
     test('Point equality and hashCode', () {
       const source = '''
+      import 'dart:math';
       main() {
         Point p1 = Point(3, 4);
         Point p2 = Point(3, 4);

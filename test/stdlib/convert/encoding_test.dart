@@ -5,6 +5,7 @@ void main() {
   group('Encoding tests', () {
     test('utf8 encode and decode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = utf8;
         String original = "Hello, UTF-8!";
@@ -23,6 +24,7 @@ void main() {
 
     test('ascii encode and decode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = ascii;
         String original = "Hello, ASCII!";
@@ -41,6 +43,7 @@ void main() {
 
     test('latin1 encode and decode', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = latin1;
         String original = "Hello, Latin1!";
@@ -59,6 +62,7 @@ void main() {
 
     test('utf8 decoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = utf8;
         return encoding.decoder.runtimeType.toString();
@@ -69,6 +73,7 @@ void main() {
 
     test('ascii decoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = ascii;
         return encoding.decoder.runtimeType.toString();
@@ -79,6 +84,7 @@ void main() {
 
     test('latin1 decoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = latin1;
         return encoding.decoder.runtimeType.toString();
@@ -89,6 +95,7 @@ void main() {
 
     test('utf8 encoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = utf8;
         return encoding.encoder.runtimeType.toString();
@@ -99,6 +106,7 @@ void main() {
 
     test('ascii encoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = ascii;
         return encoding.encoder.runtimeType.toString();
@@ -109,6 +117,7 @@ void main() {
 
     test('latin1 encoder', () {
       const source = '''
+      import 'dart:convert';
       main() {
         Encoding encoding = latin1;
         return encoding.encoder.runtimeType.toString();

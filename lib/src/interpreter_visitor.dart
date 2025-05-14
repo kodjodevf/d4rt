@@ -5,18 +5,33 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:d4rt/d4rt.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/extensions/string.dart';
+import 'package:d4rt/src/module_loader.dart';
 
 /// Main visitor that walks the AST and interprets the code.
 /// Uses a two-pass approach (DeclarationVisitor first).
 class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   Environment environment;
   final Environment globalEnvironment;
+  final ModuleLoader moduleLoader; // Field for ModuleLoader
   InterpretedFunction? currentFunction; // Track the function being executed
   AsyncExecutionState? currentAsyncState;
   Set<String> _currentStatementLabels = {};
 
-  InterpreterVisitor({required this.globalEnvironment})
-      : environment = globalEnvironment;
+  InterpreterVisitor({
+    required this.globalEnvironment,
+    required this.moduleLoader, // Accept ModuleLoader in the constructor
+    Uri? initiallibrary, // New: Optional URI for the initial source
+  }) : environment = globalEnvironment {
+    if (initiallibrary != null) {
+      // Sets the base URI in the ModuleLoader for the initial source code.
+      // This is crucial for resolving relative imports in this initial source code.
+      moduleLoader.currentlibrary = initiallibrary;
+      Logger.debug(
+          "[InterpreterVisitor] Initial source URI set in ModuleLoader to: $initiallibrary");
+    }
+    // Initialize currentAsyncState if it's null and we are in an async context implicitly
+    // This might be more complex depending on how top-level async calls are handled
+  }
 
   @override
   Object? visitCompilationUnit(CompilationUnit node) {
@@ -392,20 +407,45 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitPrefixedIdentifier(PrefixedIdentifier node) {
-    final prefix = node.prefix.accept<Object?>(this);
-    if (prefix is AsyncSuspensionRequest) {
+    final prefixValue = node.prefix.accept<Object?>(this);
+    if (prefixValue is AsyncSuspensionRequest) {
       // Propagate the suspension so that the state machine resumes this node after resolution
-      return prefix;
+      return prefixValue;
     }
     final memberName = node.identifier.name;
 
-    if (prefix is InterpretedClass) {
+    // Handle the case where the prefix is an environment (prefixed import)
+    if (prefixValue is Environment) {
+      Logger.debug(
+          "[PrefixedIdentifier] The prefix '${node.prefix.toSource()}' resolved to an Environment. Searching for '$memberName' in this environment.");
+      try {
+        // The call to get() on the prefixed environment could return a function (which must be called if it's a getter)
+        // or a direct value.
+        final member = prefixValue.get(memberName);
+        // If it's an InterpretedFunction and a getter, it must be called.
+        if (member is InterpretedFunction && member.isGetter) {
+          Logger.debug(
+              "[PrefixedIdentifier] Member '$memberName' is a getter. Calling...");
+          return member.call(this, [],
+              {}); // Call without 'this' because it's a prefixed import
+        }
+        Logger.debug(
+            "[PrefixedIdentifier] Member '$memberName' found directly: $member");
+        return member; // Return the value/function directly
+      } on RuntimeError catch (e) {
+        throw RuntimeError(
+            "Erreur lors de la récupération du membre '$memberName' de l'import préfixé '${node.prefix.toSource()}': ${e.message}");
+      }
+    }
+
+    if (prefixValue is InterpretedClass) {
       // Static access
       try {
-        return prefix.getStaticField(memberName);
+        return prefixValue.getStaticField(memberName);
       } on RuntimeError catch (_) {
-        InterpretedFunction? staticMember = prefix.findStaticGetter(memberName);
-        staticMember ??= prefix.findStaticMethod(memberName);
+        InterpretedFunction? staticMember =
+            prefixValue.findStaticGetter(memberName);
+        staticMember ??= prefixValue.findStaticMethod(memberName);
         if (staticMember != null) {
           if (staticMember.isGetter) {
             return staticMember.call(this, [], {});
@@ -414,27 +454,27 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
         } else {
           throw RuntimeError(
-              "Undefined static member '$memberName' on class '${prefix.name}'.");
+              "Undefined static member '$memberName' on class '${prefixValue.name}'.");
         }
       }
-    } else if (prefix is InterpretedEnum) {
+    } else if (prefixValue is InterpretedEnum) {
       if (memberName == 'values') {
         Logger.debug(
-            "[PrefixedIdentifier] Accessing static getter 'values' on enum '${prefix.name}'.");
-        return prefix.valuesList;
+            "[PrefixedIdentifier] Accessing static getter 'values' on enum '${prefixValue.name}'.");
+        return prefixValue.valuesList;
       } else {
-        final value = prefix.values[memberName];
+        final value = prefixValue.values[memberName];
         if (value != null) {
           Logger.debug(
-              "[PrefixedIdentifier] Accessing static value '$memberName' on enum '${prefix.name}'.");
+              "[PrefixedIdentifier] Accessing static value '$memberName' on enum '${prefixValue.name}'.");
           return value;
         } else {
           throw RuntimeError(
-              "Undefined static value '$memberName' on enum '${prefix.name}'. Available: ${prefix.valueNames.join(', ')}");
+              "Undefined static value '$memberName' on enum '${prefixValue.name}'. Available: ${prefixValue.valueNames.join(', ')}");
         }
       }
-    } else if (prefix is BridgedClass) {
-      final bridgedClass = prefix;
+    } else if (prefixValue is BridgedClass) {
+      final bridgedClass = prefixValue;
       Logger.debug(
           "[PrefixedIdentifier] Static access on BridgedClass: ${bridgedClass.name}.$memberName");
       final staticGetter = bridgedClass.findStaticGetterAdapter(memberName);
@@ -449,9 +489,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         throw RuntimeError(
             "Undefined static member '$memberName' on bridged class '${bridgedClass.name}'.");
       }
-    } else if (prefix is InterpretedInstance) {
+    } else if (prefixValue is InterpretedInstance) {
       try {
-        final member = prefix.get(memberName);
+        final member = prefixValue.get(memberName);
         if (member is InterpretedFunction && member.isGetter) {
           return member.call(this, [], {});
         } else {
@@ -460,10 +500,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       } on RuntimeError catch (e) {
         if (e.message.contains("Undefined property '$memberName'")) {
           final extensionMember =
-              environment.findExtensionMember(prefix, memberName);
+              environment.findExtensionMember(prefixValue, memberName);
           if (extensionMember is InterpretedExtensionMethod) {
             if (extensionMember.isGetter) {
-              return extensionMember.call(this, [prefix], {});
+              return extensionMember.call(this, [prefixValue], {});
             } else if (!extensionMember.isOperator &&
                 !extensionMember.isSetter) {
               return extensionMember;
@@ -473,43 +513,43 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         throw RuntimeError(
             "${e.message} (accessing property via PrefixedIdentifier '$memberName')");
       }
-    } else if (prefix is InterpretedEnumValue) {
+    } else if (prefixValue is InterpretedEnumValue) {
       if (memberName == 'index') {
         Logger.debug(
-            "[PrefixedIdentifier] Accessing getter 'index' on enum value '$prefix'.");
-        return prefix.index;
+            "[PrefixedIdentifier] Accessing getter 'index' on enum value '$prefixValue'.");
+        return prefixValue.index;
       } else if (memberName == 'toString') {
         Logger.debug(
-            "[PrefixedIdentifier] Accessing method 'toString' on enum value '$prefix'. Returning callable.");
+            "[PrefixedIdentifier] Accessing method 'toString' on enum value '$prefixValue'. Returning callable.");
         // Return directly the string for simplicity in prefixed access?
         // No, return a callable function to be consistent with methods.
         return NativeFunction((_, args, __, ___) {
           if (args.isNotEmpty) {
             throw RuntimeError("toString() takes no arguments.");
           }
-          return prefix.toString();
+          return prefixValue.toString();
         }, arity: 0, name: 'toString');
       } else if (memberName == 'name') {
         Logger.debug(
-            "[PrefixedIdentifier] Explicitly accessing 'name' on enum value '$prefix'. Returning value.");
-        return prefix.name; // Access directly the 'name' property
+            "[PrefixedIdentifier] Explicitly accessing 'name' on enum value '$prefixValue'. Returning value.");
+        return prefixValue.name; // Access directly the 'name' property
       } else {
         Logger.debug(
-            "[PrefixedIdentifier] Accessing member '$memberName' on enum value '$prefix'. Calling get()...");
+            "[PrefixedIdentifier] Accessing member '$memberName' on enum value '$prefixValue'. Calling get()...");
         try {
           // Pass 'this' (the visitor) to allow getter execution if needed.
-          return prefix.get(memberName, this);
+          return prefixValue.get(memberName, this);
         } on ReturnException catch (e) {
           // If get() executes a getter that throws ReturnException
           return e.value;
         } catch (e) {
           // Propagate other errors from get()
           throw RuntimeError(
-              "Error getting member '$memberName' from enum value '$prefix': $e");
+              "Error getting member '$memberName' from enum value '$prefixValue': $e");
         }
       }
-    } else if (toBridgedInstance(prefix).$2) {
-      final bridgedInstance = toBridgedInstance(prefix).$1!;
+    } else if (toBridgedInstance(prefixValue).$2) {
+      final bridgedInstance = toBridgedInstance(prefixValue).$1!;
       final getterAdapter =
           bridgedInstance.bridgedClass.findInstanceGetterAdapter(memberName);
       if (getterAdapter != null) {
@@ -523,9 +563,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
       throw RuntimeError(
           "Undefined property or method '$memberName' on bridged instance of '${bridgedInstance.bridgedClass.name}'.");
-    } else if (prefix is InterpretedRecord) {
+    } else if (prefixValue is InterpretedRecord) {
       // Accessing field of a record
-      final record = prefix;
+      final record = prefixValue;
       Logger.debug(
           "[PrefixedIdentifier] Access on InterpretedRecord: .$memberName");
       // Check if it's a positional field access ($1, $2, ...)
@@ -552,18 +592,18 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "Record has no field named '$memberName'. Available fields: ${record.namedFields.keys.join(', ')}");
         }
       }
-    } else if (prefix is BridgedEnum) {
+    } else if (prefixValue is BridgedEnum) {
       Logger.debug(
-          "[PrefixedIdentifier] Accessing value on BridgedEnum: ${prefix.name}.$memberName");
-      final enumValue = prefix.getValue(memberName);
+          "[PrefixedIdentifier] Accessing value on BridgedEnum: ${prefixValue.name}.$memberName");
+      final enumValue = prefixValue.getValue(memberName);
       if (enumValue != null) {
         return enumValue; // Return the BridgedEnumValue
       } else {
         throw RuntimeError(
-            "Undefined enum value '$memberName' on bridged enum '${prefix.name}'.");
+            "Undefined enum value '$memberName' on bridged enum '${prefixValue.name}'.");
       }
-    } else if (prefix is BridgedEnumValue) {
-      final bridgedEnumValue = prefix;
+    } else if (prefixValue is BridgedEnumValue) {
+      final bridgedEnumValue = prefixValue;
       Logger.debug(
           "[PrefixedIdentifier] Accessing property '$memberName' on BridgedEnumValue (within InterpretedEnumValue block): $bridgedEnumValue");
       try {
@@ -584,14 +624,16 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     } else {
       try {
         final extensionMember =
-            environment.findExtensionMember(prefix, memberName);
+            environment.findExtensionMember(prefixValue, memberName);
 
         if (extensionMember is InterpretedExtensionMethod) {
           // Handle extension getter call immediately
           if (extensionMember.isGetter) {
             Logger.debug(
                 "[PrefixedIdentifier] Found extension getter '$memberName' (fallback). Calling...");
-            final extensionPositionalArgs = [prefix]; // Getter takes receiver
+            final extensionPositionalArgs = [
+              prefixValue
+            ]; // Getter takes receiver
             return extensionMember.call(this, extensionPositionalArgs, {});
           } else if (!extensionMember.isOperator && !extensionMember.isSetter) {
             // Return extension method itself if it's not a getter/setter/operator
@@ -614,9 +656,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // This will now only be reached if the prefix isn't a class, instance, enum, bridge, record,
       // AND no suitable extension getter/method was found.
       return Stdlib(environment).evalMethod(
-          prefix, memberName, [], {}, this, [],
+          prefixValue, memberName, [], {}, this, [],
           error:
-              "Cannot access property '$memberName' on target of type ${prefix?.runtimeType}.");
+              "Cannot access property '$memberName' on target of type ${prefixValue?.runtimeType}.");
     }
   }
 
@@ -1604,7 +1646,22 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       targetValue = node.target!.accept<Object?>(this);
       final methodName = node.methodName.name;
 
-      if (targetValue is InterpretedInstance) {
+      // BLOCK FOR HANDLING PREFIXED IMPORTS
+      if (targetValue is Environment) {
+        Logger.debug(
+            "[MethodInvocation] Target is an Environment (prefixed import '${node.target!.toSource()}'). Looking for method '$methodName' in this environment.");
+        try {
+          calleeValue = targetValue.get(methodName);
+          // The 'targetValue' for the call will be null because this is not an instance method on the environment itself,
+          // but a function retrieved from this environment.
+          // Functions obtained in this way are already "autonomous" or correctly bound if they come from classes.
+        } on RuntimeError catch (e) {
+          throw RuntimeError(
+              "Method '$methodName' not found in imported module '${node.target!.toSource()}'. Error: ${e.message}");
+        }
+        // calleeValue is now the function/method of the imported module.
+        // The call logic will be handled in the final visitMethodInvocation.
+      } else if (targetValue is InterpretedInstance) {
         // Instance method call
         try {
           // Get should return the BOUND method
@@ -3508,29 +3565,63 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     Object? returnValue;
     if (node.expression != null) {
-      // Ensure we explicitly specify the return type expected from accept
-      returnValue = node.expression!.accept<Object?>(this); // Re-add <Object?>
-      // If the expression resulted in a suspension, don't throw ReturnException yet.
-      // Let the caller (like runAsyncBody) handle the suspension.
+      returnValue = node.expression!.accept<Object?>(this);
       if (returnValue is AsyncSuspensionRequest) {
         return returnValue;
       }
     } else {
-      returnValue = null; // No expression means return null
+      returnValue = null;
     }
 
     if (eDecl != null && eDecl is FunctionDeclaration) {
       bool isNullable = false;
       final functionName = eDecl.name.lexeme;
+      RuntimeType? declaredType;
+      RuntimeType? valueRuntimeType;
+
       try {
         final currentCallable = environment.get(functionName);
 
-        RuntimeType? declaredType;
         if (currentCallable is InterpretedFunction) {
           declaredType = currentCallable.declaredReturnType;
           isNullable = currentCallable.isNullable;
         }
-        final valueRuntimeType = environment.getRuntimeType(returnValue);
+        valueRuntimeType = environment.getRuntimeType(returnValue);
+
+        String declaredTypeDetails = "N/A";
+        if (declaredType != null) {
+          declaredTypeDetails =
+              "Name: ${declaredType.name}, Hash: ${declaredType.hashCode}";
+          if (declaredType is BridgedClass) {
+            declaredTypeDetails +=
+                ", NativeType: ${declaredType.nativeType}, NativeHash: ${declaredType.nativeType.hashCode}";
+          }
+        }
+
+        String valueRuntimeTypeDetails = "N/A";
+        if (valueRuntimeType != null) {
+          valueRuntimeTypeDetails =
+              "Name: ${valueRuntimeType.name}, Hash: ${valueRuntimeType.hashCode}";
+          if (valueRuntimeType is BridgedClass) {
+            valueRuntimeTypeDetails +=
+                ", NativeType: ${valueRuntimeType.nativeType}, NativeHash: ${valueRuntimeType.nativeType.hashCode}";
+          }
+        }
+
+        Logger.debug("[visitReturnStatement] Function: '$functionName'");
+        Logger.debug(
+            "[visitReturnStatement]   Declared Type: $declaredTypeDetails");
+        Logger.debug(
+            "[visitReturnStatement]   Value Runtime Type: $valueRuntimeTypeDetails");
+        Logger.debug(
+            "[visitReturnStatement]   Return Value: $returnValue (Type: ${returnValue?.runtimeType})");
+        Logger.debug(
+            "[visitReturnStatement]   Is Declared Type Nullable: $isNullable");
+
+        if (declaredType != null && valueRuntimeType != null) {
+          Logger.debug(
+              "[visitReturnStatement]   declaredType.isSubtypeOf(valueRuntimeType) = ${declaredType.isSubtypeOf(valueRuntimeType)}");
+        }
 
         if (valueRuntimeType != null) {
           if (declaredType != null) {
@@ -3555,6 +3646,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
         }
       } catch (e) {
+        // Log before rethrow for more context in case of unexpected error here
+        Logger.error(
+            "[visitReturnStatement] Error during type check for function '$functionName': $e");
+        if (e is Error) {
+          Logger.error("Stack trace: ${e.stackTrace}");
+        }
         rethrow;
       }
     }
@@ -6252,13 +6349,84 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     return null; // The super() call itself doesn't return a value.
   }
-} // End of InterpreterVisitor class
-
-/// Exception specifically for pattern matching failures.
-class PatternMatchException implements Exception {
-  final String message;
-  PatternMatchException(this.message);
 
   @override
-  String toString() => "PatternMatchException: $message";
-}
+  Object? visitImportDirective(ImportDirective node) {
+    final importUriString = node.uri.stringValue;
+    if (importUriString == null) {
+      Logger.warn(
+          "[visitImportDirective] Import directive with null URI string.");
+      return null; // Return null if the URI is null
+    }
+
+    Logger.debug(
+        "[InterpreterVisitor.visitImportDirective] START processing import: $importUriString");
+
+    Uri resolvedUri;
+    final importUri = Uri.parse(importUriString);
+
+    if (importUri.isScheme('dart') || importUri.isScheme('package')) {
+      resolvedUri = importUri;
+      Logger.debug(
+          "[visitImportDirective] Using absolute/unresolvable URI: $resolvedUri");
+    } else {
+      final baseUri = moduleLoader.currentlibrary;
+      if (baseUri == null) {
+        throw RuntimeError(
+            "Unable to resolve relative import '$importUriString': Base URI not defined in ModuleLoader.");
+      }
+      Logger.debug(
+          "[visitImportDirective] Attempting to resolve relative URI '$importUriString' relative to '$baseUri'");
+      resolvedUri = baseUri.resolveUri(importUri);
+      Logger.debug(
+          "[visitImportDirective] Resolved relative URI: $resolvedUri");
+    }
+
+    final prefixIdentifier = node.prefix; // Get the prefix identifier
+    final prefixName = prefixIdentifier?.name;
+    Logger.debug(
+        "[visitImportDirective] Loading module for resolved URI: $resolvedUri (prefix: $prefixName)");
+
+    LoadedModule loadedModule = moduleLoader.loadModule(resolvedUri);
+
+    // Extract the show/hide combinators from the import directive
+    Set<String>? showNames;
+    Set<String>? hideNames;
+
+    for (final combinator in node.combinators) {
+      if (combinator is ShowCombinator) {
+        showNames ??= {};
+        showNames.addAll(combinator.shownNames.map((id) => id.name));
+        Logger.debug(
+            "[visitImportDirective] Combinator: show ${combinator.shownNames.map((id) => id.name).join(', ')}");
+      } else if (combinator is HideCombinator) {
+        hideNames ??= {};
+        hideNames.addAll(combinator.hiddenNames.map((id) => id.name));
+        Logger.debug(
+            "[visitImportDirective] Combinator: hide ${combinator.hiddenNames.map((id) => id.name).join(', ')}");
+      }
+    }
+
+    if (prefixName != null) {
+      Logger.debug(
+          "[visitImportDirective] Importation du module '${resolvedUri.toString()}' avec le préfixe '$prefixName'. Show: $showNames, Hide: $hideNames");
+
+      Environment envForPrefix;
+      if (showNames != null || hideNames != null) {
+        // Apply show/hide to the exported environment of the loaded module BEFORE defining it for the prefix
+        envForPrefix = loadedModule.exportedEnvironment
+            .shallowCopyFiltered(showNames: showNames, hideNames: hideNames);
+      } else {
+        envForPrefix = loadedModule.exportedEnvironment;
+      }
+      environment.definePrefixedImport(prefixName, envForPrefix);
+    } else {
+      Logger.debug(
+          "[visitImportDirective] Direct import of module '${resolvedUri.toString()}' into the current environment. Show: $showNames, Hide: $hideNames");
+      // Apply show/hide directly during import into the current environment
+      environment.importEnvironment(loadedModule.exportedEnvironment,
+          show: showNames, hide: hideNames);
+    }
+    return null; // Import directives do not produce a value.
+  }
+} // End of InterpreterVisitor class
