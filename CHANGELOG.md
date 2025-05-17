@@ -1,4 +1,5 @@
 ## 0.0.4
+- Add 'import/export' directive support, support for 'show' and 'hide' combinators 
 - add some dart:collection & dart:typed_data
 - support for ParenthesizedExpression property access in simpleIdentifier in async state
 
