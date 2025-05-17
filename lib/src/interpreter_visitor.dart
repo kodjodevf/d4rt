@@ -909,6 +909,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final index = node.index;
     final targetValue = target?.accept<Object?>(this);
     final indexValue = index.accept<Object?>(this);
+
+    if (targetValue is AsyncSuspensionRequest) return targetValue;
+    if (indexValue is AsyncSuspensionRequest) return indexValue;
+
     if (targetValue is Map) {
       return targetValue[indexValue];
     }
@@ -919,44 +923,62 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (indexValue < 0 || indexValue >= targetValue.length) {
           throw RuntimeError('Index out of range: $indexValue');
         }
-        return targetValue[indexValue]; // Access value by index in List
+        return targetValue[indexValue];
       } else {
         throw RuntimeError('List index must be an integer');
       }
-    } else {
-      const operatorName = '[]'; // Specific name for index-read operator
-      try {
-        final extensionOperator =
-            environment.findExtensionMember(targetValue, operatorName);
+    } else if (toBridgedInstance(targetValue).$2) {
+      final bridgedInstance = toBridgedInstance(targetValue).$1!;
+      final bridgedClass = bridgedInstance.bridgedClass;
+      final operatorName = '[]';
 
-        if (extensionOperator is InterpretedExtensionMethod &&
-            extensionOperator.isOperator) {
-          Logger.debug(
-              "[IndexExpression] Found extension operator '[]' for type ${targetValue?.runtimeType}. Calling...");
-          // Call the extension operator method
-          // Args: receiver (targetValue), index (indexValue)
-          final extensionPositionalArgs = [targetValue, indexValue];
-          try {
-            return extensionOperator.call(this, extensionPositionalArgs, {});
-          } on ReturnException catch (e) {
-            return e.value; // Should not happen for operators, but handle
-          } catch (e) {
-            throw RuntimeError("Error executing extension operator '[]': $e");
-          }
+      final methodAdapter =
+          bridgedClass.findInstanceMethodAdapter(operatorName);
+
+      if (methodAdapter != null) {
+        Logger.debug(
+            "[visitIndexExpression] Found bridged operator '$operatorName' for ${bridgedClass.name}. Calling adapter...");
+        try {
+          return methodAdapter(
+              this, bridgedInstance.nativeObject, [indexValue], {});
+        } catch (e, s) {
+          Logger.error(
+              "[visitIndexExpression] Native exception during bridged operator '$operatorName' on ${bridgedClass.name}: $e\\n$s");
+          throw RuntimeError(
+              "Native error during bridged operator '$operatorName' on ${bridgedClass.name}: $e");
         }
-        Logger.debug(
-            "[IndexExpression] No suitable extension operator '[]' found for type ${targetValue?.runtimeType}.");
-      } on RuntimeError catch (findError) {
-        // findExtensionMember throws if no member is found at all.
-        Logger.debug(
-            "[IndexExpression] No extension member '[]' found for type ${targetValue?.runtimeType}. Error: ${findError.message}");
-        // Fall through to the final standard error below.
       }
-
-      // Fallback error if not Map, String, List, or handled by extension
-      throw RuntimeError(
-          'Unsupported target for indexing: ${targetValue?.runtimeType}');
+      Logger.debug(
+          "[visitIndexExpression] Bridged operator '$operatorName' not found directly for ${bridgedClass.name}. Trying extensions.");
     }
+
+    const operatorNameForExtension = '[]';
+    try {
+      final extensionOperator = environment.findExtensionMember(
+          targetValue, operatorNameForExtension);
+
+      if (extensionOperator is InterpretedExtensionMethod &&
+          extensionOperator.isOperator) {
+        Logger.debug(
+            "[IndexExpression] Found extension operator '[]' for type ${targetValue?.runtimeType}. Calling...");
+        final extensionPositionalArgs = [targetValue, indexValue];
+        try {
+          return extensionOperator.call(this, extensionPositionalArgs, {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError("Error executing extension operator '[]': $e");
+        }
+      }
+      Logger.debug(
+          "[IndexExpression] No suitable extension operator '[]' found for type ${targetValue?.runtimeType}.");
+    } on RuntimeError catch (findError) {
+      Logger.debug(
+          "[IndexExpression] No extension member '[]' found for type ${targetValue?.runtimeType}. Error: ${findError.message}");
+    }
+
+    throw RuntimeError(
+        'Unsupported target for indexing: ${targetValue?.runtimeType}');
   }
 
   @override
@@ -1588,6 +1610,29 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
           targetValue[indexValue] = finalValueToAssign;
           return finalValueToAssign;
+        } else if (toBridgedInstance(targetValue).$2) {
+          final bridgedInstance = toBridgedInstance(targetValue).$1!;
+          final bridgedClass = bridgedInstance.bridgedClass;
+          final operatorName = '[]=';
+
+          final methodAdapter =
+              bridgedClass.findInstanceMethodAdapter(operatorName);
+          if (methodAdapter != null) {
+            Logger.debug(
+                "[visitAssignmentExpression-Index] Found bridged operator '$operatorName' for ${bridgedClass.name}. Calling adapter...");
+            try {
+              methodAdapter(this, bridgedInstance.nativeObject,
+                  [indexValue, finalValueToAssign], {});
+              return finalValueToAssign;
+            } catch (e, s) {
+              Logger.error(
+                  "[visitAssignmentExpression-Index] Native exception during bridged operator '$operatorName' on ${bridgedClass.name}: $e\\n$s");
+              throw RuntimeError(
+                  "Native error during bridged operator '$operatorName' on ${bridgedClass.name}: $e");
+            }
+          }
+          throw RuntimeError(
+              "[Bridged operator '$operatorName' not found directly for ${bridgedClass.name}. Trying extensions.");
         } else {
           const operatorName = '[]=';
           try {
@@ -1900,7 +1945,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         final bridgedClass = targetValue;
         final methodName = node.methodName.name;
         Logger.debug(
-            "[visitMethodInvocation] Target is BridgedClass: '$methodName' on '$bridgedClass.name'");
+            "[visitMethodInvocation] Target is BridgedClass: '$methodName' on '${bridgedClass.name}'");
 
         // 1. Try to find a constructor adapter
         final constructorAdapter =
@@ -1918,7 +1963,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
             if (nativeObject == null) {
               throw RuntimeError(
-                  "Bridged constructor adapter for '$bridgedClass.name.$methodName' returned null unexpectedly.");
+                  "Bridged constructor adapter for '${bridgedClass.name}.$methodName' returned null unexpectedly.");
             }
             final bridgedInstance = BridgedInstance(bridgedClass, nativeObject);
             Logger.debug(
@@ -1927,13 +1972,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           } on RuntimeError catch (e) {
             // Relaunch the adapter error
             throw RuntimeError(
-                "Error during bridged constructor '$methodName' for class '$bridgedClass.name': ${e.message}");
+                "Error during bridged constructor '$methodName' for class '${bridgedClass.name}': ${e.message}");
           } catch (e, s) {
             // Catch native errors from the adapter/native constructor
             Logger.error(
-                "[visitMethodInvocation] Native exception during bridged constructor '$bridgedClass.name.$methodName': $e\n$s");
+                "[visitMethodInvocation] Native exception during bridged constructor '${bridgedClass.name}.$methodName': $e\n$s");
             throw RuntimeError(
-                "Native error during bridged constructor '$methodName' for class '$bridgedClass.name': $e");
+                "Native error during bridged constructor '$methodName' for class '${bridgedClass.name}': $e");
           }
         } else {
           final staticMethodAdapter =
@@ -1955,7 +2000,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                   "Error during static bridged method call '$methodName' on ${bridgedClass.name}: ${e.message}");
             } catch (e, s) {
               Logger.warn(
-                  "[visitMethodInvocation] Native exception during static bridged method call '$bridgedClass.name.$methodName': $e\n$s");
+                  "[visitMethodInvocation] Native exception during static bridged method call '${bridgedClass.name}.$methodName': $e\n$s");
               throw RuntimeError(
                   "Native error during static bridged method call '$methodName' on ${bridgedClass.name}: $e");
             }

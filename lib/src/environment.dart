@@ -49,8 +49,13 @@ class Environment {
   }
 
   BridgedClass toBridgedClass(Type nativeType) {
-    final bridgedClass = _bridgedClassesLookupByType[nativeType];
-
+    BridgedClass? bridgedClass = _bridgedClassesLookupByType[nativeType];
+    final nativeTypeName = nativeType.toString();
+    if (bridgedClass == null && (nativeTypeName.substring(0, 1) == '_')) {
+      bridgedClass = _bridgedClassesLookupByType.entries
+          .firstWhereOrNull((e) => e.value.name == nativeTypeName.substring(1))
+          ?.value;
+    }
     if (bridgedClass == null) {
       throw RuntimeError(
           'Cannot bridge native object: No registered bridged class found for native type $nativeType.');

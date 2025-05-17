@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-
 import 'package:d4rt/src/callable.dart';
 import 'package:d4rt/src/exceptions.dart';
 import 'package:d4rt/src/interpreter_visitor.dart';
@@ -10,6 +9,7 @@ import 'package:d4rt/src/stdlib/core.dart';
 import 'package:d4rt/src/stdlib/convert.dart';
 import 'package:d4rt/src/stdlib/math.dart';
 import 'package:d4rt/src/stdlib/async.dart';
+import 'package:d4rt/src/stdlib/typed_data.dart';
 import 'stdlib_io.dart' if (dart.library.html) 'stdlib_web.dart';
 
 class Stdlib {
@@ -20,6 +20,7 @@ class Stdlib {
   void register() {
     registerCoreLibs(environment);
     registerAsyncLibs(environment);
+    registerTypedData(environment);
   }
 
   Object? evalMethod(

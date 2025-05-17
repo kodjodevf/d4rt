@@ -4,6 +4,7 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:d4rt/src/stdlib/convert.dart';
 import 'package:d4rt/src/stdlib/math.dart';
+import 'package:d4rt/src/stdlib/collection.dart';
 import 'package:d4rt/src/stdlib/stdlib_io.dart'
     if (dart.library.html) 'package:d4rt/src/stdlib/stdlib_web.dart';
 import 'package:pub_semver/pub_semver.dart';
@@ -202,6 +203,7 @@ class ModuleLoader {
         'async',
         'convert',
         'io',
+        'collection',
       ];
       if (knownStdlibDartLibs.contains(uri.path)) {
         if (uri.path == 'convert') {
@@ -214,6 +216,10 @@ class ModuleLoader {
         }
         if (uri.path == 'io') {
           StdlibIo.registerStdIoLibs(globalEnvironment);
+          return '';
+        }
+        if (uri.path == 'collection') {
+          registerCollectionLibs(globalEnvironment);
           return '';
         }
         Logger.info(
