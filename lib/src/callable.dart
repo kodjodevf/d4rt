@@ -1729,38 +1729,37 @@ class InterpretedFunction implements Callable {
         // Determine the next node AFTER the ExpressionStatement
         final AstNode? nextNode =
             _findNextSequentialNode(visitor, awaitContextNode);
+        final propertyAccess = expression.childEntities.lastOrNull;
+        if (propertyAccess != null && propertyAccess is PropertyAccess) {
+          if (propertyAccess.target is ParenthesizedExpression) {
+            // We want to access the property on the resolved Future value
+            final propertyName = propertyAccess.propertyName.name;
+            final (bridgedInstance, isBridgedInstance) =
+                visitor.toBridgedInstance(resolvedRhs);
+            if (isBridgedInstance) {
+              final getterAdapter = bridgedInstance!.bridgedClass
+                  .findInstanceGetterAdapter(propertyName);
+              if (getterAdapter != null) {
+                final getterResult =
+                    getterAdapter(visitor, bridgedInstance.nativeObject);
 
-        if (operatorType == TokenType.EQ) {
-          if (lhs is SimpleIdentifier) {
-            final propertyAccess = expression.childEntities.lastOrNull;
-            if (propertyAccess != null && propertyAccess is PropertyAccess) {
-              if (propertyAccess.target is ParenthesizedExpression) {
-                // We want to access the property on the resolved Future value
-                final propertyName = propertyAccess.propertyName.name;
-                final (bridgedInstance, isBridgedInstance) =
-                    visitor.toBridgedInstance(resolvedRhs);
-                if (isBridgedInstance) {
-                  final getterAdapter = bridgedInstance!.bridgedClass
-                      .findInstanceGetterAdapter(propertyName);
-                  if (getterAdapter != null) {
-                    final getterResult =
-                        getterAdapter(visitor, bridgedInstance.nativeObject);
+                resolvedRhs = getterResult;
+              }
 
-                    resolvedRhs = getterResult;
-                  }
+              final methodAdapter = bridgedInstance.bridgedClass
+                  .findInstanceMethodAdapter(propertyName);
+              if (methodAdapter != null) {
+                // Return a callable bound to the instance
+                final boundCallable = BridgedMethodCallable(
+                    bridgedInstance, methodAdapter, propertyName);
 
-                  final methodAdapter = bridgedInstance.bridgedClass
-                      .findInstanceMethodAdapter(propertyName);
-                  if (methodAdapter != null) {
-                    // Return a callable bound to the instance
-                    final boundCallable = BridgedMethodCallable(
-                        bridgedInstance, methodAdapter, propertyName);
-
-                    resolvedRhs = boundCallable;
-                  }
-                }
+                resolvedRhs = boundCallable;
               }
             }
+          }
+        }
+        if (operatorType == TokenType.EQ) {
+          if (lhs is SimpleIdentifier) {
             final varName = lhs.name;
             try {
               currentEnv.assign(varName, resolvedRhs);
