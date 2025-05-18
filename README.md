@@ -51,7 +51,7 @@ void main() {
   ''';
 
   final interpreter = D4rt();
-  final result = interpreter.execute(code);
+  final result = interpreter.execute(source: code);
   print('Result: $result'); // Result: 8
 }
 ```
@@ -75,28 +75,45 @@ final myClassBridge = BridgedClassDefinition(
   nativeType: MyClass,
   name: 'MyClass',
   constructors: {
-    '': (visitor, positionalArgs, namedArgs) => MyClass(positionalArgs[0] as int),
+    '': (InterpreterVisitor visitor, List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
+      if (positionalArgs.length == 1 && positionalArgs[0] is int) {
+        return MyClass(positionalArgs[0] as int);
+      }
+      throw ArgumentError('MyClass constructor expects one integer argument.');
+    },
   },
   methods: {
-    'doubleValue': (visitor, target, positionalArgs, namedArgs) => (target as MyClass).doubleValue(),
+    'doubleValue': (InterpreterVisitor visitor, Object target, List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
+      if (target is MyClass) {
+        return target.doubleValue();
+      }
+      throw TypeError();
+    },
   },
   getters: {
-    'value': (visitor, target) => (target as MyClass).value,
+    'value': (InterpreterVisitor? visitor, Object target) {
+      if (target is MyClass) {
+        return target.value;
+      }
+      throw TypeError();
+    },
   },
 );
 
 void main() {
   final interpreter = D4rt();
-  interpreter.defineBridge(myClassBridge);
+  interpreter.registerBridgedClass(myClassBridge, 'package:example/my_class_library.dart');
 
   final code = '''
+    import 'package:example/my_class_library.dart';
+
     main() {
       var obj = MyClass(21);
       return obj.doubleValue();
     }
   ''';
 
-  final result = interpreter.execute(code);
+  final result = interpreter.execute(source: code);
   print(result); // 42
 }
 ```
@@ -115,16 +132,20 @@ final colorEnumBridge = BridgedEnumDefinition<Color>(
 
 void main() {
   final interpreter = D4rt();
-  interpreter.registerBridgedEnum(colorEnumBridge);
+  interpreter.registerBridgedEnum(colorEnumBridge, 'package:example/my_enum_library.dart');
 
   final code = '''
+    import 'package:example/my_enum_library.dart';
+
     main() {
-      return Color.green.name;
+      var favoriteColor = Color.green;
+      print('My favorite color is \${favoriteColor.name}');
+      return favoriteColor.index;
     }
   ''';
 
-  final result = interpreter.execute(code);
-  print(result); // green
+  final result = interpreter.execute(source: code);
+  print(result); // 1
 }
 ```
 
@@ -146,7 +167,7 @@ void main() {
 | Static members                 | ✅ Supported (fields, methods, getters/setters, bridge)                        |
 | Switch/case                    | ✅ Supported (classic, pattern, default, fallthrough, exhaustive checks)       |
 | Try/catch/finally              | ✅ Supported (multiple catch, on/type, rethrow, stacktrace)                    |
-| Imports                        | 🚫 Not supported in interpreted code (bridges only via API)                    |
+| Imports                        | ✅ Supported (URIs, show/hide clauses for libraries defined in `sources`)      |
 | Generics                       | ⚠️ Partial (basic generic classes/functions, no runtime type checks)           |
 | Operator overloading           | ⚠️ Partial (via extensions, not via class operator methods)                    |
 | FFI                            | 🚫 Not supported                                                               |
@@ -165,7 +186,6 @@ See the [documentation](#documentation) for details and limitations.
 
 ## Limitations
 
-- No support for `import`/`export` directives in interpreted code.
 - Generics and operator overloading are partially supported.
 - Some advanced Dart features (isolates, FFI, mirrors) are not available.
 - The interpreter is not a full Dart VM: some language features may behave differently.
@@ -175,7 +195,7 @@ See the [documentation](#documentation) for details and limitations.
 ## Documentation
 
 - [API Reference](https://pub.dev/documentation/d4rt/latest/)
-- [Bridging Guide](#example-bridging-a-native-class)
+- [Bridging Guide](BRIDGING_GUIDE.md)
 - [Supported Features](#supported-features)
 - [Examples](example/)
 
