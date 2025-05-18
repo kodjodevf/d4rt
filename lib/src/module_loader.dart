@@ -232,7 +232,8 @@ class ModuleLoader {
             "Dart library '${uri.toString()}' not supported.");
       }
     }
-    if (bridgedEnumDefinitions.isNotEmpty) {
+    if (bridgedClassDefinitions.isNotEmpty ||
+        bridgedEnumDefinitions.isNotEmpty) {
       for (var bridgedEnumDefinition in bridgedEnumDefinitions) {
         if (bridgedEnumDefinition.containsKey(uriString)) {
           final definition = bridgedEnumDefinition[uriString]!;
@@ -248,9 +249,7 @@ class ModuleLoader {
           }
         }
       }
-      return '';
-    }
-    if (bridgedClassDefinitions.isNotEmpty) {
+
       for (var bridgedClassDefinition in bridgedClassDefinitions) {
         if (bridgedClassDefinition.containsKey(uriString)) {
           final definition = bridgedClassDefinition[uriString]!;

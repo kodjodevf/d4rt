@@ -1,3 +1,6 @@
+## 0.0.5
+- minor fix
+
 ## 0.0.4
 - Add 'import/export' directive support, support for 'show' and 'hide' combinators 
 - add some dart:collection & dart:typed_data

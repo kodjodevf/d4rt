@@ -268,7 +268,6 @@ class D4rt {
     Map<String, Object?> namedArgs = const {},
     Map<String, String>? sources,
   ]) {
-    _moduleLoader = _initModule(sources);
     if (_interpretedInstance == null) {
       throw RuntimeError(
           "No interpreted instance found. Call setInterpretedInstance first.");
