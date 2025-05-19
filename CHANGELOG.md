@@ -1,10 +1,13 @@
+## 0.0.6
+- Update docs
+
 ## 0.0.5
 - minor fix
 
 ## 0.0.4
 - Add 'import/export' directive support, support for 'show' and 'hide' combinators 
-- add some dart:collection & dart:typed_data
-- support for ParenthesizedExpression property access in simpleIdentifier in async state
+- Add some dart:collection & dart:typed_data
+- Support for ParenthesizedExpression property access in simpleIdentifier in async state
 
 ## 0.0.3
 - Fix infinite loop when using rethrow in try catch in async state
