@@ -1,5 +1,6 @@
 import 'package:d4rt/d4rt.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
+import 'package:d4rt/src/utils/extensions/string.dart';
 
 class Environment {
   final Environment? _enclosing;
@@ -50,10 +51,22 @@ class Environment {
 
   BridgedClass toBridgedClass(Type nativeType) {
     BridgedClass? bridgedClass = _bridgedClassesLookupByType[nativeType];
-    final nativeTypeName = nativeType.toString();
+
+    String nativeTypeName = nativeType.toString();
+
     if (bridgedClass == null && (nativeTypeName.substring(0, 1) == '_')) {
+      if (nativeTypeName.endsWith('Impl')) {
+        nativeTypeName = nativeTypeName.substringBeforeLast('Impl');
+      }
       bridgedClass = _bridgedClassesLookupByType.entries
-          .firstWhereOrNull((e) => e.value.name == nativeTypeName.substring(1))
+          .firstWhereOrNull((e) =>
+              (e.value.name ==
+                  nativeTypeName.substring(1).substringBefore('<')) ||
+              nativeTypeName.contains('${e.value.name}<'))
+          ?.value;
+    } else if (bridgedClass == null && nativeTypeName.contains('<')) {
+      bridgedClass = _bridgedClassesLookupByType.entries
+          .firstWhereOrNull((e) => nativeTypeName.contains('${e.value.name}<'))
           ?.value;
     }
     if (bridgedClass == null) {

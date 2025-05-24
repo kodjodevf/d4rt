@@ -1841,6 +1841,11 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       } else if (toBridgedInstance(targetValue).$2) {
         final bridgedInstance = toBridgedInstance(targetValue).$1!;
         final bridgedClass = bridgedInstance.bridgedClass;
+        switch (methodName) {
+          case 'toString':
+            return targetValue.toString();
+          default:
+        }
         // Use directly instanceMethodAdapters because we need the BridgedMethodCallable
         final adapter = bridgedClass.instanceMethodAdapters[methodName];
 
@@ -2476,6 +2481,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       final bridgedInstance = toBridgedInstance(target).$1!;
       Logger.debug(
           "[PropertyAccess] Access on BridgedInstance: ${bridgedInstance.bridgedClass.name}.$propertyName");
+      switch (propertyName) {
+        case 'runtimeType':
+          return target.runtimeType;
+        case 'hashCode':
+          return target.hashCode;
+        default:
+      }
       final getterAdapter =
           bridgedInstance.bridgedClass.findInstanceGetterAdapter(propertyName);
       if (getterAdapter != null) {
@@ -5513,8 +5525,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           throw RuntimeError("Named argument '$name' provided more than once.");
         }
         final bridgedInstance = toBridgedInstance(value);
-        namedArgs[name] =
-            bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : value;
+        namedArgs[name] = _bridgeInterpreterValueToNative(
+            bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : value);
       } else {
         if (namedArgsEncountered) {
           throw RuntimeError(
@@ -5522,12 +5534,24 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
         final a = arg.accept<Object?>(this);
         final bridgedInstance = toBridgedInstance(a);
-        positionalArgs
-            .add(bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : a);
+        positionalArgs.add(_bridgeInterpreterValueToNative(
+            bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : a));
       }
     }
 
     return (positionalArgs, namedArgs);
+  }
+
+  Object? _bridgeInterpreterValueToNative(Object? interpreterValue) {
+    if (interpreterValue is BridgedInstance) {
+      return interpreterValue.nativeObject;
+    }
+
+    if (interpreterValue is BridgedEnumValue) {
+      return interpreterValue.nativeValue;
+    }
+
+    return interpreterValue;
   }
 
   // Add FunctionExpressionInvocation handler
