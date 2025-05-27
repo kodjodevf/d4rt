@@ -1,3 +1,6 @@
+## 0.0.7
+- fix: support null safety
+
 ## 0.0.6
 - Update docs
 

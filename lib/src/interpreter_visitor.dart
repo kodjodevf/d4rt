@@ -1682,6 +1682,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     Object? targetValue; // Keep track of the target object/class
     // Argument lists - declared here, evaluated later if needed
 
+    // Determine if this is a conditional call by inspecting the source
+    final isNullAware = node.toSource().contains('?.');
+
     if (node.target == null) {
       // Simple function call (or class constructor call)
       calleeValue = node.methodName.accept<Object?>(this);
@@ -1690,6 +1693,15 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // Property/Method call on a target (instance or class)
       targetValue = node.target!.accept<Object?>(this);
       final methodName = node.methodName.name;
+
+      // Null safety support: if the target is null and the call is null-aware, return null
+      if (targetValue == null) {
+        if (isNullAware) {
+          return null;
+        }
+        throw RuntimeError(
+            "Cannot invoke method '$methodName' on null. Use '?.' for null-aware method invocation.");
+      }
 
       // BLOCK FOR HANDLING PREFIXED IMPORTS
       if (targetValue is Environment) {
@@ -2090,14 +2102,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // Attempt call via stdlib first (for built-in types primarily)
         try {
           Logger.debug(
-              "[MethodInvocation] Trying stdlib evalMethod for '$methodName' on ${targetValue?.runtimeType}");
+              "[MethodInvocation] Trying stdlib evalMethod for '$methodName' on ${targetValue.runtimeType}");
           // Ensure type arguments are passed to stdlib if available
           return Stdlib(environment).evalMethod(targetValue, methodName,
               positionalArgs, namedArgs, this, evaluatedTypeArguments ?? []);
         } on RuntimeError catch (stdlibError) {
           // Stdlib failed, NOW try to find an extension method
           Logger.debug(
-              "[MethodInvocation] Stdlib evalMethod failed ('${stdlibError.message}'). Looking for extension method '$methodName' for target type ${targetValue?.runtimeType}.");
+              "[MethodInvocation] Stdlib evalMethod failed ('${stdlibError.message}'). Looking for extension method '$methodName' for target type ${targetValue.runtimeType}.");
           final extensionCallable =
               environment.findExtensionMember(targetValue, methodName);
 
@@ -2263,10 +2275,22 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // Propagate suspension so the state machine resumes this node after resolution
       return target;
     }
+
+    // Determine if this is a conditional access by inspecting the source
+    final isNullAware = node.toSource().contains('?.');
     final propertyName = node.propertyName.name;
 
+    // Null safety support: if the target is null and the access is null-aware, return null
+    if (target == null) {
+      if (isNullAware) {
+        return null;
+      }
+      throw RuntimeError(
+          "Cannot access property '$propertyName' on null. Use '?.' for null-aware access.");
+    }
+
     Logger.debug(
-        "[PropertyAccess: ${node.toSource()}] Target type: ${target?.runtimeType}, Target value: ${target?.toString()}");
+        "[PropertyAccess: ${node.toSource()}] Target type: ${target.runtimeType}, Target value: ${target.toString()}");
 
     if (target is InterpretedInstance) {
       // Standard Instance Access: Try direct first, then extension
@@ -2591,7 +2615,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       //  Try Stdlib first
       try {
         Logger.debug(
-            "[PropertyAccess] Trying stdlib evalMethod for getter '$propertyName' on ${target?.runtimeType}");
+            "[PropertyAccess] Trying stdlib evalMethod for getter '$propertyName' on ${target.runtimeType}");
         // Use evalMethod which might handle properties/getters for basic types
         return Stdlib(environment)
             .evalMethod(target, propertyName, [], {}, this, []);
@@ -2599,7 +2623,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // Stdlib failed, try extension getter
         // This block remains for types that are not InterpretedInstance
         Logger.debug(
-            "[PropertyAccess] Stdlib evalMethod failed ('${stdlibError.message}'). Looking for extension getter '$propertyName' for target type ${target?.runtimeType}.");
+            "[PropertyAccess] Stdlib evalMethod failed ('${stdlibError.message}'). Looking for extension getter '$propertyName' for target type ${target.runtimeType}.");
         final extensionCallable =
             environment.findExtensionMember(target, propertyName);
 
@@ -3900,6 +3924,16 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   @override
   Object? visitPostfixExpression(PostfixExpression node) {
     final operatorType = node.operator.type;
+
+    // Support for the non-null assertion operator (!)
+    if (operatorType == TokenType.BANG) {
+      final operandValue = node.operand.accept<Object?>(this);
+      if (operandValue == null) {
+        throw RuntimeError(
+            "Null check operator used on a null value at ${node.toString()}");
+      }
+      return operandValue;
+    }
 
     // Check if operand is assignable (SimpleIdentifier or PropertyAccess)
     if (node.operand is SimpleIdentifier) {

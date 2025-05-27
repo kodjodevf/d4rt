@@ -288,7 +288,15 @@ class ModuleLoader {
       path: pathToReport,
       featureSet: FeatureSet.fromEnableFlags2(
         sdkLanguageVersion: Version(3, 0, 0), // Keep a SDK version
-        flags: ['null-aware-elements'],
+        flags: [
+          'non-nullable',
+          'null-aware-elements',
+          'triple-shift',
+          'spread-collections',
+          'control-flow-collections',
+          'extension-methods',
+          'extension-types',
+        ],
       ),
     );
 

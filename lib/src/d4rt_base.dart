@@ -116,7 +116,15 @@ class D4rt {
         throwIfDiagnostics: false,
         featureSet: FeatureSet.fromEnableFlags2(
           sdkLanguageVersion: Version(3, 0, 0),
-          flags: ['null-aware-elements'],
+          flags: [
+            'non-nullable',
+            'null-aware-elements',
+            'triple-shift',
+            'spread-collections',
+            'control-flow-collections',
+            'extension-methods',
+            'extension-types',
+          ],
         ),
       );
 
