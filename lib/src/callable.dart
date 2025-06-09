@@ -658,14 +658,17 @@ class InterpretedFunction implements Callable {
       final previousAsyncState = visitor.currentAsyncState;
 
       // Configure the visitor for the current state
-      // Use the loop environment for FOR loops, otherwise the state environment
-      visitor.environment =
-          currentState.forLoopEnvironment ?? currentState.environment;
+      // Use the top of the loop environment stack if it exists, otherwise the state environment
+      if (currentState.loopEnvironmentStack.isNotEmpty) {
+        visitor.environment = currentState.loopEnvironmentStack.last;
+      } else {
+        visitor.environment = currentState.environment;
+      }
       visitor.currentAsyncState = currentState;
       // currentFunction is already defined by the call method
 
       Logger.debug(
-          " [StateMachine] Executing state: ${currentNode.runtimeType} in state env ${currentState.environment.hashCode}, loop env ${currentState.forLoopEnvironment?.hashCode}. Visitor env set to: ${visitor.environment.hashCode}");
+          " [StateMachine] Executing state: ${currentNode.runtimeType} in state env ${currentState.environment.hashCode}, loop stack depth: ${currentState.loopEnvironmentStack.length}. Visitor env set to: ${visitor.environment.hashCode}");
 
       try {
         // Case: While loop
@@ -810,11 +813,17 @@ class InterpretedFunction implements Callable {
               if (parts is ForEachPartsWithDeclaration) {
                 final loopVariable = parts.loopVariable;
                 // Create a dedicated environment for the loop if it hasn't been done yet
-                currentState.forLoopEnvironment ??=
-                    Environment(enclosing: currentState.environment);
-                visitor.environment = currentState.forLoopEnvironment!;
+                if (currentState.loopEnvironmentStack.isEmpty) {
+                  final newLoopEnvironment =
+                      Environment(enclosing: currentState.environment);
+                  currentState.forLoopEnvironment = newLoopEnvironment;
+                  currentState.loopEnvironmentStack.add(newLoopEnvironment);
+                  currentState.loopNodeStack
+                      .add(forNode); // Track ForStatement for for-in loops too
+                }
+                visitor.environment = currentState.loopEnvironmentStack.last;
                 // Define the loop variable in this environment
-                currentState.forLoopEnvironment!
+                currentState.loopEnvironmentStack.last
                     .define(loopVariable.name.lexeme, currentItem);
               } else if (parts is ForEachPartsWithIdentifier) {
                 // No declaration, assign in the current environment
@@ -845,6 +854,12 @@ class InterpretedFunction implements Callable {
               currentState.currentForInIterator = null; // Clean the iterator
               // Clean the loop environment if it existed
               currentState.forLoopEnvironment = null;
+              if (currentState.loopEnvironmentStack.isNotEmpty) {
+                currentState.loopEnvironmentStack.removeLast();
+              }
+              if (currentState.loopNodeStack.isNotEmpty) {
+                currentState.loopNodeStack.removeLast();
+              }
               visitor.environment = currentState.environment;
               currentNode = _findNextSequentialNode(visitor, forNode);
               Logger.debug(
@@ -862,24 +877,42 @@ class InterpretedFunction implements Callable {
           final parts = forNode.forLoopParts;
           bool cameFromBody = false; // Flag to know if we came from the body
 
-          // Determine if we came from the body of the loop
-          // (Approximation: if the current node is ForStatement and we have a loop environment)
-          if (currentState.forLoopEnvironment != null &&
-              currentState.forLoopInitialized &&
-              !currentState.resumedFromInitializer) {
-            // We came from the body if the env exists, is initialized, and we didn't resume from the initializer
-            cameFromBody = true;
+          // Check if this ForStatement is already on the stack (returning to existing loop)
+          // vs a new nested ForStatement (needs initialization)
+          bool isExistingLoop = currentState.loopNodeStack.isNotEmpty &&
+              currentState.loopNodeStack.last == forNode;
+
+          bool currentLoopInitialized = false;
+          if (isExistingLoop) {
+            // This is a return to an existing loop, check its initialization status
+            currentLoopInitialized =
+                currentState.loopInitializedStack.isNotEmpty
+                    ? currentState.loopInitializedStack.last
+                    : currentState.forLoopInitialized;
+
+            if (currentState.loopEnvironmentStack.isNotEmpty &&
+                currentLoopInitialized &&
+                !currentState.resumedFromInitializer) {
+              // We came from the body if the env exists, is initialized, and we didn't resume from the initializer
+              cameFromBody = true;
+            }
           }
           // Reset the flag after having used it
           currentState.resumedFromInitializer = false;
 
-          if (!currentState.forLoopInitialized) {
+          if (!currentLoopInitialized) {
             Logger.debug(" [StateMachine] Handling For: Initializing.");
-            // Create the loop environment once
-            currentState.forLoopEnvironment =
-                Environment(enclosing: currentState.environment);
-            visitor.environment =
-                currentState.forLoopEnvironment!; // Use the loop env
+            // Create the loop environment once using the currently active environment as parent
+            final newLoopEnvironment =
+                Environment(enclosing: visitor.environment);
+            currentState.forLoopEnvironment = newLoopEnvironment;
+            // Push the new environment, initialization state, and ForStatement node onto the stacks
+            currentState.loopEnvironmentStack.add(newLoopEnvironment);
+            currentState.loopInitializedStack
+                .add(false); // Start as uninitialized
+            currentState.loopNodeStack
+                .add(forNode); // Track which ForStatement this corresponds to
+            visitor.environment = newLoopEnvironment;
 
             AstNode? initNode;
             if (parts is ForPartsWithDeclarations) {
@@ -897,19 +930,34 @@ class InterpretedFunction implements Callable {
                 Logger.debug(
                     "[StateMachine] For loop initialization suspended. Will resume.");
                 // Mark as initialized so the suspension logic will resume
-                currentState.forLoopInitialized = true;
+                if (currentState.loopInitializedStack.isNotEmpty) {
+                  currentState.loopInitializedStack[
+                      currentState.loopInitializedStack.length - 1] = true;
+                } else {
+                  currentState.forLoopInitialized = true;
+                }
                 // Leave lastResult as is, the general suspension logic will handle it
                 // Do NOT continue to the condition or updaters now.
                 // The 'finally' will restore the env, and the .then() will restart _runStateMachine.
               } else {
                 // Synchronous initialization completed
-                currentState.forLoopInitialized = true;
+                if (currentState.loopInitializedStack.isNotEmpty) {
+                  currentState.loopInitializedStack[
+                      currentState.loopInitializedStack.length - 1] = true;
+                } else {
+                  currentState.forLoopInitialized = true;
+                }
                 cameFromBody = false; // Do NOT go to updaters
                 // Continue to the condition IN THIS SAME ITERATION of the loop
               }
             } else {
               // No initialization
-              currentState.forLoopInitialized = true;
+              if (currentState.loopInitializedStack.isNotEmpty) {
+                currentState.loopInitializedStack[
+                    currentState.loopInitializedStack.length - 1] = true;
+              } else {
+                currentState.forLoopInitialized = true;
+              }
               cameFromBody = false;
             }
             // Do NOT restore the environment here, we will need it for the condition/updaters
@@ -917,12 +965,39 @@ class InterpretedFunction implements Callable {
           }
 
           // Runs only if we are not suspended by the initialization
+          bool currentLoopInitialized2 =
+              currentState.loopInitializedStack.isNotEmpty
+                  ? currentState.loopInitializedStack.last
+                  : currentState.forLoopInitialized;
           if (cameFromBody &&
-              currentState.forLoopInitialized &&
+              currentLoopInitialized2 &&
               lastResult is! AsyncSuspensionRequest) {
             Logger.debug(" [StateMachine] Handling For: Running updaters.");
-            visitor.environment =
-                currentState.forLoopEnvironment!; // Use the loop env
+            // Use the current loop environment from the stack
+            if (currentState.loopEnvironmentStack.isNotEmpty) {
+              visitor.environment = currentState.loopEnvironmentStack.last;
+              Logger.debug(
+                  " [DEBUG] Updater: Using stack environment ${currentState.loopEnvironmentStack.last.hashCode}, stack depth: ${currentState.loopEnvironmentStack.length}");
+            } else {
+              visitor.environment = currentState.forLoopEnvironment!;
+              Logger.debug(
+                  " [DEBUG] Updater: Using fallback forLoopEnvironment ${currentState.forLoopEnvironment!.hashCode}");
+            }
+
+            // Debug: check what variables are available in the current environment
+            try {
+              final envVars = <String>[];
+              Environment? currentEnv = visitor.environment;
+              while (currentEnv != null) {
+                envVars.add(
+                    "Env ${currentEnv.hashCode}: ${currentEnv.values.keys.join(', ')}");
+                currentEnv = currentEnv.enclosing;
+              }
+              Logger.debug(
+                  " [DEBUG] Environment chain: ${envVars.join(' -> ')}");
+            } catch (e) {
+              Logger.debug(" [DEBUG] Error checking environment chain: $e");
+            }
             NodeList<Expression>? updaters;
             if (parts is ForPartsWithDeclarations) {
               updaters = parts.updaters;
@@ -951,11 +1026,19 @@ class InterpretedFunction implements Callable {
 
           // Condition (if initialized and not suspended during init/updater)\
           // Runs after init (if sync) or after updater (if sync)
-          if (currentState.forLoopInitialized &&
+          bool currentLoopInitialized3 =
+              currentState.loopInitializedStack.isNotEmpty
+                  ? currentState.loopInitializedStack.last
+                  : currentState.forLoopInitialized;
+          if (currentLoopInitialized3 &&
               lastResult is! AsyncSuspensionRequest) {
             Logger.debug(" [StateMachine] Handling For: Evaluating condition.");
-            visitor.environment =
-                currentState.forLoopEnvironment!; // Use the loop env
+            // Use the current loop environment from the stack
+            if (currentState.loopEnvironmentStack.isNotEmpty) {
+              visitor.environment = currentState.loopEnvironmentStack.last;
+            } else {
+              visitor.environment = currentState.forLoopEnvironment!;
+            }
             Expression? condition;
             if (parts is ForPartsWithDeclarations) {
               condition = parts.condition;
@@ -1013,9 +1096,19 @@ class InterpretedFunction implements Callable {
                 // Condition false: exit the loop
                 Logger.debug(
                     "[StateMachine] For condition FALSE. Finding node after loop.");
-                // Clean the loop state
-                currentState.forLoopInitialized = false;
+                // Clean the loop state and pop from all stacks
+                if (currentState.loopInitializedStack.isNotEmpty) {
+                  currentState.loopInitializedStack.removeLast();
+                } else {
+                  currentState.forLoopInitialized = false;
+                }
                 currentState.forLoopEnvironment = null;
+                if (currentState.loopEnvironmentStack.isNotEmpty) {
+                  currentState.loopEnvironmentStack.removeLast();
+                }
+                if (currentState.loopNodeStack.isNotEmpty) {
+                  currentState.loopNodeStack.removeLast();
+                }
                 visitor.environment =
                     currentState.environment; // Restore the environment
                 currentNode = _findNextSequentialNode(visitor, forNode);
@@ -1507,10 +1600,11 @@ class InterpretedFunction implements Callable {
   static AstNode? _determineNextNodeAfterAwait(InterpreterVisitor visitor,
       AsyncExecutionState state, AstNode nodeThatCausedSuspension) {
     Object? futureResult = state.lastAwaitResult;
-    final currentExecutionEnvironment =
-        state.forLoopEnvironment ?? state.environment;
+    final currentExecutionEnvironment = state.loopEnvironmentStack.isNotEmpty
+        ? state.loopEnvironmentStack.last
+        : state.environment;
     Logger.debug(
-        "[_determineNextNodeAfterAwait] Modifying environment: ${currentExecutionEnvironment.hashCode} (state.environment: ${state.environment.hashCode}, state.forLoopEnvironment: ${state.forLoopEnvironment?.hashCode})");
+        "[_determineNextNodeAfterAwait] Modifying environment: ${currentExecutionEnvironment.hashCode} (state.environment: ${state.environment.hashCode}, loop stack depth: ${state.loopEnvironmentStack.length})");
 
     Logger.debug(
         "[_determineNextNodeAfterAwait] Resuming after await. Node causing suspension: ${nodeThatCausedSuspension.runtimeType}, Result: $futureResult");
@@ -1689,8 +1783,9 @@ class InterpretedFunction implements Callable {
         targetVar ??= varList.variables.first;
 
         // Assign the result in the correct environment (the loop environment if inside one)
-        final currentEnv =
-            state.forLoopEnvironment ?? currentExecutionEnvironment;
+        final currentEnv = state.loopEnvironmentStack.isNotEmpty
+            ? state.loopEnvironmentStack.last
+            : currentExecutionEnvironment;
         // Use define() because the variable was not defined during the initial visit
         currentEnv.define(targetVar.name.lexeme, futureResult);
         // SPECULATIVE FIX: Try assigning immediately after defining
@@ -1720,8 +1815,9 @@ class InterpretedFunction implements Callable {
         Object? resolvedRhs = state.lastAwaitResult; // La valeur résolue
         final operatorType = assignmentNode.operator.type;
         final lhs = assignmentNode.leftHandSide;
-        final currentEnv =
-            state.forLoopEnvironment ?? currentExecutionEnvironment;
+        final currentEnv = state.loopEnvironmentStack.isNotEmpty
+            ? state.loopEnvironmentStack.last
+            : currentExecutionEnvironment;
 
         Logger.debug(
             " [_determineNextNodeAfterAwait] Resuming ExpressionStatement(AssignmentExpression Op: $operatorType). RHS: $resolvedRhs (${resolvedRhs?.runtimeType})");
@@ -1860,8 +1956,9 @@ class InterpretedFunction implements Callable {
       final operatorType = assignmentNode.operator.type;
       final lhs = assignmentNode.leftHandSide;
       // Use the correct environment (the loop environment if applicable)
-      final currentEnv =
-          state.forLoopEnvironment ?? currentExecutionEnvironment;
+      final currentEnv = state.loopEnvironmentStack.isNotEmpty
+          ? state.loopEnvironmentStack.last
+          : currentExecutionEnvironment;
 
       Logger.debug(
           " [_determineNextNodeAfterAwait] Resuming AssignmentExpression (Operator: $operatorType). RHS resolved to: $resolvedRhs (${resolvedRhs?.runtimeType})");
@@ -2075,14 +2172,17 @@ class InterpretedFunction implements Callable {
       // Check if we are resuming specifically from initializer suspension
       // We know we suspended during initialization if:
       // 1. The context node is the ForStatement itself.
-      // 2. The loop environment exists (currentState.forLoopEnvironment != null).
-      // 3. The loop is marked as initialized (currentState.forLoopInitialized == true)
+      // 2. The loop environment exists (currentState.loopEnvironmentStack is not empty).
+      // 3. The loop is marked as initialized (currentState.forLoopInitialized == true or stack indicates initialized)
       //    (because the SM marks it initialized *before* waiting on the init suspension).
       // 4. We haven't already processed the initializer resumption (currentState.resumedFromInitializer == false).
+      bool isLoopInitialized = state.loopInitializedStack.isNotEmpty
+          ? state.loopInitializedStack.last
+          : state.forLoopInitialized;
       bool resumingFromInitializer = (awaitContextNode ==
               forNode) && // Suspended *while processing* the ForStatement node
-          state.forLoopEnvironment != null &&
-          state.forLoopInitialized && // Was set before waiting
+          state.loopEnvironmentStack.isNotEmpty &&
+          isLoopInitialized && // Was set before waiting
           !state.resumedFromInitializer; // Haven't resumed the init part yet
 
       if (resumingFromInitializer) {
@@ -2090,9 +2190,9 @@ class InterpretedFunction implements Callable {
             " [_determineNextNodeAfterAwait] Detected resumption from For initializer. Assigning result and proceeding to condition.");
 
         // Assign the result to the loop variable
-        if (state.forLoopEnvironment == null) {
+        if (state.loopEnvironmentStack.isEmpty) {
           throw StateError(
-              "Internal error: For loop environment null after initializer await resumption.");
+              "Internal error: For loop environment stack empty after initializer await resumption.");
         }
         final parts = forNode.forLoopParts;
         if (parts is ForPartsWithDeclarations) {
@@ -2100,7 +2200,7 @@ class InterpretedFunction implements Callable {
           if (parts.variables.variables.length == 1) {
             final loopVarName = parts.variables.variables.first.name.lexeme;
             // Assign the actual result now. The var was defined as null previously by visitVariableDeclarationList.
-            state.forLoopEnvironment!.assign(loopVarName, awaitResult);
+            state.loopEnvironmentStack.last.assign(loopVarName, awaitResult);
             Logger.debug(
                 " [_determineNextNodeAfterAwait] Assigned awaited result $awaitResult to for loop variable '$loopVarName' in env ${currentExecutionEnvironment.hashCode}.");
           } else {
@@ -2180,6 +2280,12 @@ class InterpretedFunction implements Callable {
                 " [_determineNextNodeAfterAwait] For condition FALSE. Finding node after loop.");
             state.forLoopInitialized = false; // Clean up state
             state.forLoopEnvironment = null;
+            if (state.loopEnvironmentStack.isNotEmpty) {
+              state.loopEnvironmentStack.removeLast();
+            }
+            if (state.loopNodeStack.isNotEmpty) {
+              state.loopNodeStack.removeLast();
+            }
             return _findNextSequentialNode(visitor, forNode);
           }
         } else if (inUpdater) {
@@ -2229,6 +2335,12 @@ class InterpretedFunction implements Callable {
                   "[_determineNextNodeAfterAwait] Could not determine sequence after await in For loop body. Context: ${awaitContextNode.runtimeType}, Suspension: ${nodeThatCausedSuspension.runtimeType}. Stopping.");
               state.forLoopInitialized = false;
               state.forLoopEnvironment = null;
+              if (state.loopEnvironmentStack.isNotEmpty) {
+                state.loopEnvironmentStack.removeLast();
+              }
+              if (state.loopNodeStack.isNotEmpty) {
+                state.loopNodeStack.removeLast();
+              }
               return null;
             }
           }

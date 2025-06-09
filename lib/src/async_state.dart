@@ -37,6 +37,15 @@ class AsyncExecutionState {
   /// Optional: Environment for the current standard for-loop scope.
   Environment? forLoopEnvironment;
 
+  /// Stack of loop environments for nested loops
+  final List<Environment> loopEnvironmentStack = [];
+
+  /// Stack of initialization flags for nested loops
+  final List<bool> loopInitializedStack = [];
+
+  /// Stack of ForStatement nodes corresponding to the environments
+  final List<ForStatement> loopNodeStack = [];
+
   /// Optional: A reference back to the function definition might be useful.
   final InterpretedFunction function;
 

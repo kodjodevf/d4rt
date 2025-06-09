@@ -14,6 +14,9 @@ class Environment {
 
   Environment({Environment? enclosing}) : _enclosing = enclosing;
 
+  Environment? get enclosing => _enclosing;
+  Map<String, Object?> get values => _values;
+
   void define(String name, Object? value) {
     if (_values.containsKey(name) ||
         _bridgedClasses.containsKey(name) ||

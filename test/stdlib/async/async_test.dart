@@ -222,7 +222,7 @@ void main() {
     });
   });
   group('Async Control Flow Tests', () {
-    test('Async While Loop Test', () async {
+    test('async while loop with await in body', () async {
       final result = await execute('''
         // Define a simple async function to introduce an await point
         Future<void> waitABit() async {
@@ -247,7 +247,7 @@ void main() {
       expect(result, equals(10));
     });
 
-    test('Async While Loop with async condition', () async {
+    test('async while loop with await in condition', () async {
       final result = await execute('''
         // Helper async function for condition
         Future<bool> shouldContinue(int currentVal) async {
@@ -270,7 +270,7 @@ void main() {
       expect(result, equals(3));
     });
 
-    test('Async Do-While Loop with async body', () async {
+    test('async do-while loop with await in body', () async {
       final result = await execute('''
         Future<void> waitABit() async {
           await Future.value(null);
@@ -297,7 +297,7 @@ void main() {
       expect(result, equals(6));
     });
 
-    test('Async Do-While Loop with async condition', () async {
+    test('async do-while loop with await in condition', () async {
       final result = await execute('''
         Future<bool> shouldContinue(int currentVal) async {
           await Future.value(null); // Simulate async work
@@ -324,7 +324,7 @@ void main() {
       expect(result, equals(3));
     });
 
-    test('Async For Loop with async body', () async {
+    test('async for loop with await in body', () async {
       final result = await execute('''
         Future<void> waitABit() async {
           await Future.value(null);
@@ -351,7 +351,7 @@ void main() {
       expect(result, equals(6));
     });
 
-    test('Async For Loop with async initializer', () async {
+    test('async for loop with await in initializer', () async {
       final result = await execute('''
         Future<int> getStart() async {
           await Future.delayed(Duration(milliseconds: 1)); // Simulate async work
@@ -378,7 +378,7 @@ void main() {
       expect(result, equals(6));
     });
 
-    test('Async For Loop with await assignment in body', () async {
+    test('async for loop with await assignment in body', () async {
       final result = await execute(r'''
         Future<int> getValue(int iteration) async {
           await Future.delayed(Duration(milliseconds: 1));
@@ -407,7 +407,7 @@ void main() {
       expect(result, equals(23));
     });
 
-    test('Async For Loop with await in assignment op', () async {
+    test('async for loop with await in assignment operator', () async {
       final result = await execute(r'''
         Future<int> getValue(int iteration) async {
           await Future.delayed(Duration(milliseconds: 1));
@@ -434,7 +434,7 @@ void main() {
       expect(result, equals(30));
     });
 
-    test('Async For-In Loop with sync iterable and await in body', () async {
+    test('async for-in loop with await in body', () async {
       final result = await execute('''
         Future<int> getValue(int iteration) async {
           await Future.delayed(Duration(milliseconds: 1)); // Simulate async work
@@ -464,7 +464,7 @@ void main() {
       );
     });
 
-    test('Async Try/Catch/Finally with await error', () async {
+    test('async try-catch-finally with await throwing error', () async {
       final result = await execute('''
         Future<String> operationThatThrows() async {
           await Future.delayed(Duration(milliseconds: 1));
@@ -499,7 +499,7 @@ void main() {
       );
     });
 
-    test('Async If statement with await condition', () async {
+    test('async if statement with await in condition', () async {
       final result = await execute(r'''
         Future<bool> checkCondition(bool value) async {
           await Future.delayed(Duration(milliseconds: 1));
@@ -525,7 +525,8 @@ void main() {
 
       expect(result, equals('Second If False'));
     });
-    test('Async Try/Catch/rethrow with await error', () async {
+
+    test('async try-catch with rethrow and await error', () async {
       final sourceCode = '''
         Future<String> operationThatThrows() async {
           await Future.delayed(Duration(milliseconds: 1));
@@ -556,6 +557,47 @@ void main() {
         throwsA(isA<Exception>().having((e) => e.toString(), 'toString()',
             'Exception: Something went wrong asynchronously')),
       );
+    });
+
+    test('nested for-in loops with list processing', () async {
+      const source = '''
+      main() async {
+        List resultList = [];
+        for (var element in [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8]
+        ]) {
+        // Introduce a local variable for the current element
+        var currentElement = element;
+        for (var i = 0; i < currentElement.length; i++) {
+          resultList.add(currentElement[i]);
+        }
+        }
+        return resultList;
+      }
+      ''';
+      expect(await execute(source), equals([1, 2, 3, 4, 5, 6, 7, 8]));
+    });
+
+    test('nested for loops with list processing using indexed access',
+        () async {
+      const source = '''
+      main() async {
+        List resultList = [];
+        final dddd = [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8]
+        ];
+        for (var i = 0; i < dddd.length; i++) {
+        var currentElement = dddd[i];
+        for (var j = 0; j < currentElement.length; j++) {
+          resultList.add(currentElement[j]);
+        }
+        }
+        return resultList;
+      }
+      ''';
+      expect(await execute(source), equals([1, 2, 3, 4, 5, 6, 7, 8]));
     });
   });
 }
