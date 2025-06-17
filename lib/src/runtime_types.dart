@@ -24,6 +24,9 @@ class InterpretedClass implements Callable, RuntimeType {
   List<InterpretedClass> onClauseTypes;
   List<InterpretedClass> mixins;
 
+  // Support for bridged mixins
+  List<BridgedClass> bridgedMixins;
+
   // Fields for class modifiers
   final bool isFinal;
   final bool isInterface;
@@ -49,10 +52,11 @@ class InterpretedClass implements Callable, RuntimeType {
     this.staticFields,
     this.constructors, {
     this.isAbstract = false,
-    this.interfaces = const [],
+    List<InterpretedClass>? interfaces,
     this.isMixin = false,
-    this.onClauseTypes = const [],
-    this.mixins = const [],
+    List<InterpretedClass>? onClauseTypes,
+    List<InterpretedClass>? mixins,
+    List<BridgedClass>? bridgedMixins,
     // Initialize class modifiers (default to false)
     this.isFinal = false,
     this.isInterface = false,
@@ -60,7 +64,10 @@ class InterpretedClass implements Callable, RuntimeType {
     this.isSealed = false,
     // Initialize bridged superclass
     this.bridgedSuperclass, // Can be null
-  });
+  })  : interfaces = interfaces ?? [],
+        onClauseTypes = onClauseTypes ?? [],
+        mixins = mixins ?? [],
+        bridgedMixins = bridgedMixins ?? [];
 
   @override
   String toString() {
@@ -631,6 +638,59 @@ class InterpretedInstance implements RuntimeValue {
       currentClass = currentClass.superclass;
     }
 
+    // Check mixins (both interpreted and bridged) - reverse order for correct precedence
+    // (Last applied mixin wins in case of conflicts)
+
+    // Check interpreted mixins (in reverse order)
+    for (int i = klass.mixins.length - 1; i >= 0; i--) {
+      final mixin = klass.mixins[i];
+
+      final getter = mixin.findInstanceGetter(name);
+      if (getter != null) {
+        if (visitor != null) {
+          return getter.bind(this).call(visitor, [], {});
+        } else {
+          return getter.bind(this);
+        }
+      }
+
+      final method = mixin.findInstanceMethod(name);
+      if (method != null) {
+        return method.bind(this);
+      }
+    }
+
+    // Check bridged mixins (in reverse order)
+    for (int i = klass.bridgedMixins.length - 1; i >= 0; i--) {
+      final bridgedMixin = klass.bridgedMixins[i];
+
+      // Try getter first
+      final getterAdapter = bridgedMixin.findInstanceGetterAdapter(name);
+      if (getterAdapter != null) {
+        Logger.debug(
+            "[Instance.get] Found getter '$name' in bridged mixin '${bridgedMixin.name}'. Calling adapter directly.");
+        try {
+          // For bridged mixins, call the getter directly and return the value
+          return getterAdapter(visitor, this);
+        } catch (e, s) {
+          Logger.error(
+              "Native exception during bridged mixin getter '$name': $e\n$s");
+          throw RuntimeError(
+              "Native error in bridged mixin getter '$name': $e");
+        }
+      }
+
+      // Try method next
+      final methodAdapter = bridgedMixin.findInstanceMethodAdapter(name);
+      if (methodAdapter != null) {
+        Logger.debug(
+            "[Instance.get] Found method '$name' in bridged mixin '${bridgedMixin.name}'. Creating bound callable.");
+        // Return a callable that binds the method to this instance
+        return BridgedMixinMethodCallable(
+            this, methodAdapter, name, bridgedMixin.name);
+      }
+    }
+
     if (klass.bridgedSuperclass != null && bridgedSuperObject != null) {
       final bridgedSuper = klass.bridgedSuperclass!;
       final nativeTarget = bridgedSuperObject!;
@@ -1039,4 +1099,41 @@ class BridgedSuperMethodCallable implements Callable {
   @override
   String toString() =>
       '<bridged super method $bridgedClassName.$methodName bound to $superObject>';
+}
+
+/// Represents a method call on a bridged mixin applied to an interpreted instance.
+class BridgedMixinMethodCallable implements Callable {
+  final InterpretedInstance instance;
+  final BridgedMethodAdapter adapter;
+  final String methodName;
+  final String bridgedMixinName;
+
+  BridgedMixinMethodCallable(
+      this.instance, this.adapter, this.methodName, this.bridgedMixinName);
+
+  @override
+  int get arity => 0; // Arity validation is done by the adapter
+
+  @override
+  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
+      [Map<String, Object?> namedArguments = const {},
+      List<RuntimeType>? typeArguments]) {
+    try {
+      // For bridged mixins, we need to create a temporary native-like object
+      // or handle the call differently since the adapter expects a native object
+      // but we have an interpreted instance. For now, we'll pass the instance directly
+      // and let the adapter handle the conversion.
+      return adapter(visitor, instance, positionalArguments, namedArguments);
+    } catch (e, s) {
+      Logger.error(
+          "[BridgedMixinMethodCallable] Native exception during call to '$bridgedMixinName.$methodName': $e\n$s");
+      throw RuntimeError(
+          "Native error in bridged mixin method '$bridgedMixinName.$methodName': $e");
+    }
+  }
+
+  @override
+  String toString() {
+    return '<bridged mixin method $bridgedMixinName.$methodName>';
+  }
 }

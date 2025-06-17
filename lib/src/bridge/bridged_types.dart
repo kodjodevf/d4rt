@@ -12,6 +12,9 @@ class BridgedClass implements RuntimeType {
   // Number of expected type parameters
   final int typeParameterCount;
 
+  // Support for mixin usage
+  final bool canBeUsedAsMixin;
+
   // Adapters for constructors
   Map<String, BridgedConstructorCallable> constructorAdapters = {};
   // Adapters for instance methods
@@ -24,7 +27,9 @@ class BridgedClass implements RuntimeType {
   Map<String, BridgedInstanceSetterAdapter> instanceSetterAdapters = {};
 
   BridgedClass(this.nativeType,
-      {required this.name, this.typeParameterCount = 0});
+      {required this.name,
+      this.typeParameterCount = 0,
+      this.canBeUsedAsMixin = false});
 
   @override
   bool isSubtypeOf(RuntimeType other) {

@@ -64,6 +64,9 @@ class BridgedClassDefinition {
   // Number of expected type parameters
   final int typeParameterCount;
 
+  // Support for mixin usage
+  final bool canBeUsedAsMixin;
+
   // Adapters for constructors (key: constructor name, '' for default)
   final Map<String, BridgedConstructorCallable> constructors;
 
@@ -84,6 +87,7 @@ class BridgedClassDefinition {
     required this.nativeType,
     required this.name,
     this.typeParameterCount = 0,
+    this.canBeUsedAsMixin = false,
     this.constructors = const {},
     this.staticMethods = const {},
     this.staticGetters = const {},
@@ -96,7 +100,9 @@ class BridgedClassDefinition {
   // Method to create the actual BridgedClass object from this definition
   BridgedClass buildBridgedClass() {
     final bridgedClass = BridgedClass(nativeType,
-        name: name, typeParameterCount: typeParameterCount);
+        name: name,
+        typeParameterCount: typeParameterCount,
+        canBeUsedAsMixin: canBeUsedAsMixin);
     // Copy ALL adapters
     bridgedClass.constructorAdapters = constructors;
     bridgedClass.instanceMethodAdapters = methods;

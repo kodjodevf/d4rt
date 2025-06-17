@@ -4233,7 +4233,18 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           // Add to the mixins list of the existing klass object
           klass.mixins.add(mixin);
           Logger.debug(
-              "[Visitor.visitClassDeclaration] Applied mixin '$mixinName' to '$className'");
+              "[Visitor.visitClassDeclaration] Applied interpreted mixin '$mixinName' to '$className'");
+        } else if (mixin is BridgedClass) {
+          // Support for bridged classes as mixins
+          if (!mixin.canBeUsedAsMixin) {
+            throw RuntimeError(
+                "Bridged class '$mixinName' cannot be used as a mixin. Set canBeUsedAsMixin=true when registering the bridge.");
+          }
+
+          // Add to the bridged mixins list
+          klass.bridgedMixins.add(mixin);
+          Logger.debug(
+              "[Visitor.visitClassDeclaration] Applied bridged mixin '$mixinName' to '$className'");
         } else {
           throw RuntimeError(
               "Identifier '$mixinName' resolved to ${mixin?.runtimeType}, which is not a class/mixin, for class '$className'.");
