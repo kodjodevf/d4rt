@@ -22,7 +22,7 @@ class D4rt {
   InterpretedInstance? _interpretedInstance;
   InterpreterVisitor? _visitor;
   final Map<Type, BridgedClassDefinition> _bridgedDefLookupByType = {};
-
+  InterpreterVisitor? get visitor => _visitor;
   final List<NativeFunction> _nativeFunctions = [];
 
   late ModuleLoader _moduleLoader;
