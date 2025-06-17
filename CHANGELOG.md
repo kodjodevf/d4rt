@@ -1,3 +1,8 @@
+## 0.0.8
+- expose visitor getter
+- add support for bridged mixins
+- enhance async execution state with nested loop support 
+
 ## 0.0.7
 - fix: support null safety
 
