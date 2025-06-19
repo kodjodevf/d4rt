@@ -7,7 +7,7 @@ Matcher throwsRuntimeError(dynamic messageMatcher) {
 }
 
 dynamic execute(String source, {Object? args}) {
-  final d4rt = D4rt()..setDebug(false);
+  final d4rt = D4rt()..setDebug(true);
   return d4rt.execute(
       library: 'package:test/main.dart',
       args: args,

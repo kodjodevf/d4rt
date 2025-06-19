@@ -4037,9 +4037,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                     currentValue, operatorType == TokenType.PLUS_PLUS);
                 // Note: For --, we could either call x + (-1) or x - 1
                 // Let's use + with -1 for consistency
-                final newValue = operatorMethod
-                    .bind(operandValue)
-                    .call(this, [operand], {});
+                final newValue =
+                    operatorMethod.bind(operandValue).call(this, [operand], {});
                 // Assign the new value back to the variable
                 environment.assign(variableName, newValue);
                 // Return the *new* value
@@ -4086,7 +4085,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               if (operatorMethod != null) {
                 try {
                   // For ++x, we create a literal 1 and call x + 1
-                      operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  operatorType == TokenType.PLUS_PLUS ? 1 : -1;
                   // Note: For --, we could either call x + (-1) or x - 1
                   // Let's use + with -1 for consistency
                   newValue = operatorMethod
@@ -4142,7 +4141,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               if (operatorMethod != null) {
                 try {
                   // For ++x, we create a literal 1 and call x + 1
-                      operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  operatorType == TokenType.PLUS_PLUS ? 1 : -1;
                   // Note: For --, we could either call x + (-1) or x - 1
                   // Let's use + with -1 for consistency
                   newValue = operatorMethod
