@@ -4007,11 +4007,11 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       case TokenType.PLUS_PLUS: // Prefix increment (++x)
       case TokenType.MINUS_MINUS: // Prefix decrement (--x)
         // Re-evaluate and unwrap operand specifically for ++/--
-        final assignOperandValue = operandNode.accept<Object?>(this);
-        final bridgedInstance = toBridgedInstance(assignOperandValue);
+        final operandValue = operandNode.accept<Object?>(this);
+        final bridgedInstance = toBridgedInstance(operandValue);
         final assignOperand = bridgedInstance.$2
             ? bridgedInstance.$1!.nativeObject
-            : assignOperandValue;
+            : operandValue;
 
         // Check if AST node is assignable (SimpleIdentifier or PropertyAccess for now)
         if (operandNode is SimpleIdentifier) {
@@ -4027,21 +4027,251 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             environment.assign(variableName, newValue);
             // Return the *new* value
             return newValue;
+          } else if (operandValue is InterpretedInstance) {
+            // Use custom + operator with literal 1
+            final operatorMethod = operandValue.findOperator('+');
+            if (operatorMethod != null) {
+              try {
+                // For ++x, we create appropriate operand and call x + operand
+                final operand = _createIncrementOperand(
+                    currentValue, operatorType == TokenType.PLUS_PLUS);
+                // Note: For --, we could either call x + (-1) or x - 1
+                // Let's use + with -1 for consistency
+                final newValue = operatorMethod
+                    .bind(operandValue)
+                    .call(this, [operand], {});
+                // Assign the new value back to the variable
+                environment.assign(variableName, newValue);
+                // Return the *new* value
+                return newValue;
+              } on ReturnException catch (e) {
+                final newValue = e.value;
+                // Assign the new value back to the variable
+                environment.assign(variableName, newValue);
+                // Return the *new* value
+                return newValue;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement object of type '${operandValue.klass.name}': No operator '+' found.");
+            }
           } else {
             // Requires finding operator +/-, then assigning back.
             // Complex, skip for now.
             // Error uses original value type
             throw RuntimeError(
-                "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be a number, but was ${assignOperandValue?.runtimeType}. Extension support TBD.");
+                "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be a number, but was ${operandValue?.runtimeType}. Extension support TBD.");
           }
         } else if (operandNode is PropertyAccess) {
-          // Requires getting current, calculating new, setting back (field/setter/extension?)
-          throw UnimplementedError(
-              "Prefix ++/-- on property access not implemented yet.");
+          // Handle property access like obj.field++
+          final targetValue = operandNode.target?.accept<Object?>(this);
+          final propertyName = operandNode.propertyName.name;
+
+          if (targetValue is InterpretedInstance) {
+            // Get current value via getter or field
+            final currentValue = targetValue.get(propertyName);
+
+            // Calculate new value
+            Object? newValue;
+            if (currentValue is num) {
+              newValue = operatorType == TokenType.PLUS_PLUS
+                  ? currentValue + 1
+                  : currentValue - 1;
+            } else if (currentValue is InterpretedInstance) {
+              // Use custom + operator with literal 1
+              final operatorMethod = currentValue.findOperator('+');
+              if (operatorMethod != null) {
+                try {
+                  // For ++x, we create a literal 1 and call x + 1
+                      operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  // Note: For --, we could either call x + (-1) or x - 1
+                  // Let's use + with -1 for consistency
+                  newValue = operatorMethod
+                      .bind(currentValue)
+                      .call(this, [operand], {});
+                } on ReturnException catch (e) {
+                  newValue = e.value;
+                } catch (e) {
+                  throw RuntimeError(
+                      "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+                }
+              } else {
+                throw RuntimeError(
+                    "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+            }
+
+            // Set new value via setter or field
+            final setter = targetValue.klass.findInstanceSetter(propertyName);
+            if (setter != null) {
+              setter.bind(targetValue).call(this, [newValue], {});
+            } else {
+              targetValue.set(propertyName, newValue, this);
+            }
+
+            // Return the *new* value for prefix operators
+            return newValue;
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+          }
+        } else if (operandNode is PrefixedIdentifier) {
+          // Handle prefixed identifier like obj.field++ (parsed as PrefixedIdentifier)
+          final targetValue = operandNode.prefix.accept<Object?>(this);
+          final propertyName = operandNode.identifier.name;
+
+          if (targetValue is InterpretedInstance) {
+            // Get current value via getter or field
+            final currentValue = targetValue.get(propertyName);
+
+            // Calculate new value
+            Object? newValue;
+            if (currentValue is num) {
+              newValue = operatorType == TokenType.PLUS_PLUS
+                  ? currentValue + 1
+                  : currentValue - 1;
+            } else if (currentValue is InterpretedInstance) {
+              // Use custom + operator with literal 1
+              final operatorMethod = currentValue.findOperator('+');
+              if (operatorMethod != null) {
+                try {
+                  // For ++x, we create a literal 1 and call x + 1
+                      operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  // Note: For --, we could either call x + (-1) or x - 1
+                  // Let's use + with -1 for consistency
+                  newValue = operatorMethod
+                      .bind(currentValue)
+                      .call(this, [operand], {});
+                } on ReturnException catch (e) {
+                  newValue = e.value;
+                } catch (e) {
+                  throw RuntimeError(
+                      "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+                }
+              } else {
+                throw RuntimeError(
+                    "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+            }
+
+            // Set new value via setter or field
+            final setter = targetValue.klass.findInstanceSetter(propertyName);
+            if (setter != null) {
+              setter.bind(targetValue).call(this, [newValue], {});
+            } else {
+              targetValue.set(propertyName, newValue, this);
+            }
+
+            // Return the *new* value for prefix operators
+            return newValue;
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+          }
         } else if (operandNode is IndexExpression) {
-          throw UnimplementedError(
-              "Prefix ++/-- on index access not implemented yet.");
+          // Handle index access like ++array[i]
+          final targetValue = operandNode.target?.accept<Object?>(this);
+          final indexValue = operandNode.index.accept<Object?>(this);
+
+          // Get current value via [] operator or direct access
+          Object? currentValue;
+          if (targetValue is List) {
+            final index = indexValue as int;
+            currentValue = targetValue[index];
+          } else if (targetValue is Map) {
+            currentValue = targetValue[indexValue];
+          } else if (targetValue is InterpretedInstance) {
+            // Use class operator [] if available
+            final operatorMethod = targetValue.findOperator('[]');
+            if (operatorMethod != null) {
+              try {
+                currentValue = operatorMethod
+                    .bind(targetValue)
+                    .call(this, [indexValue], {});
+              } on ReturnException catch (e) {
+                currentValue = e.value;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing class operator '[]' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot read index for prefix increment/decrement on ${targetValue.klass.name}: No operator '[]' found.");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot apply prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' to index of type '${targetValue?.runtimeType}'.");
+          }
+
+          // Calculate new value
+          Object? newValue;
+          if (currentValue is num) {
+            newValue = operatorType == TokenType.PLUS_PLUS
+                ? currentValue + 1
+                : currentValue - 1;
+          } else if (currentValue is InterpretedInstance) {
+            // Use custom + operator with literal 1
+            final operatorMethod = currentValue.findOperator('+');
+            if (operatorMethod != null) {
+              try {
+                final operand = _createIncrementOperand(
+                    currentValue, operatorType == TokenType.PLUS_PLUS);
+                newValue =
+                    operatorMethod.bind(currentValue).call(this, [operand], {});
+              } on ReturnException catch (e) {
+                newValue = e.value;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement object at index of type '${currentValue.klass.name}': No operator '+' found.");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement value at index of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+          }
+
+          // Set new value via []= operator or direct access
+          if (targetValue is List) {
+            final index = indexValue as int;
+            targetValue[index] = newValue;
+          } else if (targetValue is Map) {
+            targetValue[indexValue] = newValue;
+          } else if (targetValue is InterpretedInstance) {
+            // Use class operator []= if available
+            final operatorMethod = targetValue.findOperator('[]=');
+            if (operatorMethod != null) {
+              try {
+                operatorMethod
+                    .bind(targetValue)
+                    .call(this, [indexValue, newValue], {});
+              } on ReturnException catch (e) {
+                // []= should not return a value, but assignment expression returns assigned value
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing class operator '[]=' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot write index for prefix increment/decrement on ${targetValue.klass.name}: No operator '[]=' found.");
+            }
+          }
+
+          // Return the *new* value for prefix operators
+          return newValue;
         } else {
+          Logger.debug("Operand type: ${operandNode.runtimeType}");
           throw RuntimeError(
               "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be an assignable variable, property, or index.");
         }
@@ -4152,13 +4382,271 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
 
         return operandValue; // Return the original value
+      } else if (operandValue is InterpretedInstance) {
+        // Use custom + operator with literal 1
+        final operatorMethod = operandValue.findOperator('+');
+        if (operatorMethod != null) {
+          try {
+            // For x++, we create a literal 1 and call x + 1
+            final operand = _createIncrementOperand(
+                currentValue, operatorType == TokenType.PLUS_PLUS);
+            Object? newValue =
+                operatorMethod.bind(operandValue).call(this, [operand], {});
+
+            // Assign back to correct target (lexical or instance)
+            if (isInstanceField && thisInstance != null) {
+              final setter =
+                  thisInstance.klass.findInstanceSetter(variableName);
+              if (setter != null) {
+                setter.bind(thisInstance).call(this, [newValue], {});
+              } else {
+                thisInstance.set(
+                    variableName, newValue, this); // Assign to instance field
+              }
+            } else {
+              environment.assign(
+                  variableName, newValue); // Assign to lexical variable
+            }
+
+            return operandValue; // Return the original value for postfix
+          } on ReturnException catch (e) {
+            final newValue = e.value;
+
+            // Assign back to correct target (lexical or instance)
+            if (isInstanceField && thisInstance != null) {
+              final setter =
+                  thisInstance.klass.findInstanceSetter(variableName);
+              if (setter != null) {
+                setter.bind(thisInstance).call(this, [newValue], {});
+              } else {
+                thisInstance.set(
+                    variableName, newValue, this); // Assign to instance field
+              }
+            } else {
+              environment.assign(
+                  variableName, newValue); // Assign to lexical variable
+            }
+
+            return operandValue; // Return the original value for postfix
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement object of type '${operandValue.klass.name}': No operator '+' found.");
+        }
       } else {
         throw RuntimeError(
             "Operand for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be a number, but was ${operandValue?.runtimeType}.");
       }
     } else if (node.operand is PropertyAccess) {
-      throw UnimplementedError(
-          "Postfix operators on property access (e.g., obj.count++) are not yet implemented.");
+      // Handle property access like obj.field++
+      final propertyAccess = node.operand as PropertyAccess;
+      final targetValue = propertyAccess.target?.accept<Object?>(this);
+      final propertyName = propertyAccess.propertyName.name;
+
+      if (targetValue is InterpretedInstance) {
+        // Get current value via getter or field
+        final currentValue = targetValue.get(propertyName);
+        final originalValue = currentValue; // Save for return
+
+        // Calculate new value
+        Object? newValue;
+        if (currentValue is num) {
+          newValue = operatorType == TokenType.PLUS_PLUS
+              ? currentValue + 1
+              : currentValue - 1;
+        } else if (currentValue is InterpretedInstance) {
+          // Use custom + operator with literal 1
+          final operatorMethod = currentValue.findOperator('+');
+          if (operatorMethod != null) {
+            try {
+              // For x++, we create a literal 1 and call x + 1
+              final operand = _createIncrementOperand(
+                  currentValue, operatorType == TokenType.PLUS_PLUS);
+              newValue =
+                  operatorMethod.bind(currentValue).call(this, [operand], {});
+            } on ReturnException catch (e) {
+              newValue = e.value;
+            } catch (e) {
+              throw RuntimeError(
+                  "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+        }
+
+        // Set new value via setter or field
+        final setter = targetValue.klass.findInstanceSetter(propertyName);
+        if (setter != null) {
+          setter.bind(targetValue).call(this, [newValue], {});
+        } else {
+          targetValue.set(propertyName, newValue, this);
+        }
+
+        // Return the *original* value for postfix operators
+        return originalValue;
+      } else {
+        throw RuntimeError(
+            "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+      }
+    } else if (node.operand is PrefixedIdentifier) {
+      // Handle prefixed identifier like obj.field++ (parsed as PrefixedIdentifier)
+      final prefixedIdentifier = node.operand as PrefixedIdentifier;
+      final targetValue = prefixedIdentifier.prefix.accept<Object?>(this);
+      final propertyName = prefixedIdentifier.identifier.name;
+
+      if (targetValue is InterpretedInstance) {
+        // Get current value via getter or field
+        final currentValue = targetValue.get(propertyName);
+        final originalValue = currentValue; // Save for return
+
+        // Calculate new value
+        Object? newValue;
+        if (currentValue is num) {
+          newValue = operatorType == TokenType.PLUS_PLUS
+              ? currentValue + 1
+              : currentValue - 1;
+        } else if (currentValue is InterpretedInstance) {
+          // Use custom + operator with literal 1
+          final operatorMethod = currentValue.findOperator('+');
+          if (operatorMethod != null) {
+            try {
+              // For x++, we create a literal 1 and call x + 1
+              final operand = _createIncrementOperand(
+                  currentValue, operatorType == TokenType.PLUS_PLUS);
+              newValue =
+                  operatorMethod.bind(currentValue).call(this, [operand], {});
+            } on ReturnException catch (e) {
+              newValue = e.value;
+            } catch (e) {
+              throw RuntimeError(
+                  "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+        }
+
+        // Set new value via setter or field
+        final setter = targetValue.klass.findInstanceSetter(propertyName);
+        if (setter != null) {
+          setter.bind(targetValue).call(this, [newValue], {});
+        } else {
+          targetValue.set(propertyName, newValue, this);
+        }
+
+        // Return the *original* value for postfix operators
+        return originalValue;
+      } else {
+        throw RuntimeError(
+            "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+      }
+    } else if (node.operand is IndexExpression) {
+      // Handle index access like array[i]++
+      final indexExpression = node.operand as IndexExpression;
+      final targetValue = indexExpression.target?.accept<Object?>(this);
+      final indexValue = indexExpression.index.accept<Object?>(this);
+
+      // Get current value via [] operator or direct access
+      Object? currentValue;
+      if (targetValue is List) {
+        final index = indexValue as int;
+        currentValue = targetValue[index];
+      } else if (targetValue is Map) {
+        currentValue = targetValue[indexValue];
+      } else if (targetValue is InterpretedInstance) {
+        // Use class operator [] if available
+        final operatorMethod = targetValue.findOperator('[]');
+        if (operatorMethod != null) {
+          try {
+            currentValue =
+                operatorMethod.bind(targetValue).call(this, [indexValue], {});
+          } on ReturnException catch (e) {
+            currentValue = e.value;
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing class operator '[]' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot read index for postfix increment/decrement on ${targetValue.klass.name}: No operator '[]' found.");
+        }
+      } else {
+        throw RuntimeError(
+            "Cannot apply postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' to index of type '${targetValue?.runtimeType}'.");
+      }
+
+      final originalValue = currentValue; // Save for return
+
+      // Calculate new value
+      Object? newValue;
+      if (currentValue is num) {
+        newValue = operatorType == TokenType.PLUS_PLUS
+            ? currentValue + 1
+            : currentValue - 1;
+      } else if (currentValue is InterpretedInstance) {
+        // Use custom + operator with literal 1
+        final operatorMethod = currentValue.findOperator('+');
+        if (operatorMethod != null) {
+          try {
+            final operand = _createIncrementOperand(
+                currentValue, operatorType == TokenType.PLUS_PLUS);
+            newValue =
+                operatorMethod.bind(currentValue).call(this, [operand], {});
+          } on ReturnException catch (e) {
+            newValue = e.value;
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement object at index of type '${currentValue.klass.name}': No operator '+' found.");
+        }
+      } else {
+        throw RuntimeError(
+            "Cannot increment/decrement value at index of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+      }
+
+      // Set new value via []= operator or direct access
+      if (targetValue is List) {
+        final index = indexValue as int;
+        targetValue[index] = newValue;
+      } else if (targetValue is Map) {
+        targetValue[indexValue] = newValue;
+      } else if (targetValue is InterpretedInstance) {
+        // Use class operator []= if available
+        final operatorMethod = targetValue.findOperator('[]=');
+        if (operatorMethod != null) {
+          try {
+            operatorMethod
+                .bind(targetValue)
+                .call(this, [indexValue, newValue], {});
+          } on ReturnException catch (e) {
+            // []= should not return a value, but assignment expression returns assigned value
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing class operator '[]=' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot write index for postfix increment/decrement on ${targetValue.klass.name}: No operator '[]=' found.");
+        }
+      }
+
+      // Return the *original* value for postfix operators
+      return originalValue;
     } else {
       throw RuntimeError(
           "Operand for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be an assignable variable or property.");
@@ -6719,5 +7207,30 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           show: showNames, hide: hideNames);
     }
     return null; // Import directives do not produce a value.
+  }
+
+  /// Helper method to create the appropriate operand for ++ and -- operators.
+  /// For numeric types, returns 1 or -1 directly.
+  /// For custom classes, attempts to create an instance with value 1 or -1.
+  Object? _createIncrementOperand(Object? targetValue, bool isIncrement) {
+    if (targetValue is! InterpretedInstance) {
+      // For primitive types (num, int, double), return the literal value
+      return isIncrement ? 1 : -1;
+    }
+
+    // For custom class instances, try to create an instance of the same class
+    // with the value 1 or -1. This handles cases like CustomNumber(1).
+    try {
+      final klass = targetValue.klass;
+      final operandValue = isIncrement ? 1 : -1;
+
+      // Try to create an instance with the operand value
+      final newInstance = klass.call(this, [operandValue], {});
+      return newInstance;
+    } catch (e) {
+      // If we can't create an instance, fall back to the literal value
+      // This allows the operator to handle the error appropriately
+      return isIncrement ? 1 : -1;
+    }
   }
 } // End of InterpreterVisitor class

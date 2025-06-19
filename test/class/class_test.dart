@@ -935,5 +935,122 @@ void main() {
         expect(result, equals(-50)); // 5 * -10, not just -5
       });
     });
+
+    group('Increment/Decrement Operators', () {
+      test('Prefix increment on property access (++obj.field)', () {
+        final result = execute('''
+          class Counter {
+            int count = 10;
+          }
+          
+          main() {
+            var counter = Counter();
+            var newValue = ++counter.count;
+            return [newValue, counter.count];
+          }
+        ''');
+        expect(result, equals([11, 11]));
+      });
+
+      test('Postfix increment on property access (obj.field++)', () {
+        final result = execute('''
+          class Counter {
+            int count = 5;
+          }
+          
+          main() {
+            var counter = Counter();
+            var oldValue = counter.count++;
+            return [oldValue, counter.count];
+          }
+        ''');
+        expect(result, equals([5, 6]));
+      });
+
+      test('Prefix decrement on property access (--obj.field)', () {
+        final result = execute('''
+          class Counter {
+            int count = 20;
+          }
+          
+          main() {
+            var counter = Counter();
+            var newValue = --counter.count;
+            return [newValue, counter.count];
+          }
+        ''');
+        expect(result, equals([19, 19]));
+      });
+
+      test('Postfix decrement on property access (obj.field--)', () {
+        final result = execute('''
+          class Counter {
+            int count = 15;
+          }
+          
+          main() {
+            var counter = Counter();
+            var oldValue = counter.count--;
+            return [oldValue, counter.count];
+          }
+        ''');
+        expect(result, equals([15, 14]));
+      });
+
+      test('Prefix increment on index access (++array[i])', () {
+        final result = execute('''
+          main() {
+            var list = [10, 20, 30];
+            var newValue = ++list[1];
+            return [newValue, list[1], list];
+          }
+        ''');
+        expect(
+            result,
+            equals([
+              21,
+              21,
+              [10, 21, 30]
+            ]));
+      });
+
+      test('Postfix increment on index access (array[i]++)', () {
+        final result = execute('''
+          main() {
+            var list = [5, 15, 25];
+            var oldValue = list[0]++;
+            return [oldValue, list[0], list];
+          }
+        ''');
+        expect(
+            result,
+            equals([
+              5,
+              6,
+              [6, 15, 25]
+            ]));
+      });
+
+      test('Increment with custom class operators', () {
+        final result = execute('''
+          class CustomNumber {
+            int value;
+            CustomNumber(this.value);
+            
+            CustomNumber operator+(CustomNumber other) {
+              return CustomNumber(value + other.value);
+            }
+          }
+          
+          main() {
+            var num = CustomNumber(10);
+            // This should use the custom + operator with CustomNumber(1)
+            ++num; // Should call num = num + CustomNumber(1)
+            return num.value;
+          }
+        ''');
+        expect(result, equals(11));
+      });
+    });
   });
 }
