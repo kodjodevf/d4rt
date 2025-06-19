@@ -18,6 +18,8 @@ class InterpretedClass implements Callable, RuntimeType {
   final Map<String, InterpretedFunction> staticSetters;
   final Map<String, Object?> staticFields;
   final Map<String, InterpretedFunction> constructors;
+  // Map for operator methods (e.g., '+', '==', '[]', etc.)
+  final Map<String, InterpretedFunction> operators;
   final bool isAbstract;
   List<InterpretedClass> interfaces;
   final bool isMixin;
@@ -50,7 +52,8 @@ class InterpretedClass implements Callable, RuntimeType {
     this.staticGetters,
     this.staticSetters,
     this.staticFields,
-    this.constructors, {
+    this.constructors,
+    this.operators, {
     this.isAbstract = false,
     List<InterpretedClass>? interfaces,
     this.isMixin = false,
@@ -170,6 +173,28 @@ class InterpretedClass implements Callable, RuntimeType {
   InterpretedFunction? findStaticMethod(String name) => staticMethods[name];
   InterpretedFunction? findStaticGetter(String name) => staticGetters[name];
   InterpretedFunction? findStaticSetter(String name) => staticSetters[name];
+
+  // Find operator methods (supports inheritance)
+  InterpretedFunction? findOperator(String operatorSymbol) {
+    if (operators.containsKey(operatorSymbol)) {
+      return operators[operatorSymbol];
+    }
+
+    // Check applied mixins in reverse order
+    for (int i = mixins.length - 1; i >= 0; i--) {
+      final mixinOperator = mixins[i].findOperator(operatorSymbol);
+      if (mixinOperator != null) {
+        return mixinOperator;
+      }
+    }
+
+    if (superclass != null) {
+      return superclass!.findOperator(operatorSymbol);
+    }
+
+    return null;
+  }
+
   InterpretedFunction? findConstructor(String name) {
     // Constructors are defined directly on the class, not inherited
     // from standard superclasses. Check bridged superclass ONLY if no constructor
@@ -726,6 +751,32 @@ class InterpretedInstance implements RuntimeValue {
 
     // If not found anywhere in the hierarchy or bridge
     throw RuntimeError("Undefined property '$name' on ${klass.name}.");
+  }
+
+  // Find operator method on this instance (supports inheritance and mixins)
+  InterpretedFunction? findOperator(String operatorSymbol) {
+    // Check instance operators in the current class and superclasses
+    InterpretedClass? currentClass = klass;
+    while (currentClass != null) {
+      final operator = currentClass.findOperator(operatorSymbol);
+      if (operator != null) {
+        return operator;
+      }
+      // Move up to the superclass
+      currentClass = currentClass.superclass;
+    }
+
+    // Check interpreted mixins (in reverse order for correct precedence)
+    for (int i = klass.mixins.length - 1; i >= 0; i--) {
+      final mixin = klass.mixins[i];
+      final operator = mixin.findOperator(operatorSymbol);
+      if (operator != null) {
+        return operator;
+      }
+    }
+
+    // No operator found
+    return null;
   }
 
   // Set: Setter -> Field (now includes inheritance for finding setters)

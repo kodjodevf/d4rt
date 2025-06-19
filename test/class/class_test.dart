@@ -556,5 +556,384 @@ void main() {
       ''');
       expect(result, equals(100));
     });
+
+    group('Binary Operators', () {
+      test('Addition operator (+)', () {
+        final result = execute('''
+          class Money {
+            final int cents;
+            Money(this.cents);
+            
+            Money operator+(Money other) {
+              return Money(this.cents + other.cents);
+            }
+            
+            String toString() {
+              return 'Money(\${cents} cents)';
+            }
+          }
+          
+          main() {
+            var m1 = Money(100);
+            var m2 = Money(200);
+            var result = m1 + m2;
+            return result.cents;
+          }
+        ''');
+        expect(result, equals(300));
+      });
+
+      test('Equality operator (==)', () {
+        final result = execute('''
+          class Point {
+            final int x;
+            final int y;
+            Point(this.x, this.y);
+            
+            bool operator==(Object other) {
+              if (other is! Point) return false;
+              return x == other.x && y == other.y;
+            }
+          }
+          
+          main() {
+            var p1 = Point(1, 2);
+            var p2 = Point(1, 2);
+            var p3 = Point(2, 3);
+            return [p1 == p2, p1 == p3];
+          }
+        ''');
+        expect(result, equals([true, false]));
+      });
+
+      test('Comparison operators (< and >)', () {
+        final result = execute('''
+          class Temperature {
+            final double celsius;
+            Temperature(this.celsius);
+            
+            bool operator<(Temperature other) {
+              return celsius < other.celsius;
+            }
+            
+            bool operator>(Temperature other) {
+              return celsius > other.celsius;
+            }
+          }
+          
+          main() {
+            var t1 = Temperature(20.0);
+            var t2 = Temperature(25.0);
+            return [t1 < t2, t1 > t2];
+          }
+        ''');
+        expect(result, equals([true, false]));
+      });
+
+      test('Multiple operators on same class', () {
+        final result = execute('''
+          class Vector {
+            final double x;
+            final double y;
+            Vector(this.x, this.y);
+            
+            Vector operator+(Vector other) {
+              return Vector(x + other.x, y + other.y);
+            }
+            
+            Vector operator-(Vector other) {
+              return Vector(x - other.x, y - other.y);
+            }
+            
+            Vector operator*(double scalar) {
+              return Vector(x * scalar, y * scalar);
+            }
+          }
+          
+          main() {
+            var v1 = Vector(1.0, 2.0);
+            var v2 = Vector(3.0, 4.0);
+            var sum = v1 + v2;
+            var diff = v1 - v2;
+            var scaled = v1 * 2.0;
+            
+            return [
+              [sum.x, sum.y],
+              [diff.x, diff.y], 
+              [scaled.x, scaled.y]
+            ];
+          }
+        ''');
+        expect(
+            result,
+            equals([
+              [4.0, 6.0],
+              [-2.0, -2.0],
+              [2.0, 4.0]
+            ]));
+      });
+    });
+
+    group('Index Operators', () {
+      test('Index operator ([])', () {
+        final result = execute('''
+          class NumberContainer {
+            final List<int> numbers;
+            NumberContainer(this.numbers);
+            
+            int operator[](int index) {
+              return numbers[index];
+            }
+          }
+
+          main() {
+            var container = NumberContainer([10, 20, 30]);
+            return [container[0], container[1], container[2]];
+          }
+        ''');
+        expect(result, equals([10, 20, 30]));
+      });
+
+      test('Index assignment operator ([]=)', () {
+        final result = execute('''
+          class NumberContainer {
+            final List<int> numbers;
+            NumberContainer(this.numbers);
+            
+            int operator[](int index) {
+              return numbers[index];
+            }
+            
+            void operator[]=(int index, int value) {
+              numbers[index] = value;
+            }
+          }
+
+          main() {
+            var container = NumberContainer([10, 20, 30]);
+            container[1] = 99;
+            return [container[0], container[1], container[2]];
+          }
+        ''');
+        expect(result, equals([10, 99, 30]));
+      });
+
+      test('Compound assignment with index operators', () {
+        final result = execute('''
+          class NumberContainer {
+            final List<int> numbers;
+            NumberContainer(this.numbers);
+            
+            int operator[](int index) {
+              return numbers[index];
+            }
+            
+            void operator[]=(int index, int value) {
+              numbers[index] = value;
+            }
+          }
+
+          main() {
+            var container = NumberContainer([10, 20, 30]);
+            container[0] += 5;
+            container[1] *= 2;
+            container[2] -= 10;
+            return [container[0], container[1], container[2]];
+          }
+        ''');
+        expect(result, equals([15, 40, 20]));
+      });
+
+      test('String-keyed container with index operators', () {
+        final result = execute('''
+          class StringKeyedContainer {
+            final Map<String, String> data = {};
+            
+            String operator[](String key) {
+              return data[key] ?? 'not found';
+            }
+            
+            void operator[]=(String key, String value) {
+              data[key] = value;
+            }
+          }
+
+          main() {
+            var container = StringKeyedContainer();
+            container['name'] = 'Alice';
+            container['age'] = '30';
+            
+            return [container['name'], container['age'], container['unknown']];
+          }
+        ''');
+        expect(result, equals(['Alice', '30', 'not found']));
+      });
+
+      test('Index operators with inheritance', () {
+        final result = execute('''
+          class BaseContainer {
+            final List<dynamic> items;
+            BaseContainer(this.items);
+            
+            dynamic operator[](int index) {
+              return items[index];
+            }
+            
+            void operator[]=(int index, dynamic value) {
+              items[index] = value;
+            }
+          }
+
+          class NumberContainer extends BaseContainer {
+            NumberContainer(List<int> numbers) : super(numbers);
+            
+            // Inherited operators should work
+          }
+
+          main() {
+            var container = NumberContainer([1, 2, 3]);
+            container[0] = 100;
+            return [container[0], container[1], container[2]];
+          }
+        ''');
+        expect(result, equals([100, 2, 3]));
+      });
+    });
+
+    group('Unary Operators', () {
+      test('Unary minus operator (-)', () {
+        final result = execute('''
+          class Vector {
+            final double x;
+            final double y;
+            Vector(this.x, this.y);
+            
+            Vector operator-() {
+              return Vector(-x, -y);
+            }
+          }
+          
+          main() {
+            var v = Vector(3.0, 4.0);
+            var negV = -v;
+            return [negV.x, negV.y];
+          }
+        ''');
+        expect(result, equals([-3.0, -4.0]));
+      });
+
+      test('Bitwise NOT operator (~)', () {
+        final result = execute('''
+          class BitMask {
+            final int value;
+            BitMask(this.value);
+            
+            BitMask operator~() {
+              return BitMask(~value);
+            }
+          }
+          
+          main() {
+            var mask = BitMask(5); // Binary: 101
+            var inverted = ~mask;  // Should invert all bits
+            return inverted.value;
+          }
+        ''');
+        expect(result, equals(~5)); // -6 in two's complement
+      });
+
+      test('Multiple unary operators on same class', () {
+        final result = execute('''
+          class SignedNumber {
+            final int value;
+            SignedNumber(this.value);
+            
+            SignedNumber operator-() {
+              return SignedNumber(-value);
+            }
+            
+            SignedNumber operator~() {
+              return SignedNumber(~value);
+            }
+          }
+          
+          main() {
+            var num = SignedNumber(10);
+            var negated = -num;
+            var inverted = ~num;
+            
+            return [negated.value, inverted.value];
+          }
+        ''');
+        expect(result, equals([-10, ~10])); // [-10, -11]
+      });
+
+      test('Unary operators with inheritance', () {
+        final result = execute('''
+          class BaseNumber {
+            final int value;
+            BaseNumber(this.value);
+            
+            BaseNumber operator-() {
+              return BaseNumber(-value);
+            }
+          }
+
+          class ExtendedNumber extends BaseNumber {
+            ExtendedNumber(int value) : super(value);
+            
+            // Inherited unary operator should work
+          }
+
+          main() {
+            var num = ExtendedNumber(42);
+            var negated = -num;
+            return negated.value;
+          }
+        ''');
+        expect(result, equals(-42));
+      });
+
+      test('Complex unary operator with custom logic', () {
+        final result = execute('''
+          class ComplexNumber {
+            final double real;
+            final double imaginary;
+            ComplexNumber(this.real, this.imaginary);
+            
+            ComplexNumber operator-() {
+              return ComplexNumber(-real, -imaginary);
+            }
+          }
+          
+          main() {
+            var c = ComplexNumber(3.5, -2.1);
+            var negated = -c;
+            return [negated.real, negated.imaginary];
+          }
+        ''');
+        expect(result, equals([-3.5, 2.1]));
+      });
+
+      test('Unary operator precedence over extensions', () {
+        final result = execute('''
+          class CustomInt {
+            final int value;
+            CustomInt(this.value);
+            
+            CustomInt operator-() {
+              return CustomInt(value * -10); // Custom behavior, not just negation
+            }
+          }
+          
+          main() {
+            var num = CustomInt(5);
+            var result = -num;
+            return result.value;
+          }
+        ''');
+        expect(result, equals(-50)); // 5 * -10, not just -5
+      });
+    });
   });
 }

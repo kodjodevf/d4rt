@@ -761,6 +761,26 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     // Moved this block BEFORE standard ==, !=, <, <=, >, >= checks
     final operatorName = operator.lexeme;
+
+    // Check for class operator methods FIRST (before extensions and built-in operators)
+    if (leftOperandValue is InterpretedInstance) {
+      final operatorMethod = leftOperandValue.findOperator(operatorName);
+      if (operatorMethod != null) {
+        Logger.debug(
+            "[BinaryExpression] Found class operator '$operatorName' on ${leftOperandValue.klass.name}. Calling...");
+        try {
+          return operatorMethod
+              .bind(leftOperandValue)
+              .call(this, [rightOperandValue], {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError(
+              "Error executing class operator '$operatorName': $e");
+        }
+      }
+    }
+
     // Only try extension immediately for operators where standard checks might bypass it
     // (e.g., ==, !=, <, >, <=, >= which have generic fallbacks)
     bool checkExtensionEarly = [
@@ -926,6 +946,20 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         return targetValue[indexValue];
       } else {
         throw RuntimeError('List index must be an integer');
+      }
+    } else if (targetValue is InterpretedInstance) {
+      // Check for class operator [] method
+      final operatorMethod = targetValue.findOperator('[]');
+      if (operatorMethod != null) {
+        Logger.debug(
+            "[visitIndexExpression] Found class operator '[]' on ${targetValue.klass.name}. Calling...");
+        try {
+          return operatorMethod.bind(targetValue).call(this, [indexValue], {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError("Error executing class operator '[]': $e");
+        }
       }
     } else if (toBridgedInstance(targetValue).$2) {
       final bridgedInstance = toBridgedInstance(targetValue).$1!;
@@ -1567,6 +1601,46 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                   'Index out of range for compound assignment read: $indexValue');
             }
             currentValue = targetValue[indexValue];
+          } else if (targetValue is InterpretedInstance) {
+            // Check for class operator [] method for reading current value
+            final operatorMethod = targetValue.findOperator('[]');
+            if (operatorMethod != null) {
+              try {
+                currentValue = operatorMethod
+                    .bind(targetValue)
+                    .call(this, [indexValue], {});
+              } on ReturnException catch (e) {
+                currentValue = e.value;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing class operator '[]' for compound read: $e");
+              }
+            } else {
+              // No class operator found, try extensions
+              try {
+                final extensionGetter =
+                    environment.findExtensionMember(targetValue, '[]');
+                if (extensionGetter is InterpretedExtensionMethod &&
+                    extensionGetter.isOperator) {
+                  final extensionPositionalArgs = [targetValue, indexValue];
+                  try {
+                    currentValue =
+                        extensionGetter.call(this, extensionPositionalArgs, {});
+                  } on ReturnException catch (e) {
+                    currentValue = e.value;
+                  } catch (e) {
+                    throw RuntimeError(
+                        "Error executing extension operator '[]' for compound read: $e");
+                  }
+                } else {
+                  throw RuntimeError(
+                      'Cannot read current value for compound index assignment on ${targetValue.klass.name}: No operator [] found (class or extension).');
+                }
+              } on RuntimeError catch (e) {
+                throw RuntimeError(
+                    'Cannot read current value for compound index assignment on ${targetValue.klass.name}: ${e.message}');
+              }
+            }
           } else {
             try {
               final extensionGetter =
@@ -1610,6 +1684,55 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
           targetValue[indexValue] = finalValueToAssign;
           return finalValueToAssign;
+        } else if (targetValue is InterpretedInstance) {
+          // Check for class operator []= method
+          final operatorMethod = targetValue.findOperator('[]=');
+          if (operatorMethod != null) {
+            Logger.debug(
+                "[visitAssignmentExpression-Index] Found class operator '[]=' on ${targetValue.klass.name}. Calling...");
+            try {
+              operatorMethod
+                  .bind(targetValue)
+                  .call(this, [indexValue, finalValueToAssign], {});
+              return finalValueToAssign;
+            } on ReturnException catch (e) {
+              return finalValueToAssign; // []= should not return a value, but assignment expression returns assigned value
+            } catch (e) {
+              throw RuntimeError("Error executing class operator '[]=': $e");
+            }
+          } else {
+            // No class operator found, try extensions
+            const operatorName = '[]=';
+            try {
+              final extensionSetter =
+                  environment.findExtensionMember(targetValue, operatorName);
+              if (extensionSetter is InterpretedExtensionMethod &&
+                  extensionSetter.isOperator) {
+                Logger.debug(
+                    "[Assignment] Found extension operator '[]=' for ${targetValue.klass.name}. Calling...");
+                // Args: receiver (targetValue), index (indexValue), value (finalValueToAssign)
+                final extensionPositionalArgs = [
+                  targetValue,
+                  indexValue,
+                  finalValueToAssign
+                ];
+                try {
+                  extensionSetter.call(this, extensionPositionalArgs, {});
+                  // '[]=' operator should not return a meaningful value, but the assignment expression returns the assigned value
+                  return finalValueToAssign;
+                } catch (e) {
+                  throw RuntimeError(
+                      "Error executing extension operator '[]=': $e");
+                }
+              } else {
+                throw RuntimeError(
+                    'Cannot assign to index on ${targetValue.klass.name}: No operator []= found (class or extension).');
+              }
+            } on RuntimeError catch (findError) {
+              throw RuntimeError(
+                  'Cannot assign to index on ${targetValue.klass.name}: ${findError.message}');
+            }
+          }
         } else if (toBridgedInstance(targetValue).$2) {
           final bridgedInstance = toBridgedInstance(targetValue).$1!;
           final bridgedClass = bridgedInstance.bridgedClass;
@@ -3788,34 +3911,48 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           return -operand;
         } else if (operand is BigInt) {
           return -operand;
-        } else {
-          const operatorName = '-';
-          try {
-            final extensionOperator =
-                environment.findExtensionMember(operandValue, operatorName);
-            if (extensionOperator is InterpretedExtensionMethod &&
-                extensionOperator.isOperator) {
-              Logger.debug(
-                  "[PrefixExpr] Found extension operator '-' for type ${operandValue?.runtimeType}. Calling...");
-              // Args: receiver (operandValue)
-              try {
-                return extensionOperator.call(this, [operandValue], {});
-              } on ReturnException catch (e) {
-                return e.value;
-              } catch (e) {
-                throw RuntimeError(
-                    "Error executing extension operator '-': $e");
-              }
-            }
-          } on RuntimeError catch (findError) {
+        } else if (operandValue is InterpretedInstance) {
+          // Check for class operator - method
+          final operatorMethod = operandValue.findOperator('-');
+          if (operatorMethod != null) {
             Logger.debug(
-                "[PrefixExpr] Extension operator '-' not found for type ${operandValue?.runtimeType}. Error: ${findError.message}");
-            // Fall through
+                "[PrefixExpr] Found class operator '-' on ${operandValue.klass.name}. Calling...");
+            try {
+              return operatorMethod.bind(operandValue).call(this, [], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError("Error executing class operator '-': $e");
+            }
           }
-          // Error uses original value type if extension not found/failed
-          throw RuntimeError(
-              "Operand for unary '-' must be a number or have an extension operator, but was ${operandValue?.runtimeType}.");
+          // No class operator found, try extensions
         }
+
+        const operatorName = '-';
+        try {
+          final extensionOperator =
+              environment.findExtensionMember(operandValue, operatorName);
+          if (extensionOperator is InterpretedExtensionMethod &&
+              extensionOperator.isOperator) {
+            Logger.debug(
+                "[PrefixExpr] Found extension operator '-' for type ${operandValue?.runtimeType}. Calling...");
+            // Args: receiver (operandValue)
+            try {
+              return extensionOperator.call(this, [operandValue], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError("Error executing extension operator '-': $e");
+            }
+          }
+        } on RuntimeError catch (findError) {
+          Logger.debug(
+              "[PrefixExpr] Extension operator '-' not found for type ${operandValue?.runtimeType}. Error: ${findError.message}");
+          // Fall through
+        }
+        // Error uses original value type if extension not found/failed
+        throw RuntimeError(
+            "Operand for unary '-' must be a number or have an operator defined, but was ${operandValue?.runtimeType}.");
 
       case TokenType.TILDE: // Bitwise NOT (~)
         if (operand is int) {
@@ -3823,9 +3960,23 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         } else if (operand is BigInt) {
           // BigInt does not have a standard unary ~ operator in Dart
           // We rely solely on extensions for BigInt bitwise NOT
-        } else {
-          // Try extension operator directly if not int
+        } else if (operandValue is InterpretedInstance) {
+          // Check for class operator ~ method
+          final operatorMethod = operandValue.findOperator('~');
+          if (operatorMethod != null) {
+            Logger.debug(
+                "[PrefixExpr] Found class operator '~' on ${operandValue.klass.name}. Calling...");
+            try {
+              return operatorMethod.bind(operandValue).call(this, [], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError("Error executing class operator '~': $e");
+            }
+          }
+          // No class operator found, try extensions
         }
+
         // Try Extension Operator '~' (for non-int or BigInt)
         const operatorNameTilde = '~';
         try {
@@ -3851,7 +4002,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
         // Error if neither standard nor extension worked
         throw RuntimeError(
-            "Operand for unary '~' must be an int or have an extension operator, but was ${operandValue?.runtimeType}.");
+            "Operand for unary '~' must be an int or have an operator defined, but was ${operandValue?.runtimeType}.");
 
       case TokenType.PLUS_PLUS: // Prefix increment (++x)
       case TokenType.MINUS_MINUS: // Prefix decrement (--x)
@@ -3895,8 +4046,25 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be an assignable variable, property, or index.");
         }
       default:
-        // Check for other extension operators if not handled above
+        // Check for class operators first for any other unary operators
         final String operatorLexeme = node.operator.lexeme;
+        if (operandValue is InterpretedInstance) {
+          final operatorMethod = operandValue.findOperator(operatorLexeme);
+          if (operatorMethod != null) {
+            Logger.debug(
+                "[PrefixExpr] Found class operator '$operatorLexeme' on ${operandValue.klass.name}. Calling...");
+            try {
+              return operatorMethod.bind(operandValue).call(this, [], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError(
+                  "Error executing class operator '$operatorLexeme': $e");
+            }
+          }
+        }
+
+        // Check for extension operators if no class operator found
         try {
           final extensionOperator =
               environment.findExtensionMember(operandValue, operatorLexeme);
@@ -4279,6 +4447,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             klass.getters[methodName] = function;
           } else if (member.isSetter) {
             klass.setters[methodName] = function;
+          } else if (member.isOperator) {
+            // Add operator methods to the operators map
+            klass.operators[methodName] = function;
           } else {
             klass.methods[methodName] = function;
           }
@@ -4296,6 +4467,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             klass.getters[methodName] = function;
           } else if (member.isSetter) {
             klass.setters[methodName] = function;
+          } else if (member.isOperator) {
+            // Add abstract operator methods to the operators map
+            klass.operators[methodName] = function;
           } else {
             klass.methods[methodName] = function;
           }
@@ -4467,6 +4641,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               mixinClass.getters[methodName] = function;
             } else if (member.isSetter) {
               mixinClass.setters[methodName] = function;
+            } else if (member.isOperator) {
+              // Add operator methods to the operators map for mixins
+              mixinClass.operators[methodName] = function;
             } else {
               mixinClass.methods[methodName] = function;
             }

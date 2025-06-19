@@ -33,6 +33,7 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       <String, InterpretedFunction>{}, // staticSetters
       <String, Object?>{}, // staticFields
       <String, InterpretedFunction>{}, // constructors
+      <String, InterpretedFunction>{}, // operators
       // Named parameters
       isAbstract: node.abstractKeyword != null,
       isMixin:
@@ -71,6 +72,7 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       <String, InterpretedFunction>{}, // staticSetters
       <String, Object?>{}, // staticFields
       <String, InterpretedFunction>{}, // constructors (empty for mixins)
+      <String, InterpretedFunction>{}, // operators
       // Named parameters
       isAbstract: false, // Mixins are not abstract
       isMixin: true,
