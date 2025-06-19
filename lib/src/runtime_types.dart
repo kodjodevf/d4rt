@@ -616,10 +616,18 @@ class InterpretedInstance implements RuntimeValue {
   // Get: Field -> Getter -> Method (now includes inheritance)
   @override
   Object? get(String name, {InterpreterVisitor? visitor}) {
+    Logger.debug(
+        "[Instance.get] Looking for '$name' on instance $hashCode of '${klass.name}'. Fields: ${_fields.keys}");
+
     // Check fields in the current instance first
     if (_fields.containsKey(name)) {
+      Logger.debug(
+          "[Instance.get] Found field '$name' with value: ${_fields[name]}");
       return _fields[name];
     }
+
+    Logger.debug(
+        "[Instance.get] Field '$name' not found in instance fields. Checking getters/methods...");
 
     // Check instance members (getter/method) in the current class and superclasses
     InterpretedClass? currentClass = klass;
@@ -783,7 +791,7 @@ class InterpretedInstance implements RuntimeValue {
   @override
   void set(String name, Object? value, [InterpreterVisitor? visitor]) {
     Logger.debug(
-        "[Instance.set] called for '${klass.name}.$name' with value: $value");
+        "[Instance.set] called for '${klass.name}.$name' with value: $value on instance $hashCode");
     // Look for a setter in the current class and superclasses
     InterpretedClass? currentClass = klass;
     while (currentClass != null) {
@@ -820,7 +828,11 @@ class InterpretedInstance implements RuntimeValue {
     }
 
     // No setter found in the hierarchy or bridge, assign directly to the field
+    Logger.debug(
+        "[Instance.set] No setter found for '$name'. Setting field directly. Instance $hashCode");
     _fields[name] = value;
+    Logger.debug(
+        "[Instance.set] Field '$name' set. Fields now: ${_fields.keys}");
   }
 
   // Added to allow explicit field access, bypassing getters/methods for super

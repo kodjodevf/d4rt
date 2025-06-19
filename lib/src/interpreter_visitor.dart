@@ -1,4 +1,4 @@
-import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -493,7 +493,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       try {
         final member = prefixValue.get(memberName);
         if (member is InterpretedFunction && member.isGetter) {
-          return member.call(this, [], {});
+          return member.bind(prefixValue).call(this, [], {});
         } else {
           return member;
         }
@@ -3737,8 +3737,38 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       isNullable = returnType.toSource().contains('?');
     }
 
-    final declaredReturnType =
-        _resolveTypeAnnotation(node.returnType, isAsync: isAsync);
+    // Handle type parameters for generic functions
+    Environment? tempEnvironment;
+    final typeParameters = node.functionExpression.typeParameters;
+
+    if (typeParameters != null) {
+      Logger.debug(
+          "[InterpreterVisitor.visitFunctionDeclaration] Function '${node.name.lexeme}' has ${typeParameters.typeParameters.length} type parameters");
+
+      // Create a temporary environment for type resolution
+      tempEnvironment = Environment(enclosing: environment);
+
+      // Create temporary type parameter placeholders
+      for (final typeParam in typeParameters.typeParameters) {
+        final paramName = typeParam.name.lexeme;
+
+        // Create a simple TypeParameter placeholder in the temp environment
+        final typeParamPlaceholder = TypeParameter(paramName);
+        tempEnvironment.define(paramName, typeParamPlaceholder);
+
+        Logger.debug(
+            "[InterpreterVisitor.visitFunctionDeclaration]   Defined type parameter '$paramName' in temp environment");
+      }
+    }
+
+    // Use the temp environment (if any) for type resolution, otherwise use the normal environment
+    final resolveEnvironment = tempEnvironment ?? environment;
+
+    final declaredReturnType = tempEnvironment != null
+        ? _resolveTypeAnnotationWithEnvironment(
+            node.returnType, resolveEnvironment,
+            isAsync: isAsync)
+        : _resolveTypeAnnotation(node.returnType, isAsync: isAsync);
 
     final function = InterpretedFunction.declaration(
         node, environment, declaredReturnType, isNullable);
@@ -4037,9 +4067,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                     currentValue, operatorType == TokenType.PLUS_PLUS);
                 // Note: For --, we could either call x + (-1) or x - 1
                 // Let's use + with -1 for consistency
-                final newValue = operatorMethod
-                    .bind(operandValue)
-                    .call(this, [operand], {});
+                final newValue =
+                    operatorMethod.bind(operandValue).call(this, [operand], {});
                 // Assign the new value back to the variable
                 environment.assign(variableName, newValue);
                 // Return the *new* value
@@ -4086,7 +4115,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               if (operatorMethod != null) {
                 try {
                   // For ++x, we create a literal 1 and call x + 1
-                      operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  operatorType == TokenType.PLUS_PLUS ? 1 : -1;
                   // Note: For --, we could either call x + (-1) or x - 1
                   // Let's use + with -1 for consistency
                   newValue = operatorMethod
@@ -4142,7 +4171,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               if (operatorMethod != null) {
                 try {
                   // For ++x, we create a literal 1 and call x + 1
-                      operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  operatorType == TokenType.PLUS_PLUS ? 1 : -1;
                   // Note: For --, we could either call x + (-1) or x - 1
                   // Let's use + with -1 for consistency
                   newValue = operatorMethod
@@ -6038,6 +6067,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   // Resolve TypeAnnotation AST node to RuntimeType
   RuntimeType _resolveTypeAnnotation(TypeAnnotation? typeNode,
       {bool isAsync = false}) {
+    return _resolveTypeAnnotationWithEnvironment(typeNode, environment,
+        isAsync: isAsync);
+  }
+
+  // Resolve TypeAnnotation AST node to RuntimeType using a specific environment
+  RuntimeType _resolveTypeAnnotationWithEnvironment(
+      TypeAnnotation? typeNode, Environment env,
+      {bool isAsync = false}) {
     if (typeNode == null) {
       return BridgedClass(dynamic, name: 'dynamic');
     }
@@ -6054,7 +6091,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
       Logger.debug("[ResolveType] Resolving NamedType: $typeName");
       try {
-        final resolved = environment.get(typeName);
+        final resolved = env.get(typeName);
         if (resolved is RuntimeType) {
           Logger.debug(
               "[ResolveType]   Resolved to RuntimeType: ${resolved.name}");
@@ -6137,26 +6174,60 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               .toList();
         }
 
-        // Create and initialize the fields, passing the type arguments
-        final instance =
-            klass.createAndInitializeInstance(this, evaluatedTypeArguments);
-        // Bind 'this' and call the constructor logic
-        final boundConstructor = constructor.bind(instance);
-        boundConstructor.call(this, positionalArgs, namedArgs);
-        // The constructor call returns the instance
-        return instance;
-      } on ReturnException catch (e) {
-        // Use a cast after type checking
-        if (e.value != null && e.value is InterpretedInstance) {
-          final instance = e.value as InterpretedInstance; // Explicit cast
-          if (instance.klass == klass) {
-            // Check on the casted instance
-            return instance;
+        // Handle factory constructors differently from regular constructors
+        if (constructor.isFactory) {
+          // Factory constructors don't need a pre-created instance
+          // They are responsible for creating and returning their own instance
+          Logger.debug(
+              "[InstanceCreation] Calling factory constructor '$constructorLookupName'");
+
+          // Call the factory constructor directly without creating an instance first
+          // The factory will create its own instance and return it
+          final result = constructor.call(
+              this, positionalArgs, namedArgs, evaluatedTypeArguments);
+
+          // Factory constructors should return an instance of the expected type
+          if (result is InterpretedInstance && result.klass == klass) {
+            return result;
+          } else if (result is InterpretedInstance) {
+            throw RuntimeError(
+                "Factory constructor '$constructorLookupName' returned an instance of '${result.klass.name}' but expected '$constructorName'.");
+          } else {
+            throw RuntimeError(
+                "Factory constructor '$constructorLookupName' must return an instance, but returned ${result?.runtimeType}.");
           }
+        } else {
+          // Regular constructors: create instance first, then call constructor
+          Logger.debug(
+              "[InstanceCreation] Calling regular constructor '$constructorLookupName'");
+
+          // Create and initialize the fields, passing the type arguments
+          final instance =
+              klass.createAndInitializeInstance(this, evaluatedTypeArguments);
+          // Bind 'this' and call the constructor logic
+          final boundConstructor = constructor.bind(instance);
+          boundConstructor.call(this, positionalArgs, namedArgs);
+          // The constructor call returns the instance
+          return instance;
         }
-        // If the condition fails (null, not InterpretedInstance, or wrong class)
-        throw RuntimeError(
-            "Constructor return value error for '$constructorName'.");
+      } on ReturnException catch (e) {
+        // Handle return exceptions (applies to both factory and regular constructors)
+        if (constructor.isFactory) {
+          // For factory constructors, the return value is the actual result
+          return e.value;
+        } else {
+          // For regular constructors, check if returned value is valid
+          if (e.value != null && e.value is InterpretedInstance) {
+            final instance = e.value as InterpretedInstance; // Explicit cast
+            if (instance.klass == klass) {
+              // Check on the casted instance
+              return instance;
+            }
+          }
+          // If the condition fails (null, not InterpretedInstance, or wrong class)
+          throw RuntimeError(
+              "Constructor return value error for '$constructorName'.");
+        }
       } on RuntimeError catch (e) {
         // Simplified error message
         throw RuntimeError(
