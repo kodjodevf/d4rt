@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:d4rt/d4rt.dart';
 
@@ -37,13 +37,27 @@ class InterpretedFunction implements Callable {
   final bool isAbstract;
   // Async flag for methods/functions
   final bool isAsync;
+  // Factory flag for constructors
+  final bool isFactory;
 
   final RuntimeType? declaredReturnType; // Store the declared type
 
   final bool isNullable; // Store if the return type is nullable
 
+  // Store type parameter names from the original declaration
+  final List<String> typeParameterNames; // e.g., ['T', 'U', 'V']
+
   // Public getter for the closure environment
   Environment get closure => _closure;
+
+  // Helper method to extract type parameter names from a TypeParameterList
+  static List<String> _extractTypeParameterNames(
+      TypeParameterList? typeParameters) {
+    if (typeParameters == null) return const [];
+    return typeParameters.typeParameters
+        .map((param) => param.name.lexeme)
+        .toList();
+  }
 
   // Private constructor for bind
   InterpretedFunction._internal(
@@ -58,8 +72,10 @@ class InterpretedFunction implements Callable {
     this.ownerType,
     this.isAbstract = false,
     this.isAsync = false,
+    this.isFactory = false,
     this.declaredReturnType,
     this.isNullable = false,
+    this.typeParameterNames = const [],
   }) : _constructorInitializers = constructorInitializers;
 
   // Constructor for declared functions (top-level or nested, not methods)
@@ -78,6 +94,8 @@ class InterpretedFunction implements Callable {
               .functionExpression.body.isAsynchronous, // Pass async flag
           declaredReturnType: declaredReturnType,
           isNullable: isNullable,
+          typeParameterNames: _extractTypeParameterNames(
+              declaration.functionExpression.typeParameters),
         );
 
   // Constructor for function expressions (anonymous)
@@ -86,8 +104,9 @@ class InterpretedFunction implements Callable {
       : this._internal(expression.parameters, expression.body, closure, null,
             ownerType: null, // Not defined within a class/enum
             isAbstract: false, // Anonymous functions cannot be abstract
-            isAsync: expression.body.isAsynchronous // Pass async flag
-            );
+            isAsync: expression.body.isAsynchronous, // Pass async flag
+            typeParameterNames:
+                _extractTypeParameterNames(expression.typeParameters));
 
   // Constructor for methods
   InterpretedFunction.method(
@@ -100,21 +119,26 @@ class InterpretedFunction implements Callable {
             isSetter: declaration.isSetter, // Pass setter flag
             ownerType: owner, // Pass the owner type (class or enum)
             isAbstract: declaration.isAbstract, // Set the abstract flag
-            isAsync: declaration.body.isAsynchronous // Pass async flag
-            );
+            isAsync: declaration.body.isAsynchronous, // Pass async flag
+            typeParameterNames:
+                _extractTypeParameterNames(declaration.typeParameters));
 
   // Constructor for constructors
   InterpretedFunction.constructor(ConstructorDeclaration declaration,
       Environment closure, RuntimeType? owner)
-      : this._internal(declaration.parameters, declaration.body, closure,
-            declaration.name?.lexeme ?? '', // Use '' for unnamed constructor
-            isInitializer: true,
-            constructorInitializers:
-                declaration.initializers, // Pass to renamed param
-            ownerType: owner, // Pass the owner type (class or enum)
-            isAbstract: false, // Constructors cannot be abstract
-            isAsync: false // Constructors cannot be async
-            );
+      : this._internal(
+          declaration.parameters, declaration.body, closure,
+          declaration.name?.lexeme ?? '', // Use '' for unnamed constructor
+          isInitializer: declaration.factoryKeyword ==
+              null, // Factory constructors are not initializers
+          constructorInitializers:
+              declaration.initializers, // Pass to renamed param
+          ownerType: owner, // Pass the owner type (class or enum)
+          isAbstract: false, // Constructors cannot be abstract
+          isAsync: false, // Constructors cannot be async
+          isFactory:
+              declaration.factoryKeyword != null, // Detect factory constructors
+        );
 
   @override
   int get arity {
@@ -161,7 +185,9 @@ class InterpretedFunction implements Callable {
       ownerType: ownerType, // Pass ownerType
       isAbstract: isAbstract,
       isAsync: isAsync,
+      isFactory: isFactory, // Copy the factory flag
       declaredReturnType: declaredReturnType,
+      typeParameterNames: typeParameterNames, // Copy type parameter names
     );
     return boundFunction;
   }
@@ -172,8 +198,43 @@ class InterpretedFunction implements Callable {
     InterpreterVisitor visitor,
     List<Object?> positionalArguments,
     Map<String, Object?> namedArguments,
+    List<RuntimeType>? typeArguments,
   ) {
     final executionEnvironment = Environment(enclosing: _closure);
+
+    // Handle type parameters (generics) if provided
+    if (typeArguments != null && typeArguments.isNotEmpty) {
+      // Use the stored type parameter names from the declaration
+      for (int i = 0;
+          i < typeArguments.length && i < typeParameterNames.length;
+          i++) {
+        final paramName = typeParameterNames[i];
+        final typeArg = typeArguments[i];
+
+        // Define the type parameter in the execution environment
+        executionEnvironment.define(paramName, typeArg);
+
+        Logger.debug(
+            "[InterpretedFunction._prepareExecutionEnvironment] Defined type parameter '$paramName' = ${typeArg.name}");
+      }
+    }
+
+    // Also handle declared type parameters without explicit type arguments
+    // (needed for cases where a method has type parameters but no explicit type args are provided)
+    if (typeParameterNames.isNotEmpty) {
+      for (final paramName in typeParameterNames) {
+        // Only define if not already defined by type arguments above
+        if (!executionEnvironment.isDefinedLocally(paramName)) {
+          // Create a placeholder TypeParameter
+          final typeParam = TypeParameter(paramName);
+          executionEnvironment.define(paramName, typeParam);
+
+          Logger.debug(
+              "[InterpretedFunction._prepareExecutionEnvironment] Defined placeholder type parameter '$paramName'");
+        }
+      }
+    }
+
     final params = _parameters?.parameters;
     int positionalArgIndex = 0;
     final providedNamedArgs = namedArguments;
@@ -515,6 +576,7 @@ class InterpretedFunction implements Callable {
       visitor,
       positionalArguments,
       namedArguments,
+      typeArguments, // Pass type arguments to preparation
     );
 
     final executionEnvironment = prepResult.environment;

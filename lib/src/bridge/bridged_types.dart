@@ -124,3 +124,24 @@ class BridgedInstance<T extends Object> implements RuntimeValue {
     }
   }
 }
+
+/// Represents a generic type parameter like T, U, etc.
+class TypeParameter implements RuntimeType {
+  @override
+  final String name;
+  final RuntimeType?
+      bound; // The extends clause if any (e.g., T extends Object)
+
+  TypeParameter(this.name, {this.bound});
+
+  @override
+  bool isSubtypeOf(RuntimeType other) {
+    // For now, type parameters accept any type as a subtype
+    // This is because we don't have full generic type inference yet
+    // In a real type system, this would be more sophisticated
+    return true;
+  }
+
+  @override
+  String toString() => name;
+}
