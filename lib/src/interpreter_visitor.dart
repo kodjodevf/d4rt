@@ -1,4 +1,4 @@
-import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -205,6 +205,19 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   Object? visitStringLiteral(StringLiteral node) {
     if (node is SimpleStringLiteral) {
       return node.value;
+    } else if (node is AdjacentStrings) {
+      // Handle adjacent strings like 'Hello ' 'World!'
+      final buffer = StringBuffer();
+      for (final stringLiteral in node.strings) {
+        if (stringLiteral is SimpleStringLiteral) {
+          buffer.write(stringLiteral.value);
+        } else {
+          // Recursively handle nested adjacent strings or other string types
+          final value = visitStringLiteral(stringLiteral);
+          buffer.write(value.toString());
+        }
+      }
+      return buffer.toString();
     }
     throw UnimplementedError(
       'Type de StringLiteral non géré: ${node.runtimeType}',
@@ -493,7 +506,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       try {
         final member = prefixValue.get(memberName);
         if (member is InterpretedFunction && member.isGetter) {
-          return member.call(this, [], {});
+          return member.bind(prefixValue).call(this, [], {});
         } else {
           return member;
         }
@@ -761,6 +774,26 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     // Moved this block BEFORE standard ==, !=, <, <=, >, >= checks
     final operatorName = operator.lexeme;
+
+    // Check for class operator methods FIRST (before extensions and built-in operators)
+    if (leftOperandValue is InterpretedInstance) {
+      final operatorMethod = leftOperandValue.findOperator(operatorName);
+      if (operatorMethod != null) {
+        Logger.debug(
+            "[BinaryExpression] Found class operator '$operatorName' on ${leftOperandValue.klass.name}. Calling...");
+        try {
+          return operatorMethod
+              .bind(leftOperandValue)
+              .call(this, [rightOperandValue], {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError(
+              "Error executing class operator '$operatorName': $e");
+        }
+      }
+    }
+
     // Only try extension immediately for operators where standard checks might bypass it
     // (e.g., ==, !=, <, >, <=, >= which have generic fallbacks)
     bool checkExtensionEarly = [
@@ -926,6 +959,20 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         return targetValue[indexValue];
       } else {
         throw RuntimeError('List index must be an integer');
+      }
+    } else if (targetValue is InterpretedInstance) {
+      // Check for class operator [] method
+      final operatorMethod = targetValue.findOperator('[]');
+      if (operatorMethod != null) {
+        Logger.debug(
+            "[visitIndexExpression] Found class operator '[]' on ${targetValue.klass.name}. Calling...");
+        try {
+          return operatorMethod.bind(targetValue).call(this, [indexValue], {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError("Error executing class operator '[]': $e");
+        }
       }
     } else if (toBridgedInstance(targetValue).$2) {
       final bridgedInstance = toBridgedInstance(targetValue).$1!;
@@ -1567,6 +1614,46 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                   'Index out of range for compound assignment read: $indexValue');
             }
             currentValue = targetValue[indexValue];
+          } else if (targetValue is InterpretedInstance) {
+            // Check for class operator [] method for reading current value
+            final operatorMethod = targetValue.findOperator('[]');
+            if (operatorMethod != null) {
+              try {
+                currentValue = operatorMethod
+                    .bind(targetValue)
+                    .call(this, [indexValue], {});
+              } on ReturnException catch (e) {
+                currentValue = e.value;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing class operator '[]' for compound read: $e");
+              }
+            } else {
+              // No class operator found, try extensions
+              try {
+                final extensionGetter =
+                    environment.findExtensionMember(targetValue, '[]');
+                if (extensionGetter is InterpretedExtensionMethod &&
+                    extensionGetter.isOperator) {
+                  final extensionPositionalArgs = [targetValue, indexValue];
+                  try {
+                    currentValue =
+                        extensionGetter.call(this, extensionPositionalArgs, {});
+                  } on ReturnException catch (e) {
+                    currentValue = e.value;
+                  } catch (e) {
+                    throw RuntimeError(
+                        "Error executing extension operator '[]' for compound read: $e");
+                  }
+                } else {
+                  throw RuntimeError(
+                      'Cannot read current value for compound index assignment on ${targetValue.klass.name}: No operator [] found (class or extension).');
+                }
+              } on RuntimeError catch (e) {
+                throw RuntimeError(
+                    'Cannot read current value for compound index assignment on ${targetValue.klass.name}: ${e.message}');
+              }
+            }
           } else {
             try {
               final extensionGetter =
@@ -1610,6 +1697,55 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
           targetValue[indexValue] = finalValueToAssign;
           return finalValueToAssign;
+        } else if (targetValue is InterpretedInstance) {
+          // Check for class operator []= method
+          final operatorMethod = targetValue.findOperator('[]=');
+          if (operatorMethod != null) {
+            Logger.debug(
+                "[visitAssignmentExpression-Index] Found class operator '[]=' on ${targetValue.klass.name}. Calling...");
+            try {
+              operatorMethod
+                  .bind(targetValue)
+                  .call(this, [indexValue, finalValueToAssign], {});
+              return finalValueToAssign;
+            } on ReturnException catch (e) {
+              return finalValueToAssign; // []= should not return a value, but assignment expression returns assigned value
+            } catch (e) {
+              throw RuntimeError("Error executing class operator '[]=': $e");
+            }
+          } else {
+            // No class operator found, try extensions
+            const operatorName = '[]=';
+            try {
+              final extensionSetter =
+                  environment.findExtensionMember(targetValue, operatorName);
+              if (extensionSetter is InterpretedExtensionMethod &&
+                  extensionSetter.isOperator) {
+                Logger.debug(
+                    "[Assignment] Found extension operator '[]=' for ${targetValue.klass.name}. Calling...");
+                // Args: receiver (targetValue), index (indexValue), value (finalValueToAssign)
+                final extensionPositionalArgs = [
+                  targetValue,
+                  indexValue,
+                  finalValueToAssign
+                ];
+                try {
+                  extensionSetter.call(this, extensionPositionalArgs, {});
+                  // '[]=' operator should not return a meaningful value, but the assignment expression returns the assigned value
+                  return finalValueToAssign;
+                } catch (e) {
+                  throw RuntimeError(
+                      "Error executing extension operator '[]=': $e");
+                }
+              } else {
+                throw RuntimeError(
+                    'Cannot assign to index on ${targetValue.klass.name}: No operator []= found (class or extension).');
+              }
+            } on RuntimeError catch (findError) {
+              throw RuntimeError(
+                  'Cannot assign to index on ${targetValue.klass.name}: ${findError.message}');
+            }
+          }
         } else if (toBridgedInstance(targetValue).$2) {
           final bridgedInstance = toBridgedInstance(targetValue).$1!;
           final bridgedClass = bridgedInstance.bridgedClass;
@@ -3614,8 +3750,38 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       isNullable = returnType.toSource().contains('?');
     }
 
-    final declaredReturnType =
-        _resolveTypeAnnotation(node.returnType, isAsync: isAsync);
+    // Handle type parameters for generic functions
+    Environment? tempEnvironment;
+    final typeParameters = node.functionExpression.typeParameters;
+
+    if (typeParameters != null) {
+      Logger.debug(
+          "[InterpreterVisitor.visitFunctionDeclaration] Function '${node.name.lexeme}' has ${typeParameters.typeParameters.length} type parameters");
+
+      // Create a temporary environment for type resolution
+      tempEnvironment = Environment(enclosing: environment);
+
+      // Create temporary type parameter placeholders
+      for (final typeParam in typeParameters.typeParameters) {
+        final paramName = typeParam.name.lexeme;
+
+        // Create a simple TypeParameter placeholder in the temp environment
+        final typeParamPlaceholder = TypeParameter(paramName);
+        tempEnvironment.define(paramName, typeParamPlaceholder);
+
+        Logger.debug(
+            "[InterpreterVisitor.visitFunctionDeclaration]   Defined type parameter '$paramName' in temp environment");
+      }
+    }
+
+    // Use the temp environment (if any) for type resolution, otherwise use the normal environment
+    final resolveEnvironment = tempEnvironment ?? environment;
+
+    final declaredReturnType = tempEnvironment != null
+        ? _resolveTypeAnnotationWithEnvironment(
+            node.returnType, resolveEnvironment,
+            isAsync: isAsync)
+        : _resolveTypeAnnotation(node.returnType, isAsync: isAsync);
 
     final function = InterpretedFunction.declaration(
         node, environment, declaredReturnType, isNullable);
@@ -3788,34 +3954,48 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           return -operand;
         } else if (operand is BigInt) {
           return -operand;
-        } else {
-          const operatorName = '-';
-          try {
-            final extensionOperator =
-                environment.findExtensionMember(operandValue, operatorName);
-            if (extensionOperator is InterpretedExtensionMethod &&
-                extensionOperator.isOperator) {
-              Logger.debug(
-                  "[PrefixExpr] Found extension operator '-' for type ${operandValue?.runtimeType}. Calling...");
-              // Args: receiver (operandValue)
-              try {
-                return extensionOperator.call(this, [operandValue], {});
-              } on ReturnException catch (e) {
-                return e.value;
-              } catch (e) {
-                throw RuntimeError(
-                    "Error executing extension operator '-': $e");
-              }
-            }
-          } on RuntimeError catch (findError) {
+        } else if (operandValue is InterpretedInstance) {
+          // Check for class operator - method
+          final operatorMethod = operandValue.findOperator('-');
+          if (operatorMethod != null) {
             Logger.debug(
-                "[PrefixExpr] Extension operator '-' not found for type ${operandValue?.runtimeType}. Error: ${findError.message}");
-            // Fall through
+                "[PrefixExpr] Found class operator '-' on ${operandValue.klass.name}. Calling...");
+            try {
+              return operatorMethod.bind(operandValue).call(this, [], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError("Error executing class operator '-': $e");
+            }
           }
-          // Error uses original value type if extension not found/failed
-          throw RuntimeError(
-              "Operand for unary '-' must be a number or have an extension operator, but was ${operandValue?.runtimeType}.");
+          // No class operator found, try extensions
         }
+
+        const operatorName = '-';
+        try {
+          final extensionOperator =
+              environment.findExtensionMember(operandValue, operatorName);
+          if (extensionOperator is InterpretedExtensionMethod &&
+              extensionOperator.isOperator) {
+            Logger.debug(
+                "[PrefixExpr] Found extension operator '-' for type ${operandValue?.runtimeType}. Calling...");
+            // Args: receiver (operandValue)
+            try {
+              return extensionOperator.call(this, [operandValue], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError("Error executing extension operator '-': $e");
+            }
+          }
+        } on RuntimeError catch (findError) {
+          Logger.debug(
+              "[PrefixExpr] Extension operator '-' not found for type ${operandValue?.runtimeType}. Error: ${findError.message}");
+          // Fall through
+        }
+        // Error uses original value type if extension not found/failed
+        throw RuntimeError(
+            "Operand for unary '-' must be a number or have an operator defined, but was ${operandValue?.runtimeType}.");
 
       case TokenType.TILDE: // Bitwise NOT (~)
         if (operand is int) {
@@ -3823,9 +4003,23 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         } else if (operand is BigInt) {
           // BigInt does not have a standard unary ~ operator in Dart
           // We rely solely on extensions for BigInt bitwise NOT
-        } else {
-          // Try extension operator directly if not int
+        } else if (operandValue is InterpretedInstance) {
+          // Check for class operator ~ method
+          final operatorMethod = operandValue.findOperator('~');
+          if (operatorMethod != null) {
+            Logger.debug(
+                "[PrefixExpr] Found class operator '~' on ${operandValue.klass.name}. Calling...");
+            try {
+              return operatorMethod.bind(operandValue).call(this, [], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError("Error executing class operator '~': $e");
+            }
+          }
+          // No class operator found, try extensions
         }
+
         // Try Extension Operator '~' (for non-int or BigInt)
         const operatorNameTilde = '~';
         try {
@@ -3851,16 +4045,16 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
         // Error if neither standard nor extension worked
         throw RuntimeError(
-            "Operand for unary '~' must be an int or have an extension operator, but was ${operandValue?.runtimeType}.");
+            "Operand for unary '~' must be an int or have an operator defined, but was ${operandValue?.runtimeType}.");
 
       case TokenType.PLUS_PLUS: // Prefix increment (++x)
       case TokenType.MINUS_MINUS: // Prefix decrement (--x)
         // Re-evaluate and unwrap operand specifically for ++/--
-        final assignOperandValue = operandNode.accept<Object?>(this);
-        final bridgedInstance = toBridgedInstance(assignOperandValue);
+        final operandValue = operandNode.accept<Object?>(this);
+        final bridgedInstance = toBridgedInstance(operandValue);
         final assignOperand = bridgedInstance.$2
             ? bridgedInstance.$1!.nativeObject
-            : assignOperandValue;
+            : operandValue;
 
         // Check if AST node is assignable (SimpleIdentifier or PropertyAccess for now)
         if (operandNode is SimpleIdentifier) {
@@ -3876,27 +4070,273 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             environment.assign(variableName, newValue);
             // Return the *new* value
             return newValue;
+          } else if (operandValue is InterpretedInstance) {
+            // Use custom + operator with literal 1
+            final operatorMethod = operandValue.findOperator('+');
+            if (operatorMethod != null) {
+              try {
+                // For ++x, we create appropriate operand and call x + operand
+                final operand = _createIncrementOperand(
+                    currentValue, operatorType == TokenType.PLUS_PLUS);
+                // Note: For --, we could either call x + (-1) or x - 1
+                // Let's use + with -1 for consistency
+                final newValue =
+                    operatorMethod.bind(operandValue).call(this, [operand], {});
+                // Assign the new value back to the variable
+                environment.assign(variableName, newValue);
+                // Return the *new* value
+                return newValue;
+              } on ReturnException catch (e) {
+                final newValue = e.value;
+                // Assign the new value back to the variable
+                environment.assign(variableName, newValue);
+                // Return the *new* value
+                return newValue;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement object of type '${operandValue.klass.name}': No operator '+' found.");
+            }
           } else {
             // Requires finding operator +/-, then assigning back.
             // Complex, skip for now.
             // Error uses original value type
             throw RuntimeError(
-                "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be a number, but was ${assignOperandValue?.runtimeType}. Extension support TBD.");
+                "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be a number, but was ${operandValue?.runtimeType}. Extension support TBD.");
           }
         } else if (operandNode is PropertyAccess) {
-          // Requires getting current, calculating new, setting back (field/setter/extension?)
-          throw UnimplementedError(
-              "Prefix ++/-- on property access not implemented yet.");
+          // Handle property access like obj.field++
+          final targetValue = operandNode.target?.accept<Object?>(this);
+          final propertyName = operandNode.propertyName.name;
+
+          if (targetValue is InterpretedInstance) {
+            // Get current value via getter or field
+            final currentValue = targetValue.get(propertyName);
+
+            // Calculate new value
+            Object? newValue;
+            if (currentValue is num) {
+              newValue = operatorType == TokenType.PLUS_PLUS
+                  ? currentValue + 1
+                  : currentValue - 1;
+            } else if (currentValue is InterpretedInstance) {
+              // Use custom + operator with literal 1
+              final operatorMethod = currentValue.findOperator('+');
+              if (operatorMethod != null) {
+                try {
+                  // For ++x, we create a literal 1 and call x + 1
+                  operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  // Note: For --, we could either call x + (-1) or x - 1
+                  // Let's use + with -1 for consistency
+                  newValue = operatorMethod
+                      .bind(currentValue)
+                      .call(this, [operand], {});
+                } on ReturnException catch (e) {
+                  newValue = e.value;
+                } catch (e) {
+                  throw RuntimeError(
+                      "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+                }
+              } else {
+                throw RuntimeError(
+                    "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+            }
+
+            // Set new value via setter or field
+            final setter = targetValue.klass.findInstanceSetter(propertyName);
+            if (setter != null) {
+              setter.bind(targetValue).call(this, [newValue], {});
+            } else {
+              targetValue.set(propertyName, newValue, this);
+            }
+
+            // Return the *new* value for prefix operators
+            return newValue;
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+          }
+        } else if (operandNode is PrefixedIdentifier) {
+          // Handle prefixed identifier like obj.field++ (parsed as PrefixedIdentifier)
+          final targetValue = operandNode.prefix.accept<Object?>(this);
+          final propertyName = operandNode.identifier.name;
+
+          if (targetValue is InterpretedInstance) {
+            // Get current value via getter or field
+            final currentValue = targetValue.get(propertyName);
+
+            // Calculate new value
+            Object? newValue;
+            if (currentValue is num) {
+              newValue = operatorType == TokenType.PLUS_PLUS
+                  ? currentValue + 1
+                  : currentValue - 1;
+            } else if (currentValue is InterpretedInstance) {
+              // Use custom + operator with literal 1
+              final operatorMethod = currentValue.findOperator('+');
+              if (operatorMethod != null) {
+                try {
+                  // For ++x, we create a literal 1 and call x + 1
+                  operatorType == TokenType.PLUS_PLUS ? 1 : -1;
+                  // Note: For --, we could either call x + (-1) or x - 1
+                  // Let's use + with -1 for consistency
+                  newValue = operatorMethod
+                      .bind(currentValue)
+                      .call(this, [operand], {});
+                } on ReturnException catch (e) {
+                  newValue = e.value;
+                } catch (e) {
+                  throw RuntimeError(
+                      "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+                }
+              } else {
+                throw RuntimeError(
+                    "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+            }
+
+            // Set new value via setter or field
+            final setter = targetValue.klass.findInstanceSetter(propertyName);
+            if (setter != null) {
+              setter.bind(targetValue).call(this, [newValue], {});
+            } else {
+              targetValue.set(propertyName, newValue, this);
+            }
+
+            // Return the *new* value for prefix operators
+            return newValue;
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+          }
         } else if (operandNode is IndexExpression) {
-          throw UnimplementedError(
-              "Prefix ++/-- on index access not implemented yet.");
+          // Handle index access like ++array[i]
+          final targetValue = operandNode.target?.accept<Object?>(this);
+          final indexValue = operandNode.index.accept<Object?>(this);
+
+          // Get current value via [] operator or direct access
+          Object? currentValue;
+          if (targetValue is List) {
+            final index = indexValue as int;
+            currentValue = targetValue[index];
+          } else if (targetValue is Map) {
+            currentValue = targetValue[indexValue];
+          } else if (targetValue is InterpretedInstance) {
+            // Use class operator [] if available
+            final operatorMethod = targetValue.findOperator('[]');
+            if (operatorMethod != null) {
+              try {
+                currentValue = operatorMethod
+                    .bind(targetValue)
+                    .call(this, [indexValue], {});
+              } on ReturnException catch (e) {
+                currentValue = e.value;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing class operator '[]' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot read index for prefix increment/decrement on ${targetValue.klass.name}: No operator '[]' found.");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot apply prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' to index of type '${targetValue?.runtimeType}'.");
+          }
+
+          // Calculate new value
+          Object? newValue;
+          if (currentValue is num) {
+            newValue = operatorType == TokenType.PLUS_PLUS
+                ? currentValue + 1
+                : currentValue - 1;
+          } else if (currentValue is InterpretedInstance) {
+            // Use custom + operator with literal 1
+            final operatorMethod = currentValue.findOperator('+');
+            if (operatorMethod != null) {
+              try {
+                final operand = _createIncrementOperand(
+                    currentValue, operatorType == TokenType.PLUS_PLUS);
+                newValue =
+                    operatorMethod.bind(currentValue).call(this, [operand], {});
+              } on ReturnException catch (e) {
+                newValue = e.value;
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing custom operator '+' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement object at index of type '${currentValue.klass.name}': No operator '+' found.");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement value at index of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+          }
+
+          // Set new value via []= operator or direct access
+          if (targetValue is List) {
+            final index = indexValue as int;
+            targetValue[index] = newValue;
+          } else if (targetValue is Map) {
+            targetValue[indexValue] = newValue;
+          } else if (targetValue is InterpretedInstance) {
+            // Use class operator []= if available
+            final operatorMethod = targetValue.findOperator('[]=');
+            if (operatorMethod != null) {
+              try {
+                operatorMethod
+                    .bind(targetValue)
+                    .call(this, [indexValue, newValue], {});
+              } on ReturnException catch (e) {
+                // []= should not return a value, but assignment expression returns assigned value
+              } catch (e) {
+                throw RuntimeError(
+                    "Error executing class operator '[]=' for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+              }
+            } else {
+              throw RuntimeError(
+                  "Cannot write index for prefix increment/decrement on ${targetValue.klass.name}: No operator '[]=' found.");
+            }
+          }
+
+          // Return the *new* value for prefix operators
+          return newValue;
         } else {
+          Logger.debug("Operand type: ${operandNode.runtimeType}");
           throw RuntimeError(
               "Operand for prefix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be an assignable variable, property, or index.");
         }
       default:
-        // Check for other extension operators if not handled above
+        // Check for class operators first for any other unary operators
         final String operatorLexeme = node.operator.lexeme;
+        if (operandValue is InterpretedInstance) {
+          final operatorMethod = operandValue.findOperator(operatorLexeme);
+          if (operatorMethod != null) {
+            Logger.debug(
+                "[PrefixExpr] Found class operator '$operatorLexeme' on ${operandValue.klass.name}. Calling...");
+            try {
+              return operatorMethod.bind(operandValue).call(this, [], {});
+            } on ReturnException catch (e) {
+              return e.value;
+            } catch (e) {
+              throw RuntimeError(
+                  "Error executing class operator '$operatorLexeme': $e");
+            }
+          }
+        }
+
+        // Check for extension operators if no class operator found
         try {
           final extensionOperator =
               environment.findExtensionMember(operandValue, operatorLexeme);
@@ -3984,13 +4424,271 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
 
         return operandValue; // Return the original value
+      } else if (operandValue is InterpretedInstance) {
+        // Use custom + operator with literal 1
+        final operatorMethod = operandValue.findOperator('+');
+        if (operatorMethod != null) {
+          try {
+            // For x++, we create a literal 1 and call x + 1
+            final operand = _createIncrementOperand(
+                currentValue, operatorType == TokenType.PLUS_PLUS);
+            Object? newValue =
+                operatorMethod.bind(operandValue).call(this, [operand], {});
+
+            // Assign back to correct target (lexical or instance)
+            if (isInstanceField && thisInstance != null) {
+              final setter =
+                  thisInstance.klass.findInstanceSetter(variableName);
+              if (setter != null) {
+                setter.bind(thisInstance).call(this, [newValue], {});
+              } else {
+                thisInstance.set(
+                    variableName, newValue, this); // Assign to instance field
+              }
+            } else {
+              environment.assign(
+                  variableName, newValue); // Assign to lexical variable
+            }
+
+            return operandValue; // Return the original value for postfix
+          } on ReturnException catch (e) {
+            final newValue = e.value;
+
+            // Assign back to correct target (lexical or instance)
+            if (isInstanceField && thisInstance != null) {
+              final setter =
+                  thisInstance.klass.findInstanceSetter(variableName);
+              if (setter != null) {
+                setter.bind(thisInstance).call(this, [newValue], {});
+              } else {
+                thisInstance.set(
+                    variableName, newValue, this); // Assign to instance field
+              }
+            } else {
+              environment.assign(
+                  variableName, newValue); // Assign to lexical variable
+            }
+
+            return operandValue; // Return the original value for postfix
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement object of type '${operandValue.klass.name}': No operator '+' found.");
+        }
       } else {
         throw RuntimeError(
             "Operand for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be a number, but was ${operandValue?.runtimeType}.");
       }
     } else if (node.operand is PropertyAccess) {
-      throw UnimplementedError(
-          "Postfix operators on property access (e.g., obj.count++) are not yet implemented.");
+      // Handle property access like obj.field++
+      final propertyAccess = node.operand as PropertyAccess;
+      final targetValue = propertyAccess.target?.accept<Object?>(this);
+      final propertyName = propertyAccess.propertyName.name;
+
+      if (targetValue is InterpretedInstance) {
+        // Get current value via getter or field
+        final currentValue = targetValue.get(propertyName);
+        final originalValue = currentValue; // Save for return
+
+        // Calculate new value
+        Object? newValue;
+        if (currentValue is num) {
+          newValue = operatorType == TokenType.PLUS_PLUS
+              ? currentValue + 1
+              : currentValue - 1;
+        } else if (currentValue is InterpretedInstance) {
+          // Use custom + operator with literal 1
+          final operatorMethod = currentValue.findOperator('+');
+          if (operatorMethod != null) {
+            try {
+              // For x++, we create a literal 1 and call x + 1
+              final operand = _createIncrementOperand(
+                  currentValue, operatorType == TokenType.PLUS_PLUS);
+              newValue =
+                  operatorMethod.bind(currentValue).call(this, [operand], {});
+            } on ReturnException catch (e) {
+              newValue = e.value;
+            } catch (e) {
+              throw RuntimeError(
+                  "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+        }
+
+        // Set new value via setter or field
+        final setter = targetValue.klass.findInstanceSetter(propertyName);
+        if (setter != null) {
+          setter.bind(targetValue).call(this, [newValue], {});
+        } else {
+          targetValue.set(propertyName, newValue, this);
+        }
+
+        // Return the *original* value for postfix operators
+        return originalValue;
+      } else {
+        throw RuntimeError(
+            "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+      }
+    } else if (node.operand is PrefixedIdentifier) {
+      // Handle prefixed identifier like obj.field++ (parsed as PrefixedIdentifier)
+      final prefixedIdentifier = node.operand as PrefixedIdentifier;
+      final targetValue = prefixedIdentifier.prefix.accept<Object?>(this);
+      final propertyName = prefixedIdentifier.identifier.name;
+
+      if (targetValue is InterpretedInstance) {
+        // Get current value via getter or field
+        final currentValue = targetValue.get(propertyName);
+        final originalValue = currentValue; // Save for return
+
+        // Calculate new value
+        Object? newValue;
+        if (currentValue is num) {
+          newValue = operatorType == TokenType.PLUS_PLUS
+              ? currentValue + 1
+              : currentValue - 1;
+        } else if (currentValue is InterpretedInstance) {
+          // Use custom + operator with literal 1
+          final operatorMethod = currentValue.findOperator('+');
+          if (operatorMethod != null) {
+            try {
+              // For x++, we create a literal 1 and call x + 1
+              final operand = _createIncrementOperand(
+                  currentValue, operatorType == TokenType.PLUS_PLUS);
+              newValue =
+                  operatorMethod.bind(currentValue).call(this, [operand], {});
+            } on ReturnException catch (e) {
+              newValue = e.value;
+            } catch (e) {
+              throw RuntimeError(
+                  "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+            }
+          } else {
+            throw RuntimeError(
+                "Cannot increment/decrement object of type '${currentValue.klass.name}': No operator '+' found.");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement property '$propertyName' of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+        }
+
+        // Set new value via setter or field
+        final setter = targetValue.klass.findInstanceSetter(propertyName);
+        if (setter != null) {
+          setter.bind(targetValue).call(this, [newValue], {});
+        } else {
+          targetValue.set(propertyName, newValue, this);
+        }
+
+        // Return the *original* value for postfix operators
+        return originalValue;
+      } else {
+        throw RuntimeError(
+            "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
+      }
+    } else if (node.operand is IndexExpression) {
+      // Handle index access like array[i]++
+      final indexExpression = node.operand as IndexExpression;
+      final targetValue = indexExpression.target?.accept<Object?>(this);
+      final indexValue = indexExpression.index.accept<Object?>(this);
+
+      // Get current value via [] operator or direct access
+      Object? currentValue;
+      if (targetValue is List) {
+        final index = indexValue as int;
+        currentValue = targetValue[index];
+      } else if (targetValue is Map) {
+        currentValue = targetValue[indexValue];
+      } else if (targetValue is InterpretedInstance) {
+        // Use class operator [] if available
+        final operatorMethod = targetValue.findOperator('[]');
+        if (operatorMethod != null) {
+          try {
+            currentValue =
+                operatorMethod.bind(targetValue).call(this, [indexValue], {});
+          } on ReturnException catch (e) {
+            currentValue = e.value;
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing class operator '[]' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot read index for postfix increment/decrement on ${targetValue.klass.name}: No operator '[]' found.");
+        }
+      } else {
+        throw RuntimeError(
+            "Cannot apply postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' to index of type '${targetValue?.runtimeType}'.");
+      }
+
+      final originalValue = currentValue; // Save for return
+
+      // Calculate new value
+      Object? newValue;
+      if (currentValue is num) {
+        newValue = operatorType == TokenType.PLUS_PLUS
+            ? currentValue + 1
+            : currentValue - 1;
+      } else if (currentValue is InterpretedInstance) {
+        // Use custom + operator with literal 1
+        final operatorMethod = currentValue.findOperator('+');
+        if (operatorMethod != null) {
+          try {
+            final operand = _createIncrementOperand(
+                currentValue, operatorType == TokenType.PLUS_PLUS);
+            newValue =
+                operatorMethod.bind(currentValue).call(this, [operand], {});
+          } on ReturnException catch (e) {
+            newValue = e.value;
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing custom operator '+' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement object at index of type '${currentValue.klass.name}': No operator '+' found.");
+        }
+      } else {
+        throw RuntimeError(
+            "Cannot increment/decrement value at index of type '${currentValue?.runtimeType}': Expected number or object with '+' operator.");
+      }
+
+      // Set new value via []= operator or direct access
+      if (targetValue is List) {
+        final index = indexValue as int;
+        targetValue[index] = newValue;
+      } else if (targetValue is Map) {
+        targetValue[indexValue] = newValue;
+      } else if (targetValue is InterpretedInstance) {
+        // Use class operator []= if available
+        final operatorMethod = targetValue.findOperator('[]=');
+        if (operatorMethod != null) {
+          try {
+            operatorMethod
+                .bind(targetValue)
+                .call(this, [indexValue, newValue], {});
+          } on ReturnException catch (e) {
+            // []= should not return a value, but assignment expression returns assigned value
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing class operator '[]=' for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}': $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Cannot write index for postfix increment/decrement on ${targetValue.klass.name}: No operator '[]=' found.");
+        }
+      }
+
+      // Return the *original* value for postfix operators
+      return originalValue;
     } else {
       throw RuntimeError(
           "Operand for postfix '${operatorType == TokenType.PLUS_PLUS ? '++' : '--'}' must be an assignable variable or property.");
@@ -4279,6 +4977,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             klass.getters[methodName] = function;
           } else if (member.isSetter) {
             klass.setters[methodName] = function;
+          } else if (member.isOperator) {
+            // Add operator methods to the operators map
+            klass.operators[methodName] = function;
           } else {
             klass.methods[methodName] = function;
           }
@@ -4296,6 +4997,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             klass.getters[methodName] = function;
           } else if (member.isSetter) {
             klass.setters[methodName] = function;
+          } else if (member.isOperator) {
+            // Add abstract operator methods to the operators map
+            klass.operators[methodName] = function;
           } else {
             klass.methods[methodName] = function;
           }
@@ -4467,6 +5171,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               mixinClass.getters[methodName] = function;
             } else if (member.isSetter) {
               mixinClass.setters[methodName] = function;
+            } else if (member.isOperator) {
+              // Add operator methods to the operators map for mixins
+              mixinClass.operators[methodName] = function;
             } else {
               mixinClass.methods[methodName] = function;
             }
@@ -5373,6 +6080,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   // Resolve TypeAnnotation AST node to RuntimeType
   RuntimeType _resolveTypeAnnotation(TypeAnnotation? typeNode,
       {bool isAsync = false}) {
+    return _resolveTypeAnnotationWithEnvironment(typeNode, environment,
+        isAsync: isAsync);
+  }
+
+  // Resolve TypeAnnotation AST node to RuntimeType using a specific environment
+  RuntimeType _resolveTypeAnnotationWithEnvironment(
+      TypeAnnotation? typeNode, Environment env,
+      {bool isAsync = false}) {
     if (typeNode == null) {
       return BridgedClass(dynamic, name: 'dynamic');
     }
@@ -5389,7 +6104,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
       Logger.debug("[ResolveType] Resolving NamedType: $typeName");
       try {
-        final resolved = environment.get(typeName);
+        final resolved = env.get(typeName);
         if (resolved is RuntimeType) {
           Logger.debug(
               "[ResolveType]   Resolved to RuntimeType: ${resolved.name}");
@@ -5472,26 +6187,60 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               .toList();
         }
 
-        // Create and initialize the fields, passing the type arguments
-        final instance =
-            klass.createAndInitializeInstance(this, evaluatedTypeArguments);
-        // Bind 'this' and call the constructor logic
-        final boundConstructor = constructor.bind(instance);
-        boundConstructor.call(this, positionalArgs, namedArgs);
-        // The constructor call returns the instance
-        return instance;
-      } on ReturnException catch (e) {
-        // Use a cast after type checking
-        if (e.value != null && e.value is InterpretedInstance) {
-          final instance = e.value as InterpretedInstance; // Explicit cast
-          if (instance.klass == klass) {
-            // Check on the casted instance
-            return instance;
+        // Handle factory constructors differently from regular constructors
+        if (constructor.isFactory) {
+          // Factory constructors don't need a pre-created instance
+          // They are responsible for creating and returning their own instance
+          Logger.debug(
+              "[InstanceCreation] Calling factory constructor '$constructorLookupName'");
+
+          // Call the factory constructor directly without creating an instance first
+          // The factory will create its own instance and return it
+          final result = constructor.call(
+              this, positionalArgs, namedArgs, evaluatedTypeArguments);
+
+          // Factory constructors should return an instance of the expected type
+          if (result is InterpretedInstance && result.klass == klass) {
+            return result;
+          } else if (result is InterpretedInstance) {
+            throw RuntimeError(
+                "Factory constructor '$constructorLookupName' returned an instance of '${result.klass.name}' but expected '$constructorName'.");
+          } else {
+            throw RuntimeError(
+                "Factory constructor '$constructorLookupName' must return an instance, but returned ${result?.runtimeType}.");
           }
+        } else {
+          // Regular constructors: create instance first, then call constructor
+          Logger.debug(
+              "[InstanceCreation] Calling regular constructor '$constructorLookupName'");
+
+          // Create and initialize the fields, passing the type arguments
+          final instance =
+              klass.createAndInitializeInstance(this, evaluatedTypeArguments);
+          // Bind 'this' and call the constructor logic
+          final boundConstructor = constructor.bind(instance);
+          boundConstructor.call(this, positionalArgs, namedArgs);
+          // The constructor call returns the instance
+          return instance;
         }
-        // If the condition fails (null, not InterpretedInstance, or wrong class)
-        throw RuntimeError(
-            "Constructor return value error for '$constructorName'.");
+      } on ReturnException catch (e) {
+        // Handle return exceptions (applies to both factory and regular constructors)
+        if (constructor.isFactory) {
+          // For factory constructors, the return value is the actual result
+          return e.value;
+        } else {
+          // For regular constructors, check if returned value is valid
+          if (e.value != null && e.value is InterpretedInstance) {
+            final instance = e.value as InterpretedInstance; // Explicit cast
+            if (instance.klass == klass) {
+              // Check on the casted instance
+              return instance;
+            }
+          }
+          // If the condition fails (null, not InterpretedInstance, or wrong class)
+          throw RuntimeError(
+              "Constructor return value error for '$constructorName'.");
+        }
       } on RuntimeError catch (e) {
         // Simplified error message
         throw RuntimeError(
@@ -6542,5 +7291,30 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           show: showNames, hide: hideNames);
     }
     return null; // Import directives do not produce a value.
+  }
+
+  /// Helper method to create the appropriate operand for ++ and -- operators.
+  /// For numeric types, returns 1 or -1 directly.
+  /// For custom classes, attempts to create an instance with value 1 or -1.
+  Object? _createIncrementOperand(Object? targetValue, bool isIncrement) {
+    if (targetValue is! InterpretedInstance) {
+      // For primitive types (num, int, double), return the literal value
+      return isIncrement ? 1 : -1;
+    }
+
+    // For custom class instances, try to create an instance of the same class
+    // with the value 1 or -1. This handles cases like CustomNumber(1).
+    try {
+      final klass = targetValue.klass;
+      final operandValue = isIncrement ? 1 : -1;
+
+      // Try to create an instance with the operand value
+      final newInstance = klass.call(this, [operandValue], {});
+      return newInstance;
+    } catch (e) {
+      // If we can't create an instance, fall back to the literal value
+      // This allows the operator to handle the error appropriately
+      return isIncrement ? 1 : -1;
+    }
   }
 } // End of InterpreterVisitor class

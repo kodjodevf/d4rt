@@ -1,4 +1,4 @@
-import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:d4rt/d4rt.dart';
 
@@ -33,6 +33,7 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       <String, InterpretedFunction>{}, // staticSetters
       <String, Object?>{}, // staticFields
       <String, InterpretedFunction>{}, // constructors
+      <String, InterpretedFunction>{}, // operators
       // Named parameters
       isAbstract: node.abstractKeyword != null,
       isMixin:
@@ -71,6 +72,7 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       <String, InterpretedFunction>{}, // staticSetters
       <String, Object?>{}, // staticFields
       <String, InterpretedFunction>{}, // constructors (empty for mixins)
+      <String, InterpretedFunction>{}, // operators
       // Named parameters
       isAbstract: false, // Mixins are not abstract
       isMixin: true,
@@ -116,20 +118,44 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       return;
     }
 
-    // Similar to InterpreterVisitor.visitFunctionDeclaration
-    // We need to resolve the return type placeholder for now.
-    // The actual type resolution might be more complex if it involves imported types not yet processed.
-    // For now, let's assume a simple placeholder based on the AST node.
+    // Handle type parameters for generic functions
+    Environment? tempEnvironment;
+    final typeParameters = node.functionExpression.typeParameters;
+
+    if (typeParameters != null) {
+      Logger.debug(
+          "[DeclarationVisitor.visitFunctionDeclaration] Function '$functionName' has ${typeParameters.typeParameters.length} type parameters");
+
+      // Create a temporary environment for type resolution
+      tempEnvironment = Environment(enclosing: environment);
+
+      // Create temporary type parameter placeholders
+      for (final typeParam in typeParameters.typeParameters) {
+        final paramName = typeParam.name.lexeme;
+
+        // Create a simple TypeParameter placeholder in the temp environment
+        final typeParamPlaceholder = TypeParameter(paramName);
+        tempEnvironment.define(paramName, typeParamPlaceholder);
+
+        Logger.debug(
+            "[DeclarationVisitor.visitFunctionDeclaration]   Defined type parameter '$paramName' in temp environment");
+      }
+    }
+
+    // Use the temp environment (if any) for type resolution, otherwise use the normal environment
+    final resolveEnvironment = tempEnvironment ?? environment;
+
+    // Now resolve the return type (which might reference type parameters)
     final returnTypeNode = node.returnType;
-    // Simplified type resolution for declaration pass - might need refinement
     RuntimeType declaredReturnType;
+
     if (returnTypeNode is NamedType) {
       final typeName = returnTypeNode.name2.lexeme;
       Logger.debug(
           "[DeclarationVisitor.visitFunctionDeclaration]   Return type node name: $typeName");
 
       try {
-        final resolvedType = environment.get(typeName);
+        final resolvedType = resolveEnvironment.get(typeName);
         Logger.debug(
             "[DeclarationVisitor.visitFunctionDeclaration]     environment.get('$typeName') resolved to: ${resolvedType?.runtimeType} with name: ${(resolvedType is RuntimeType ? resolvedType.name : 'N/A')}");
 
@@ -153,6 +179,7 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       declaredReturnType =
           BridgedClass(Object, name: 'unknown_type_placeholder');
     }
+
     bool isNullable = returnTypeNode?.question != null; // Check for 'A?'
 
     final function = InterpretedFunction.declaration(

@@ -18,6 +18,8 @@ class InterpretedClass implements Callable, RuntimeType {
   final Map<String, InterpretedFunction> staticSetters;
   final Map<String, Object?> staticFields;
   final Map<String, InterpretedFunction> constructors;
+  // Map for operator methods (e.g., '+', '==', '[]', etc.)
+  final Map<String, InterpretedFunction> operators;
   final bool isAbstract;
   List<InterpretedClass> interfaces;
   final bool isMixin;
@@ -50,7 +52,8 @@ class InterpretedClass implements Callable, RuntimeType {
     this.staticGetters,
     this.staticSetters,
     this.staticFields,
-    this.constructors, {
+    this.constructors,
+    this.operators, {
     this.isAbstract = false,
     List<InterpretedClass>? interfaces,
     this.isMixin = false,
@@ -170,6 +173,28 @@ class InterpretedClass implements Callable, RuntimeType {
   InterpretedFunction? findStaticMethod(String name) => staticMethods[name];
   InterpretedFunction? findStaticGetter(String name) => staticGetters[name];
   InterpretedFunction? findStaticSetter(String name) => staticSetters[name];
+
+  // Find operator methods (supports inheritance)
+  InterpretedFunction? findOperator(String operatorSymbol) {
+    if (operators.containsKey(operatorSymbol)) {
+      return operators[operatorSymbol];
+    }
+
+    // Check applied mixins in reverse order
+    for (int i = mixins.length - 1; i >= 0; i--) {
+      final mixinOperator = mixins[i].findOperator(operatorSymbol);
+      if (mixinOperator != null) {
+        return mixinOperator;
+      }
+    }
+
+    if (superclass != null) {
+      return superclass!.findOperator(operatorSymbol);
+    }
+
+    return null;
+  }
+
   InterpretedFunction? findConstructor(String name) {
     // Constructors are defined directly on the class, not inherited
     // from standard superclasses. Check bridged superclass ONLY if no constructor
@@ -591,10 +616,18 @@ class InterpretedInstance implements RuntimeValue {
   // Get: Field -> Getter -> Method (now includes inheritance)
   @override
   Object? get(String name, {InterpreterVisitor? visitor}) {
+    Logger.debug(
+        "[Instance.get] Looking for '$name' on instance $hashCode of '${klass.name}'. Fields: ${_fields.keys}");
+
     // Check fields in the current instance first
     if (_fields.containsKey(name)) {
+      Logger.debug(
+          "[Instance.get] Found field '$name' with value: ${_fields[name]}");
       return _fields[name];
     }
+
+    Logger.debug(
+        "[Instance.get] Field '$name' not found in instance fields. Checking getters/methods...");
 
     // Check instance members (getter/method) in the current class and superclasses
     InterpretedClass? currentClass = klass;
@@ -728,11 +761,37 @@ class InterpretedInstance implements RuntimeValue {
     throw RuntimeError("Undefined property '$name' on ${klass.name}.");
   }
 
+  // Find operator method on this instance (supports inheritance and mixins)
+  InterpretedFunction? findOperator(String operatorSymbol) {
+    // Check instance operators in the current class and superclasses
+    InterpretedClass? currentClass = klass;
+    while (currentClass != null) {
+      final operator = currentClass.findOperator(operatorSymbol);
+      if (operator != null) {
+        return operator;
+      }
+      // Move up to the superclass
+      currentClass = currentClass.superclass;
+    }
+
+    // Check interpreted mixins (in reverse order for correct precedence)
+    for (int i = klass.mixins.length - 1; i >= 0; i--) {
+      final mixin = klass.mixins[i];
+      final operator = mixin.findOperator(operatorSymbol);
+      if (operator != null) {
+        return operator;
+      }
+    }
+
+    // No operator found
+    return null;
+  }
+
   // Set: Setter -> Field (now includes inheritance for finding setters)
   @override
   void set(String name, Object? value, [InterpreterVisitor? visitor]) {
     Logger.debug(
-        "[Instance.set] called for '${klass.name}.$name' with value: $value");
+        "[Instance.set] called for '${klass.name}.$name' with value: $value on instance $hashCode");
     // Look for a setter in the current class and superclasses
     InterpretedClass? currentClass = klass;
     while (currentClass != null) {
@@ -769,7 +828,11 @@ class InterpretedInstance implements RuntimeValue {
     }
 
     // No setter found in the hierarchy or bridge, assign directly to the field
+    Logger.debug(
+        "[Instance.set] No setter found for '$name'. Setting field directly. Instance $hashCode");
     _fields[name] = value;
+    Logger.debug(
+        "[Instance.set] Field '$name' set. Fields now: ${_fields.keys}");
   }
 
   // Added to allow explicit field access, bypassing getters/methods for super
