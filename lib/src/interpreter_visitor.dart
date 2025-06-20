@@ -205,6 +205,19 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   Object? visitStringLiteral(StringLiteral node) {
     if (node is SimpleStringLiteral) {
       return node.value;
+    } else if (node is AdjacentStrings) {
+      // Handle adjacent strings like 'Hello ' 'World!'
+      final buffer = StringBuffer();
+      for (final stringLiteral in node.strings) {
+        if (stringLiteral is SimpleStringLiteral) {
+          buffer.write(stringLiteral.value);
+        } else {
+          // Recursively handle nested adjacent strings or other string types
+          final value = visitStringLiteral(stringLiteral);
+          buffer.write(value.toString());
+        }
+      }
+      return buffer.toString();
     }
     throw UnimplementedError(
       'Type de StringLiteral non géré: ${node.runtimeType}',
