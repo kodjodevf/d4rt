@@ -1,5 +1,6 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/d4rt.dart';
+import 'bridge/bridged_types.dart' as bridge;
 
 /// Represents a class definition at runtime.
 class InterpretedClass implements Callable, RuntimeType {
@@ -229,7 +230,8 @@ class InterpretedClass implements Callable, RuntimeType {
     }
 
     // 1. Create the instance with a link to the class
-    final instance = InterpretedInstance(this); // Pass only the class
+    final instance = InterpretedInstance(this,
+        typeArguments: typeArguments); // Pass only the class
 
     // Use the environment where the class was defined as the outer scope
     // for evaluating initializers. We need to traverse the hierarchy.
@@ -606,10 +608,202 @@ class InterpretedInstance implements RuntimeValue {
   // Store the native object created by a bridged superclass constructor
   Object? bridgedSuperObject;
 
-  InterpretedInstance(this.klass);
+  // Store generic type arguments for this instance (e.g., for List<String>, this would be [StringType])
+  final List<RuntimeType>? typeArguments;
+
+  InterpretedInstance(this.klass, {this.typeArguments});
+
+  /// Get the generic type arguments for this instance
+  List<RuntimeType>? getTypeArguments() => typeArguments;
+
+  /// Check if a value is compatible with the expected generic type at the given index
+  bool isValueCompatibleWithTypeArgument(Object? value, int typeArgumentIndex) {
+    if (typeArguments == null || typeArgumentIndex >= typeArguments!.length) {
+      // No type constraints, allow any value
+      return true;
+    }
+
+    final expectedType = typeArguments![typeArgumentIndex];
+    return _isValueCompatibleWithType(value, expectedType);
+  }
+
+  /// Check if a value is compatible with a specific type
+  bool _isValueCompatibleWithType(Object? value, RuntimeType expectedType) {
+    if (value == null) {
+      // null is compatible with any nullable type
+      // For now, we'll allow null values (later we can add nullable/non-nullable distinction)
+      return true;
+    }
+
+    // Check for exact type matches first
+    if (expectedType is BridgedClass) {
+      // For BridgedClass, check if the value's runtime type matches or is a subtype
+      return value.runtimeType == expectedType.nativeType ||
+          expectedType.nativeType == Object ||
+          expectedType.nativeType == dynamic;
+    }
+
+    if (expectedType is InterpretedClass) {
+      if (value is InterpretedInstance) {
+        return _isClassSubtypeOf(value.klass, expectedType);
+      }
+      return false;
+    }
+
+    if (expectedType is bridge.TypeParameter) {
+      // Type parameters accept any value for now
+      // Later we can implement bounds checking
+      return true;
+    }
+
+    // Default: allow the value (permissive for now)
+    return true;
+  }
+
+  /// Check if a class is a subtype of another class (including inheritance)
+  bool _isClassSubtypeOf(
+      InterpretedClass subClass, InterpretedClass superClass) {
+    if (subClass == superClass) {
+      return true;
+    }
+
+    // Check superclass chain
+    InterpretedClass? current = subClass.superclass;
+    while (current != null) {
+      if (current == superClass) {
+        return true;
+      }
+      current = current.superclass;
+    }
+
+    // Check interfaces
+    for (final interface in subClass.interfaces) {
+      if (_isClassSubtypeOf(interface, superClass)) {
+        return true;
+      }
+    }
+
+    // Check mixins
+    for (final mixin in subClass.mixins) {
+      if (_isClassSubtypeOf(mixin, superClass)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Validate that a value can be assigned to a field with a specific generic type constraint
+  void validateFieldAssignment(
+      String fieldName, Object? value, RuntimeType? expectedType) {
+    if (expectedType == null) {
+      return; // No type constraint
+    }
+
+    if (!_isValueCompatibleWithType(value, expectedType)) {
+      throw RuntimeError(
+          "Type error: Cannot assign value of type '${_getValueTypeName(value)}' to field '$fieldName' expecting type '${expectedType.name}' in class '${klass.name}'");
+    }
+  }
+
+  /// Get a human-readable type name for a value
+  String _getValueTypeName(Object? value) {
+    if (value == null) return 'null';
+    if (value is InterpretedInstance) return value.klass.name;
+    if (value is String) return 'String';
+    if (value is int) return 'int';
+    if (value is double) return 'double';
+    if (value is bool) return 'bool';
+    if (value is List) return 'List';
+    if (value is Map) return 'Map';
+    return value.runtimeType.toString();
+  }
+
+  /// Validate field assignment for generic classes (e.g., List&lt;T&gt;, Map&lt;K,V&gt;)
+  void _validateFieldAssignmentGeneric(String fieldName, Object? value) {
+    if (typeArguments == null || typeArguments!.isEmpty) {
+      return; // No generic constraints to validate
+    }
+
+    // For common generic collection types, perform validation
+    if (klass.name == 'List' && typeArguments!.isNotEmpty) {
+      _validateListElementType(fieldName, value, typeArguments![0]);
+    } else if (klass.name == 'Map' && typeArguments!.length >= 2) {
+      _validateMapTypes(fieldName, value, typeArguments![0], typeArguments![1]);
+    } else if (klass.name == 'Set' && typeArguments!.isNotEmpty) {
+      _validateSetElementType(fieldName, value, typeArguments![0]);
+    }
+    // For custom generic classes, we could add more specific validation here
+  }
+
+  /// Validate that a value being added to a List&lt;T&gt; matches type T
+  void _validateListElementType(
+      String fieldName, Object? value, RuntimeType elementType) {
+    if (fieldName == 'add' || fieldName == 'insert' || fieldName == 'addAll') {
+      // These operations should validate the element type
+      if (fieldName == 'addAll' && value is List) {
+        // Validate all elements in the list
+        for (int i = 0; i < value.length; i++) {
+          if (!_isValueCompatibleWithType(value[i], elementType)) {
+            throw RuntimeError(
+                "Type error: Cannot add element of type '${_getValueTypeName(value[i])}' at index $i to List<${elementType.name}>");
+          }
+        }
+      } else if (fieldName == 'add' || fieldName == 'insert') {
+        // Validate single element
+        if (!_isValueCompatibleWithType(value, elementType)) {
+          throw RuntimeError(
+              "Type error: Cannot add element of type '${_getValueTypeName(value)}' to List<${elementType.name}>");
+        }
+      }
+    }
+  }
+
+  /// Validate Map&lt;K,V&gt; key and value types
+  void _validateMapTypes(String fieldName, Object? value, RuntimeType keyType,
+      RuntimeType valueType) {
+    if (fieldName == 'putIfAbsent' || fieldName == 'addAll') {
+      if (value is Map) {
+        for (final entry in value.entries) {
+          if (!_isValueCompatibleWithType(entry.key, keyType)) {
+            throw RuntimeError(
+                "Type error: Cannot add key of type '${_getValueTypeName(entry.key)}' to Map<${keyType.name}, ${valueType.name}>");
+          }
+          if (!_isValueCompatibleWithType(entry.value, valueType)) {
+            throw RuntimeError(
+                "Type error: Cannot add value of type '${_getValueTypeName(entry.value)}' to Map<${keyType.name}, ${valueType.name}>");
+          }
+        }
+      }
+    }
+  }
+
+  /// Validate Set&lt;T&gt; element type
+  void _validateSetElementType(
+      String fieldName, Object? value, RuntimeType elementType) {
+    if (fieldName == 'add' || fieldName == 'addAll') {
+      if (fieldName == 'addAll' && value is Iterable) {
+        for (final element in value) {
+          if (!_isValueCompatibleWithType(element, elementType)) {
+            throw RuntimeError(
+                "Type error: Cannot add element of type '${_getValueTypeName(element)}' to Set<${elementType.name}>");
+          }
+        }
+      } else if (fieldName == 'add') {
+        if (!_isValueCompatibleWithType(value, elementType)) {
+          throw RuntimeError(
+              "Type error: Cannot add element of type '${_getValueTypeName(value)}' to Set<${elementType.name}>");
+        }
+      }
+    }
+  }
 
   @override
   String toString() {
+    if (typeArguments != null && typeArguments!.isNotEmpty) {
+      final typeArgsStr = typeArguments!.map((t) => t.name).join(', ');
+      return '<instance of ${klass.name}<$typeArgsStr>>';
+    }
     return '<instance of ${klass.name}>';
   }
 
@@ -830,6 +1024,10 @@ class InterpretedInstance implements RuntimeValue {
     // No setter found in the hierarchy or bridge, assign directly to the field
     Logger.debug(
         "[Instance.set] No setter found for '$name'. Setting field directly. Instance $hashCode");
+
+    // Perform generic type validation if this instance has type arguments
+    _validateFieldAssignmentGeneric(name, value);
+
     _fields[name] = value;
     Logger.debug(
         "[Instance.set] Field '$name' set. Fields now: ${_fields.keys}");

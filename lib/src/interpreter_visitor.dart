@@ -261,6 +261,40 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       thisInstance = environment.get('this');
     } on RuntimeError {
       // 'this' does not exist in the current environment.
+      // Before giving up, try searching static methods in the current class if we're in a static context
+      if (currentFunction != null &&
+          currentFunction!.ownerType is InterpretedClass) {
+        final ownerClass = currentFunction!.ownerType as InterpretedClass;
+        Logger.debug(
+            "[visitSimpleIdentifier] 'this' not found, but we're in class '${ownerClass.name}'. Checking static members for '$name'.");
+
+        // Check static methods
+        final staticMethod = ownerClass.findStaticMethod(name);
+        if (staticMethod != null) {
+          Logger.debug(
+              "[visitSimpleIdentifier] Found static method '$name' in current class '${ownerClass.name}'.");
+          return staticMethod;
+        }
+
+        // Check static getters
+        final staticGetter = ownerClass.findStaticGetter(name);
+        if (staticGetter != null) {
+          Logger.debug(
+              "[visitSimpleIdentifier] Found static getter '$name' in current class '${ownerClass.name}'.");
+          return staticGetter;
+        }
+
+        // Check static fields
+        try {
+          final staticField = ownerClass.getStaticField(name);
+          Logger.debug(
+              "[visitSimpleIdentifier] Found static field '$name' in current class '${ownerClass.name}'.");
+          return staticField;
+        } on RuntimeError {
+          // Static field not found, continue to final error
+        }
+      }
+
       // This is the end of the search, the identifier is undefined.
       throw RuntimeError("Undefined variable: $name");
     }
@@ -401,6 +435,40 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // Relaunch the specific BridgeInstance errors
         rethrow;
       }
+
+      // Before final error, try static method lookup in enclosing class
+      final enclosingClass = _findEnclosingClass();
+      if (enclosingClass != null) {
+        Logger.debug(
+            "[visitSimpleIdentifier] Final attempt: checking static members for '$name' in enclosing class '${enclosingClass.name}'.");
+
+        // Check static methods
+        final staticMethod = enclosingClass.findStaticMethod(name);
+        if (staticMethod != null) {
+          Logger.debug(
+              "[visitSimpleIdentifier] Found static method '$name' in enclosing class '${enclosingClass.name}' (final attempt).");
+          return staticMethod;
+        }
+
+        // Check static getters
+        final staticGetter = enclosingClass.findStaticGetter(name);
+        if (staticGetter != null) {
+          Logger.debug(
+              "[visitSimpleIdentifier] Found static getter '$name' in enclosing class '${enclosingClass.name}' (final attempt).");
+          return staticGetter;
+        }
+
+        // Check static fields
+        try {
+          final staticField = enclosingClass.getStaticField(name);
+          Logger.debug(
+              "[visitSimpleIdentifier] Found static field '$name' in enclosing class '${enclosingClass.name}' (final attempt).");
+          return staticField;
+        } on RuntimeError {
+          // Static field not found, continue to final error
+        }
+      }
+
       // If the initial error was 'Undefined property' AND that extension lookup failed,
       // or if the initial error was something else, raise the final "Undefined variable" error.
       throw RuntimeError(
@@ -416,6 +484,35 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // This should ideally not happen if called within a valid method/constructor context
       throw RuntimeError("Keyword 'this' used outside of an instance context.");
     }
+  }
+
+  /// Helper method to find an enclosing class that might contain static members
+  /// Searches through the environment chain and currentFunction hierarchy
+  InterpretedClass? _findEnclosingClass() {
+    // First, try the current function's owner
+    if (currentFunction != null &&
+        currentFunction!.ownerType is InterpretedClass) {
+      return currentFunction!.ownerType as InterpretedClass;
+    }
+
+    // If that doesn't work, search the environment chain for class instances
+    // This is a fallback approach - look for any classes defined in parent scopes
+    Environment? current = environment;
+    while (current != null) {
+      for (final value in current.values.values) {
+        if (value is InterpretedClass) {
+          // Found a class in this environment - this might be our enclosing class
+          // We need to check if we're inside a method of this class
+          // This is a heuristic - in a proper implementation, we'd track the lexical scope better
+          Logger.debug(
+              "[_findEnclosingClass] Found class '${value.name}' in environment chain");
+          return value;
+        }
+      }
+      current = current.enclosing;
+    }
+
+    return null;
   }
 
   @override
@@ -1708,7 +1805,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                   .bind(targetValue)
                   .call(this, [indexValue, finalValueToAssign], {});
               return finalValueToAssign;
-            } on ReturnException catch (e) {
+            } on ReturnException catch (_) {
               return finalValueToAssign; // []= should not return a value, but assignment expression returns assigned value
             } catch (e) {
               throw RuntimeError("Error executing class operator '[]=': $e");
@@ -4298,7 +4395,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                 operatorMethod
                     .bind(targetValue)
                     .call(this, [indexValue, newValue], {});
-              } on ReturnException catch (e) {
+              } on ReturnException catch (_) {
                 // []= should not return a value, but assignment expression returns assigned value
               } catch (e) {
                 throw RuntimeError(
@@ -4675,7 +4772,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             operatorMethod
                 .bind(targetValue)
                 .call(this, [indexValue, newValue], {});
-          } on ReturnException catch (e) {
+          } on ReturnException catch (_) {
             // []= should not return a value, but assignment expression returns assigned value
           } catch (e) {
             throw RuntimeError(
@@ -5588,12 +5685,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       rethrow;
     } on BreakException {
       // Propagate for outer loops/switch
-      Logger.debug("[TryStatement] Propagating BreakException from try block.");
+      Logger.debug("[TryStatement] Propagating BreakException from try block");
       rethrow;
     } on ContinueException {
       // Propagate for outer loops
       Logger.debug(
-          "[TryStatement] Propagating ContinueException from try block.");
+          "[TryStatement] Propagating ContinueException from try block");
       rethrow;
     } on InternalInterpreterException catch (e, s) {
       // Catch ONLY the exceptions already encapsulated (coming from a 'throw')

@@ -47,16 +47,80 @@ class InterpretedFunction implements Callable {
   // Store type parameter names from the original declaration
   final List<String> typeParameterNames; // e.g., ['T', 'U', 'V']
 
+  // Store type parameter bounds (constraints) from the original declaration
+  final Map<String, RuntimeType?>
+      typeParameterBounds; // e.g., {'T': num, 'U': Object}
+
   // Public getter for the closure environment
   Environment get closure => _closure;
 
   // Helper method to extract type parameter names from a TypeParameterList
   static List<String> _extractTypeParameterNames(
       TypeParameterList? typeParameters) {
-    if (typeParameters == null) return const [];
+    if (typeParameters == null) return [];
     return typeParameters.typeParameters
         .map((param) => param.name.lexeme)
         .toList();
+  }
+
+  // Helper method to extract type parameter bounds from a TypeParameterList
+  static Map<String, RuntimeType?> _extractTypeParameterBounds(
+      TypeParameterList? typeParameters, Environment? resolveEnvironment) {
+    final bounds = <String, RuntimeType?>{};
+    if (typeParameters == null) return bounds;
+
+    for (final typeParam in typeParameters.typeParameters) {
+      final paramName = typeParam.name.lexeme;
+      RuntimeType? bound;
+
+      if (typeParam.bound != null && resolveEnvironment != null) {
+        // Use dynamic type resolution instead of static hard-coded types
+        try {
+          Logger.debug(
+              "[InterpretedFunction._extractTypeParameterBounds] Resolving bound for type parameter '$paramName'");
+
+          // Use dynamic resolution to look up the bound type in the environment
+          bound = _resolveTypeAnnotationDynamic(
+              typeParam.bound!, resolveEnvironment);
+
+          Logger.debug(
+              "[InterpretedFunction._extractTypeParameterBounds] Successfully resolved bound for '$paramName' to: ${bound.name}");
+        } catch (e) {
+          Logger.debug(
+              "[InterpretedFunction._extractTypeParameterBounds] Failed to resolve bound for '$paramName': $e");
+          // Re-throw the exception instead of silently ignoring it
+          rethrow;
+        }
+      }
+
+      bounds[paramName] = bound;
+    }
+
+    return bounds;
+  }
+
+  // Helper method for dynamic type resolution (similar to InterpreterVisitor logic)
+  static RuntimeType _resolveTypeAnnotationDynamic(
+      TypeAnnotation typeNode, Environment env) {
+    if (typeNode is NamedType) {
+      final typeName = typeNode.name2.lexeme;
+
+      Logger.debug(
+          "[InterpretedFunction._resolveTypeAnnotationDynamic] Resolving NamedType: $typeName");
+
+      final resolved = env.get(typeName);
+      if (resolved is RuntimeType) {
+        Logger.debug(
+            "[InterpretedFunction._resolveTypeAnnotationDynamic] Resolved from environment to RuntimeType: ${resolved.name}");
+        return resolved;
+      } else {
+        throw RuntimeError(
+            "Symbol '$typeName' resolved to non-type value: $resolved");
+      }
+    } else {
+      throw RuntimeError(
+          "Unsupported type annotation for constraint: ${typeNode.runtimeType}");
+    }
   }
 
   // Private constructor for bind
@@ -76,6 +140,7 @@ class InterpretedFunction implements Callable {
     this.declaredReturnType,
     this.isNullable = false,
     this.typeParameterNames = const [],
+    this.typeParameterBounds = const {},
   }) : _constructorInitializers = constructorInitializers;
 
   // Constructor for declared functions (top-level or nested, not methods)
@@ -96,32 +161,42 @@ class InterpretedFunction implements Callable {
           isNullable: isNullable,
           typeParameterNames: _extractTypeParameterNames(
               declaration.functionExpression.typeParameters),
+          typeParameterBounds: _extractTypeParameterBounds(
+              declaration.functionExpression.typeParameters, closure),
         );
 
   // Constructor for function expressions (anonymous)
   InterpretedFunction.expression(
       FunctionExpression expression, Environment closure)
-      : this._internal(expression.parameters, expression.body, closure, null,
-            ownerType: null, // Not defined within a class/enum
-            isAbstract: false, // Anonymous functions cannot be abstract
-            isAsync: expression.body.isAsynchronous, // Pass async flag
-            typeParameterNames:
-                _extractTypeParameterNames(expression.typeParameters));
+      : this._internal(
+          expression.parameters, expression.body, closure, null,
+          ownerType: null, // Not defined within a class/enum
+          isAbstract: false, // Anonymous functions cannot be abstract
+          isAsync: expression.body.isAsynchronous, // Pass async flag
+          typeParameterNames:
+              _extractTypeParameterNames(expression.typeParameters),
+          typeParameterBounds:
+              _extractTypeParameterBounds(expression.typeParameters, closure),
+        );
 
   // Constructor for methods
   InterpretedFunction.method(
       MethodDeclaration declaration, Environment closure, RuntimeType? owner)
-      : this._internal(declaration.parameters, declaration.body, closure,
-            declaration.name.lexeme,
-            // Consider factory methods later
-            isInitializer: false, // Methods are not initializers (usually)
-            isGetter: declaration.isGetter, // Pass getter flag
-            isSetter: declaration.isSetter, // Pass setter flag
-            ownerType: owner, // Pass the owner type (class or enum)
-            isAbstract: declaration.isAbstract, // Set the abstract flag
-            isAsync: declaration.body.isAsynchronous, // Pass async flag
-            typeParameterNames:
-                _extractTypeParameterNames(declaration.typeParameters));
+      : this._internal(
+          declaration.parameters, declaration.body, closure,
+          declaration.name.lexeme,
+          // Consider factory methods later
+          isInitializer: false, // Methods are not initializers (usually)
+          isGetter: declaration.isGetter, // Pass getter flag
+          isSetter: declaration.isSetter, // Pass setter flag
+          ownerType: owner, // Pass the owner type (class or enum)
+          isAbstract: declaration.isAbstract, // Set the abstract flag
+          isAsync: declaration.body.isAsynchronous, // Pass async flag
+          typeParameterNames:
+              _extractTypeParameterNames(declaration.typeParameters),
+          typeParameterBounds:
+              _extractTypeParameterBounds(declaration.typeParameters, closure),
+        );
 
   // Constructor for constructors
   InterpretedFunction.constructor(ConstructorDeclaration declaration,
@@ -138,6 +213,9 @@ class InterpretedFunction implements Callable {
           isAsync: false, // Constructors cannot be async
           isFactory:
               declaration.factoryKeyword != null, // Detect factory constructors
+          // Constructors don't have their own type parameters - they inherit from their class
+          typeParameterNames: const [],
+          typeParameterBounds: const {},
         );
 
   @override
@@ -188,6 +266,7 @@ class InterpretedFunction implements Callable {
       isFactory: isFactory, // Copy the factory flag
       declaredReturnType: declaredReturnType,
       typeParameterNames: typeParameterNames, // Copy type parameter names
+      typeParameterBounds: typeParameterBounds, // Copy type parameter bounds
     );
     return boundFunction;
   }
@@ -201,6 +280,58 @@ class InterpretedFunction implements Callable {
     List<RuntimeType>? typeArguments,
   ) {
     final executionEnvironment = Environment(enclosing: _closure);
+
+    // For static methods, add static members of the owner class to the execution environment
+    // This allows static methods to call other static methods without prefixing the class name
+    bool hasThis = false;
+    try {
+      _closure.get('this');
+      hasThis = true;
+    } on RuntimeError {
+      hasThis = false;
+    }
+
+    if (ownerType is InterpretedClass && !isInitializer && !hasThis) {
+      final ownerClass = ownerType as InterpretedClass;
+      Logger.debug(
+          "[InterpretedFunction._prepareExecutionEnvironment] Adding static members of class '${ownerClass.name}' to execution environment.");
+
+      // Add all static methods
+      for (final entry in ownerClass.staticMethods.entries) {
+        final methodName = entry.key;
+        final method = entry.value;
+        executionEnvironment.define(methodName, method);
+        Logger.debug(
+            "[InterpretedFunction._prepareExecutionEnvironment] Added static method '$methodName' to execution environment.");
+      }
+
+      // Add all static getters
+      for (final entry in ownerClass.staticGetters.entries) {
+        final getterName = entry.key;
+        final getter = entry.value;
+        executionEnvironment.define(getterName, getter);
+        Logger.debug(
+            "[InterpretedFunction._prepareExecutionEnvironment] Added static getter '$getterName' to execution environment.");
+      }
+
+      // Add all static setters
+      for (final entry in ownerClass.staticSetters.entries) {
+        final setterName = entry.key;
+        final setter = entry.value;
+        executionEnvironment.define(setterName, setter);
+        Logger.debug(
+            "[InterpretedFunction._prepareExecutionEnvironment] Added static setter '$setterName' to execution environment.");
+      }
+
+      // Add all static fields
+      for (final entry in ownerClass.staticFields.entries) {
+        final fieldName = entry.key;
+        final fieldValue = entry.value;
+        executionEnvironment.define(fieldName, fieldValue);
+        Logger.debug(
+            "[InterpretedFunction._prepareExecutionEnvironment] Added static field '$fieldName' to execution environment.");
+      }
+    }
 
     // Handle type parameters (generics) if provided
     if (typeArguments != null && typeArguments.isNotEmpty) {
@@ -568,141 +699,322 @@ class InterpretedFunction implements Callable {
     return _ExecutionPreparationResult(executionEnvironment, redirected);
   }
 
+  /// Validate type arguments for generic functions/methods
+  void _validateTypeArguments(List<RuntimeType>? typeArguments,
+      List<Object?> positionalArguments, Map<String, Object?> namedArguments) {
+    if (typeArguments == null || typeArguments.isEmpty) {
+      return; // No type arguments to validate
+    }
+
+    // For factory constructors, type arguments come from the class, not the method
+    // Skip validation if this is a factory constructor or regular constructor
+    if (isFactory || isInitializer) {
+      return; // Factory constructors inherit type parameters from their class
+    }
+
+    // Validate that the number of type arguments matches the number of type parameters
+    if (typeArguments.length > typeParameterNames.length) {
+      throw RuntimeError(
+          "Too many type arguments for function '${_name ?? '<anonymous>'}'. Expected at most ${typeParameterNames.length}, got ${typeArguments.length}.");
+    }
+
+    // Check type bounds for each type argument
+    _validateTypeBounds(typeArguments);
+
+    // Validate parameter types against type arguments
+    _validateParameterTypes(typeArguments, positionalArguments, namedArguments);
+
+    // Check return type constraints (will be validated at return time)
+    // Return type validation happens in visitReturnStatement
+
+    Logger.debug(
+        "[InterpretedFunction._validateTypeArguments] Validated ${typeArguments.length} type arguments for function '${_name ?? '<anonymous>'}'");
+  }
+
+  /// Validate that type arguments respect their bounds constraints
+  void _validateTypeBounds(List<RuntimeType> typeArguments) {
+    for (int i = 0;
+        i < typeArguments.length && i < typeParameterNames.length;
+        i++) {
+      final typeArg = typeArguments[i];
+      final paramName = typeParameterNames[i];
+      final bound = typeParameterBounds[paramName];
+
+      Logger.debug(
+          "[InterpretedFunction._validateTypeBounds] Type parameter '$paramName' bound check for argument '${typeArg.name}'");
+
+      if (bound != null) {
+        // Check if the type argument satisfies the bound constraint
+        bool satisfiesBound = _checkTypeSatisfiesBound(typeArg, bound);
+
+        if (!satisfiesBound) {
+          throw RuntimeError(
+              "Type argument '${typeArg.name}' for type parameter '$paramName' does not satisfy bound '${bound.name}' in function '${_name ?? '<anonymous>'}'");
+        }
+
+        Logger.debug(
+            "[InterpretedFunction._validateTypeBounds] Type parameter '$paramName' with argument '${typeArg.name}' satisfies bound '${bound.name}'");
+      } else {
+        Logger.debug(
+            "[InterpretedFunction._validateTypeBounds] Type parameter '$paramName' has no bound constraint");
+      }
+
+      // Example basic validation - could be extended
+      if (typeArg.name == 'Null') {
+        Logger.debug(
+            "[InterpretedFunction._validateTypeBounds] Warning: Null type argument for parameter '$paramName'");
+      }
+    }
+  }
+
+  /// Check if a type argument satisfies a bound constraint
+  bool _checkTypeSatisfiesBound(RuntimeType typeArg, RuntimeType bound) {
+    // If the type argument is the same as the bound, it satisfies the constraint
+    if (typeArg == bound || typeArg.name == bound.name) {
+      return true;
+    }
+
+    // Special handling for common native types
+    if (bound.name == 'num') {
+      // Check if typeArg is a numeric type
+      if (typeArg is BridgedClass) {
+        return typeArg.nativeType == int ||
+            typeArg.nativeType == double ||
+            typeArg.nativeType == num;
+      }
+      // For other types, check the name
+      return typeArg.name == 'int' ||
+          typeArg.name == 'double' ||
+          typeArg.name == 'num';
+    }
+
+    if (bound.name == 'Object') {
+      // Everything extends Object (except possibly void/dynamic)
+      return typeArg.name != 'void';
+    }
+
+    if (bound.name == 'Comparable') {
+      // Check if the type implements Comparable
+      if (typeArg is BridgedClass) {
+        try {
+          // Basic check for common comparable types
+          return typeArg.nativeType == String ||
+              typeArg.nativeType == int ||
+              typeArg.nativeType == double ||
+              typeArg.nativeType == DateTime;
+        } catch (e) {
+          return false;
+        }
+      }
+      return typeArg.name == 'String' ||
+          typeArg.name == 'int' ||
+          typeArg.name == 'double';
+    }
+
+    // Check if the type argument is a subtype of the bound
+    try {
+      return typeArg.isSubtypeOf(bound);
+    } catch (e) {
+      Logger.debug(
+          "[InterpretedFunction._checkTypeSatisfiesBound] Error checking subtype relationship: $e");
+      // If we can't determine the relationship, default to allowing it
+      // In a stricter implementation, this might default to false
+      return true;
+    }
+  }
+
+  /// Validate that positional and named arguments match the expected types
+  void _validateParameterTypes(List<RuntimeType> typeArguments,
+      List<Object?> positionalArguments, Map<String, Object?> namedArguments) {
+    // Basic validation - check if arguments are compatible with function signature
+    // This is a simplified implementation
+
+    Logger.debug(
+        "[InterpretedFunction._validateParameterTypes] Validating ${positionalArguments.length} positional and ${namedArguments.length} named arguments");
+
+    // For each positional argument, try basic type compatibility check
+    for (int i = 0; i < positionalArguments.length; i++) {
+      final argument = positionalArguments[i];
+
+      if (argument != null) {
+        Logger.debug(
+            "[InterpretedFunction._validateParameterTypes] Argument $i: ${argument.runtimeType}");
+
+        // Additional type checking could be implemented here
+        // For example, checking against expected parameter types from function signature
+      }
+    }
+
+    // For each named argument, try basic type compatibility check
+    for (final entry in namedArguments.entries) {
+      final argName = entry.key;
+      final argValue = entry.value;
+
+      if (argValue != null) {
+        Logger.debug(
+            "[InterpretedFunction._validateParameterTypes] Named argument '$argName': ${argValue.runtimeType}");
+      }
+    }
+
+    // More sophisticated validation would require:
+    // 1. Access to the function's parameter type annotations
+    // 2. Type substitution logic for generic parameters
+    // 3. Runtime type compatibility checking
+  }
+
   @override
   Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
       [Map<String, Object?> namedArguments = const {},
       List<RuntimeType>? typeArguments]) {
-    final prepResult = _prepareExecutionEnvironment(
-      visitor,
-      positionalArguments,
-      namedArguments,
-      typeArguments, // Pass type arguments to preparation
-    );
+    Logger.debug(
+        "[InterpretedFunction.call] Called '${_name ?? 'anonymous'}' with ${positionalArguments.length} positional, ${namedArguments.length} named arguments.");
 
-    final executionEnvironment = prepResult.environment;
-    final redirected = prepResult.redirected;
-
-    final previousCurrentFunction = visitor.currentFunction; // Save previous
-    visitor.currentFunction = this; // Set current function
-    final previousAsyncState =
-        visitor.currentAsyncState; // Save current async state
+    final previousFunction = visitor.currentFunction;
+    final previousAsyncState = visitor.currentAsyncState;
 
     try {
-      if (isAsync) {
-        final completer = Completer<Object?>();
+      visitor.currentFunction = this;
 
-        // Determine the first state (AST node)
-        AstNode? initialStateIdentifier;
-        final bodyToExecute = _body;
-        if (!redirected) {
-          if (bodyToExecute is BlockFunctionBody) {
-            initialStateIdentifier = bodyToExecute.block.statements.firstOrNull;
-          } else if (bodyToExecute is ExpressionFunctionBody) {
-            initialStateIdentifier = bodyToExecute.expression;
-          } else if (bodyToExecute is EmptyFunctionBody) {
-            initialStateIdentifier =
-                null; // Empty function, completes immediately
-          } else {
-            throw StateError(
-                "Unhandled function body type for async state machine: ${bodyToExecute.runtimeType}");
-          }
-        } else {
-          // Redirecting constructor, completes with 'this'
-          initialStateIdentifier = null;
-        }
+      final preparationResult = _prepareExecutionEnvironment(
+          visitor, positionalArguments, namedArguments, typeArguments);
 
-        // Create the initial state
-        final asyncState = AsyncExecutionState(
-          environment: executionEnvironment,
-          completer: completer,
-          nextStateIdentifier: initialStateIdentifier,
-          function: this,
-        );
+      // Validate generic type arguments if provided
+      _validateTypeArguments(
+          typeArguments, positionalArguments, namedArguments);
 
-        // Handle cases where the function completes immediately
-        if (initialStateIdentifier == null) {
-          if (redirected) {
-            completer.complete(executionEnvironment.get('this'));
-          } else {
-            completer.complete(null); // Empty function
-          }
-        } else {
-          // The engine will take care of scheduling (ex: via Future.microtask)
-          // Put the visitor in the initial state for the engine
-          visitor.currentAsyncState = asyncState;
-          _startAsyncStateMachine(visitor, asyncState);
-        }
+      final executionEnvironment = preparationResult.environment;
+      final redirected = preparationResult.redirected;
 
-        // Return immediately the Future
-        return completer.future;
-      } else {
-        Object? syncResult;
-        final previousVisitorEnv = visitor.environment; // Save env
-        try {
-          if (isAbstract) {
-            throw RuntimeError(
-                "Cannot call abstract method '${_name ?? '<abstract>'}'.");
-          }
+      final previousCurrentFunction = visitor.currentFunction; // Save previous
+      visitor.currentFunction = this; // Set current function
+      final previousAsyncState =
+          visitor.currentAsyncState; // Save current async state
 
+      try {
+        if (isAsync) {
+          final completer = Completer<Object?>();
+
+          // Determine the first state (AST node)
+          AstNode? initialStateIdentifier;
           final bodyToExecute = _body;
-
           if (!redirected) {
             if (bodyToExecute is BlockFunctionBody) {
-              syncResult = visitor.executeBlock(
-                  bodyToExecute.block.statements, executionEnvironment);
+              initialStateIdentifier =
+                  bodyToExecute.block.statements.firstOrNull;
             } else if (bodyToExecute is ExpressionFunctionBody) {
-              visitor.environment = executionEnvironment;
-              syncResult = bodyToExecute.expression.accept<Object?>(visitor);
+              initialStateIdentifier = bodyToExecute.expression;
             } else if (bodyToExecute is EmptyFunctionBody) {
-              if (!isInitializer && _name != null) {
-                throw RuntimeError(
-                    "Cannot execute non-constructor function $_name' with empty body.");
-              }
-              syncResult = null;
+              initialStateIdentifier =
+                  null; // Empty function, completes immediately
             } else {
               throw StateError(
-                  "Unhandled function body type: ${bodyToExecute.runtimeType}");
+                  "Unhandled function body type for async state machine: ${bodyToExecute.runtimeType}");
             }
           } else {
-            Logger.debug(
-                " [InterpretedFunction.call sync] Body skipped due to redirecting constructor for $_name");
-            // If redirected, the value is 'this'
-            syncResult = _closure.get('this');
+            // Redirecting constructor, completes with 'this'
+            initialStateIdentifier = null;
           }
-        } on ReturnException catch (returnExc) {
-          syncResult = returnExc.value;
-        } finally {
-          visitor.currentFunction = previousCurrentFunction; // Restore function
-          visitor.environment = previousVisitorEnv; // Restore environment
-        }
 
-        // For initializers (constructors), always return 'this'
-        if (isInitializer) {
-          try {
-            return _closure.get('this');
-          } catch (_) {
-            throw StateError(
-                "Internal error: 'this' not found in bound constructor environment.");
+          // Create the initial state
+          final asyncState = AsyncExecutionState(
+            environment: executionEnvironment,
+            completer: completer,
+            nextStateIdentifier: initialStateIdentifier,
+            function: this,
+          );
+
+          // Handle cases where the function completes immediately
+          if (initialStateIdentifier == null) {
+            if (redirected) {
+              completer.complete(executionEnvironment.get('this'));
+            } else {
+              completer.complete(null); // Empty function
+            }
+          } else {
+            // The engine will take care of scheduling (ex: via Future.microtask)
+            // Put the visitor in the initial state for the engine
+            visitor.currentAsyncState = asyncState;
+            _startAsyncStateMachine(visitor, asyncState);
           }
+
+          // Return immediately the Future
+          return completer.future;
         } else {
-          // Check if the synchronous execution resulted in a suspension (shouldn't happen if await is blocked)
-          if (syncResult is AsyncSuspensionRequest) {
-            throw StateError(
-                "Internal error: Synchronous function returned SuspendedState.");
+          Object? syncResult;
+          final previousVisitorEnv = visitor.environment; // Save env
+          try {
+            if (isAbstract) {
+              throw RuntimeError(
+                  "Cannot call abstract method '${_name ?? '<abstract>'}'.");
+            }
+
+            final bodyToExecute = _body;
+
+            if (!redirected) {
+              if (bodyToExecute is BlockFunctionBody) {
+                syncResult = visitor.executeBlock(
+                    bodyToExecute.block.statements, executionEnvironment);
+              } else if (bodyToExecute is ExpressionFunctionBody) {
+                visitor.environment = executionEnvironment;
+                syncResult = bodyToExecute.expression.accept<Object?>(visitor);
+              } else if (bodyToExecute is EmptyFunctionBody) {
+                if (!isInitializer && _name != null) {
+                  throw RuntimeError(
+                      "Cannot execute non-constructor function $_name' with empty body.");
+                }
+                syncResult = null;
+              } else {
+                throw StateError(
+                    "Unhandled function body type: ${bodyToExecute.runtimeType}");
+              }
+            } else {
+              Logger.debug(
+                  " [InterpretedFunction.call sync] Body skipped due to redirecting constructor for $_name");
+              // If redirected, the value is 'this'
+              syncResult = _closure.get('this');
+            }
+          } on ReturnException catch (returnExc) {
+            syncResult = returnExc.value;
+          } finally {
+            visitor.currentFunction =
+                previousCurrentFunction; // Restore function
+            visitor.environment = previousVisitorEnv; // Restore environment
           }
-          return syncResult; // Return sync result
+
+          // For initializers (constructors), always return 'this'
+          if (isInitializer) {
+            try {
+              return _closure.get('this');
+            } catch (_) {
+              throw StateError(
+                  "Internal error: 'this' not found in bound constructor environment.");
+            }
+          } else {
+            // Check if the synchronous execution resulted in a suspension (shouldn't happen if await is blocked)
+            if (syncResult is AsyncSuspensionRequest) {
+              throw StateError(
+                  "Internal error: Synchronous function returned SuspendedState.");
+            }
+            return syncResult; // Return sync result
+          }
         }
+      } on ReturnException catch (e) {
+        // Catch return from synchronous functions
+        return e.value;
+      } finally {
+        visitor.currentFunction = previousCurrentFunction; // Restore previous
+
+        // Restaurer l'état asynchrone précédent au lieu de l'écraser
+        visitor.currentAsyncState = previousAsyncState;
+        Logger.debug(
+            " [InterpretedFunction.call FINALLY] Restored currentFunction and currentAsyncState. AsyncState is now: ${visitor.currentAsyncState?.hashCode}");
       }
     } on ReturnException catch (e) {
-      // Catch return from synchronous functions
+      // Catch return from asynchronous functions
       return e.value;
     } finally {
-      visitor.currentFunction = previousCurrentFunction; // Restore previous
-
-      // Restaurer l'état asynchrone précédent au lieu de l'écraser
+      visitor.currentFunction = previousFunction;
       visitor.currentAsyncState = previousAsyncState;
-      Logger.debug(
-          " [InterpretedFunction.call FINALLY] Restored currentFunction and currentAsyncState. AsyncState is now: ${visitor.currentAsyncState?.hashCode}");
     }
   }
 

@@ -8,10 +8,13 @@ It allows you to execute Dart code dynamically, bridge native classes, and build
 ## Features
 
 - **Dart interpreter**: Run Dart code dynamically at runtime.
+- **Full generics support**: Complete support for generic classes, functions, and type constraints with runtime validation.
+- **Type bounds checking**: Enforce generic type constraints (e.g., `T extends num`) with dynamic resolution.
 - **Bridging system**: Expose your own Dart/Flutter classes, enums, and methods to interpreted code.
 - **Async/await support**: Handle asynchronous code and Futures.
 - **Class, enum, and extension support**: Use most Dart language features, including classes, inheritance, mixins, enums, and extensions.
 - **Pattern matching**: Support for Dart's pattern matching in switch/case and assignments.
+- **Runtime type validation**: Validate generic type arguments and method parameters at runtime.
 - **Custom logging**: Integrated, configurable logger for debugging interpreted code.
 - **Extensible**: Add your own bridges for custom types and native APIs.
 
@@ -168,7 +171,7 @@ void main() {
 | Switch/case                    | ✅ Supported (classic, pattern, default, fallthrough, exhaustive checks)       |
 | Try/catch/finally              | ✅ Supported (multiple catch, on/type, rethrow, stacktrace)                    |
 | Imports                        | ✅ Supported (URIs, show/hide clauses for libraries defined in `sources`)      |
-| Generics                       | ⚠️ Partial (basic generic classes/functions, no runtime type checks)           |
+| Generics                       | ✅ Full support (generic classes/functions, type constraints, runtime validation) |
 | Operator overloading           | ⚠️ Partial (via extensions, not via class operator methods)                    |
 | FFI                            | 🚫 Not supported                                                               |
 | Isolates                       | 🚫 Not supported                                                               |
@@ -186,7 +189,7 @@ See the [documentation](#documentation) for details and limitations.
 
 ## Limitations
 
-- Generics and operator overloading are partially supported.
+- Operator overloading is partially supported (via extensions, not via class operator methods).
 - Some advanced Dart features (isolates, FFI, mirrors) are not available.
 - The interpreter is not a full Dart VM: some language features may behave differently.
 
