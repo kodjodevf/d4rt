@@ -1,275 +1,217 @@
 import 'dart:io';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/map.dart'; // For named args
+import 'package:d4rt/d4rt.dart';
 
-class FileSystemEntityIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Define abstract type names
-    environment.define(
-        'FileSystemEntity',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return FileSystemEntity; // Abstract class
-        }, arity: 0, name: 'FileSystemEntity'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is FileSystemEntity) {
-      switch (name) {
-        case 'exists':
-          return target.exists();
-        case 'existsSync':
-          return target.existsSync();
-        case 'delete':
-          return target.delete(
-              recursive: namedArguments.get<bool?>('recursive') ?? false);
-        case 'deleteSync':
-          target.deleteSync(
-              recursive: namedArguments.get<bool?>('recursive') ?? false);
-          return null;
-        case 'rename':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.rename requires one String argument (newPath).');
-          }
-          return target.rename(arguments[0] as String);
-        case 'renameSync':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.renameSync requires one String argument (newPath).');
-          }
-          target.renameSync(arguments[0] as String);
-          return null;
-        case 'stat':
-          return target.stat();
-        case 'statSync':
-          return target.statSync();
-        case 'watch':
-          return target.watch(
-              events: namedArguments.get<int?>('events') ?? FileSystemEvent.all,
-              recursive: namedArguments.get<bool?>('recursive') ?? false);
-        case 'absolute': // Getter
-          return target.absolute;
-        case 'uri': // Getter
-          return target.uri;
-        case 'parent': // Getter
-          return target.parent;
-        case 'path': // Getter
-          return target.path;
-        case 'isAbsolute': // Getter
-          return target.isAbsolute;
-        case 'resolveSymbolicLinks':
-          return target.resolveSymbolicLinks();
-        case 'resolveSymbolicLinksSync':
-          return target.resolveSymbolicLinksSync();
-        // Common Object methods
-        case 'runtimeType':
-          return target.runtimeType;
-        case 'hashCode':
-          return target.hashCode;
-        case 'toString':
-          return target.toString();
-        default:
-          throw RuntimeError(
-              'FileSystemEntity has no method/getter mapping for "$name"');
-      }
-    } else {
-      // Handle top-level static methods related to FileSystemEntity
-      switch (name) {
-        case 'identical':
-          if (arguments.length != 2 ||
-              arguments[0] is! String ||
-              arguments[1] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.identical requires two String arguments (path1, path2).');
-          }
-          return FileSystemEntity.identical(
-              arguments[0] as String, arguments[1] as String);
-        case 'identicalSync':
-          if (arguments.length != 2 ||
-              arguments[0] is! String ||
-              arguments[1] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.identicalSync requires two String arguments (path1, path2).');
-          }
-          return FileSystemEntity.identicalSync(
-              arguments[0] as String, arguments[1] as String);
-        case 'isDirectory':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.isDirectory requires one String argument (path).');
-          }
-          return FileSystemEntity.isDirectory(arguments[0] as String);
-        case 'isDirectorySync':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.isDirectorySync requires one String argument (path).');
-          }
-          return FileSystemEntity.isDirectorySync(arguments[0] as String);
-        case 'isFile':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.isFile requires one String argument (path).');
-          }
-          return FileSystemEntity.isFile(arguments[0] as String);
-        case 'isFileSync':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.isFileSync requires one String argument (path).');
-          }
-          return FileSystemEntity.isFileSync(arguments[0] as String);
-        case 'isLink':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.isLink requires one String argument (path).');
-          }
-          return FileSystemEntity.isLink(arguments[0] as String);
-        case 'isLinkSync':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.isLinkSync requires one String argument (path).');
-          }
-          return FileSystemEntity.isLinkSync(arguments[0] as String);
-        case 'type':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.type requires one String argument (path).');
-          }
-          return FileSystemEntity.type(arguments[0] as String,
-              followLinks: namedArguments.get<bool?>('followLinks') ?? true);
-        case 'typeSync':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'FileSystemEntity.typeSync requires one String argument (path).');
-          }
-          return FileSystemEntity.typeSync(arguments[0] as String,
-              followLinks: namedArguments.get<bool?>('followLinks') ?? true);
-
-        default:
-          throw RuntimeError(
-              'FileSystemEntity static scope has no mapping for "$name"');
-      }
-    }
-  }
+class FileSystemEntityIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: FileSystemEntity,
+        name: 'FileSystemEntity',
+        typeParameterCount: 0,
+        staticMethods: {
+          'identical': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 2 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.identical requires two String arguments (path1, path2).');
+            }
+            return FileSystemEntity.identical(
+                positionalArgs[0] as String, positionalArgs[1] as String);
+          },
+          'identicalSync': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 2 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.identicalSync requires two String arguments (path1, path2).');
+            }
+            return FileSystemEntity.identicalSync(
+                positionalArgs[0] as String, positionalArgs[1] as String);
+          },
+          'isDirectory': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.isDirectory requires one String argument (path).');
+            }
+            return FileSystemEntity.isDirectory(positionalArgs[0] as String);
+          },
+          'isDirectorySync': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.isDirectorySync requires one String argument (path).');
+            }
+            return FileSystemEntity.isDirectorySync(
+                positionalArgs[0] as String);
+          },
+          'isFile': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.isFile requires one String argument (path).');
+            }
+            return FileSystemEntity.isFile(positionalArgs[0] as String);
+          },
+          'isFileSync': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.isFileSync requires one String argument (path).');
+            }
+            return FileSystemEntity.isFileSync(positionalArgs[0] as String);
+          },
+          'isLink': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.isLink requires one String argument (path).');
+            }
+            return FileSystemEntity.isLink(positionalArgs[0] as String);
+          },
+          'isLinkSync': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.isLinkSync requires one String argument (path).');
+            }
+            return FileSystemEntity.isLinkSync(positionalArgs[0] as String);
+          },
+          'type': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.type requires one String argument (path).');
+            }
+            return FileSystemEntity.type(positionalArgs[0] as String,
+                followLinks: namedArgs['followLinks'] as bool? ?? true);
+          },
+          'typeSync': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.typeSync requires one String argument (path).');
+            }
+            return FileSystemEntity.typeSync(positionalArgs[0] as String,
+                followLinks: namedArgs['followLinks'] as bool? ?? true);
+          },
+        },
+        methods: {
+          'exists': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).exists();
+          },
+          'existsSync': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).existsSync();
+          },
+          'delete': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity)
+                .delete(recursive: namedArgs['recursive'] as bool? ?? false);
+          },
+          'deleteSync': (visitor, target, positionalArgs, namedArgs) {
+            (target as FileSystemEntity).deleteSync(
+                recursive: namedArgs['recursive'] as bool? ?? false);
+            return null;
+          },
+          'rename': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.rename requires one String argument (newPath).');
+            }
+            return (target as FileSystemEntity)
+                .rename(positionalArgs[0] as String);
+          },
+          'renameSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.renameSync requires one String argument (newPath).');
+            }
+            (target as FileSystemEntity)
+                .renameSync(positionalArgs[0] as String);
+            return null;
+          },
+          'stat': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).stat();
+          },
+          'statSync': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).statSync();
+          },
+          'watch': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).watch(
+                events: namedArgs['events'] as int? ?? FileSystemEvent.all,
+                recursive: namedArgs['recursive'] as bool? ?? false);
+          },
+          'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).resolveSymbolicLinks();
+          },
+          'resolveSymbolicLinksSync':
+              (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileSystemEntity).resolveSymbolicLinksSync();
+          },
+        },
+        getters: {
+          'absolute': (visitor, target) =>
+              (target as FileSystemEntity).absolute,
+          'uri': (visitor, target) => (target as FileSystemEntity).uri,
+          'parent': (visitor, target) => (target as FileSystemEntity).parent,
+          'path': (visitor, target) => (target as FileSystemEntity).path,
+          'isAbsolute': (visitor, target) =>
+              (target as FileSystemEntity).isAbsolute,
+        },
+        staticGetters: {
+          'isWatchSupported': (visitor) => FileSystemEntity.isWatchSupported,
+        },
+      );
 }
 
-class FileStatIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'FileStat',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return FileStat; // Usually obtained from stat()
-        }, arity: 0, name: 'FileStat'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is FileStat) {
-      switch (name) {
-        case 'accessed': // Getter
-          return target.accessed;
-        case 'changed': // Getter
-          return target.changed;
-        case 'mode': // Getter
-          return target.mode;
-        case 'modified': // Getter
-          return target.modified;
-        case 'size': // Getter
-          return target.size;
-        case 'type': // Getter
-          return target.type;
-        case 'modeString': // Added method
-          return target.modeString();
-        // Common Object methods
-        case 'runtimeType':
-          return target.runtimeType;
-        case 'hashCode':
-          return target.hashCode;
-        case 'toString':
-          return target.toString();
-        default:
-          throw RuntimeError(
-              'FileStat has no method/getter mapping for "$name"');
-      }
-    }
-
-    throw RuntimeError(
-        'Unsupported target for FileStat: ${target.runtimeType}');
-  }
+class FileStatIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: FileStat,
+        name: 'FileStat',
+        typeParameterCount: 0,
+        constructors: {
+          // FileStat is typically obtained from stat() operations
+        },
+        methods: {
+          'modeString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FileStat).modeString();
+          },
+        },
+        getters: {
+          'accessed': (visitor, target) => (target as FileStat).accessed,
+          'changed': (visitor, target) => (target as FileStat).changed,
+          'mode': (visitor, target) => (target as FileStat).mode,
+          'modified': (visitor, target) => (target as FileStat).modified,
+          'size': (visitor, target) => (target as FileStat).size,
+          'type': (visitor, target) => (target as FileStat).type,
+        },
+      );
 }
 
-class FileSystemEntityTypeIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'FileSystemEntityType',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return FileSystemEntityType; // Container for static constants
-        }, arity: 0, name: 'FileSystemEntityType'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    switch (name) {
-      case 'file':
-        return FileSystemEntityType.file;
-      case 'directory':
-        return FileSystemEntityType.directory;
-      case 'link':
-        return FileSystemEntityType.link;
-      case 'notFound':
-        return FileSystemEntityType.notFound;
-      default:
-        throw RuntimeError(
-            'FileSystemEntityType has no static mapping for "$name"');
-    }
-  }
+class FileSystemEntityTypeIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: FileSystemEntityType,
+        name: 'FileSystemEntityType',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {},
+        getters: {
+          'file': (visitor, target) => FileSystemEntityType.file,
+          'directory': (visitor, target) => FileSystemEntityType.directory,
+          'link': (visitor, target) => FileSystemEntityType.link,
+          'notFound': (visitor, target) => FileSystemEntityType.notFound,
+        },
+      );
 }
 
-class FileSystemEventIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'FileSystemEvent',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return FileSystemEvent; // Abstract, container for constants
-        }, arity: 0, name: 'FileSystemEvent'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is FileSystemEvent) {
-      // Handle events (e.g., isCreate, isModify, path, type)
-      switch (name) {
-        case 'isCreate':
-          return target.type == FileSystemEvent.create;
-        case 'isModify':
-          return target.type == FileSystemEvent.modify;
-        case 'isDelete':
-          return target.type == FileSystemEvent.delete;
-        case 'isMove':
-          return target.type == FileSystemEvent.move;
-        case 'path':
-          return target.path;
-        case 'type':
-          return target.type;
-        default:
-          throw RuntimeError(
-              'FileSystemEvent has no property mapping for "$name"');
-      }
-    }
-
-    throw RuntimeError(
-        'Unsupported target for FileSystemEvent: ${target.runtimeType}');
-  }
+class FileSystemEventIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: FileSystemEvent,
+        name: 'FileSystemEvent',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {},
+        getters: {
+          'isCreate': (visitor, target) =>
+              (target as FileSystemEvent).type == FileSystemEvent.create,
+          'isModify': (visitor, target) =>
+              (target as FileSystemEvent).type == FileSystemEvent.modify,
+          'isDelete': (visitor, target) =>
+              (target as FileSystemEvent).type == FileSystemEvent.delete,
+          'isMove': (visitor, target) =>
+              (target as FileSystemEvent).type == FileSystemEvent.move,
+          'path': (visitor, target) => (target as FileSystemEvent).path,
+          'type': (visitor, target) => (target as FileSystemEvent).type,
+        },
+      );
 }

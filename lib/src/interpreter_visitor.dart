@@ -361,22 +361,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "[visitSimpleIdentifier] Returning '$name' = $enumMember (from EnumValue this)");
         }
         return enumMember;
-      } else {
-        // 'this' existe mais n'est ni InterpretedInstance ni BridgedInstance
-        Logger.debug(
-            "[SimpleIdentifier] 'this' is native type (${thisInstance?.runtimeType}). Trying access '$name' via Stdlib.");
-        try {
-          // Use evalMethod which handles properties/methods on base types
-          return Stdlib(environment)
-              .evalMethod(thisInstance, name, [], {}, this, []);
-        } on RuntimeError catch (stdlibErr) {
-          // If Stdlib also fails, then it is really undefined.
-          Logger.debug(
-              "[SimpleIdentifier] Stdlib access for '$name' on native 'this' failed: ${stdlibErr.message}");
-          throw RuntimeError(
-              "Undefined variable: $name (this exists as native type ${thisInstance?.runtimeType}, but member access failed: ${stdlibErr.message})");
-        }
       }
+      throw RuntimeError(
+          "Undefined variable: $name (this exists as native type ${thisInstance?.runtimeType}");
     } on RuntimeError catch (thisErr) {
       // 'this' not found OR instance.get() failed
       // If get() failed with a specific error, propagate it if it is NOT "Undefined property".
@@ -671,6 +658,29 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         return BridgedMethodCallable(bridgedInstance, methodAdapter, memberName)
             .call(this, [], {});
       }
+
+      // No adapter found, try extension methods/getters
+      try {
+        final extensionMember =
+            environment.findExtensionMember(bridgedInstance, memberName);
+        if (extensionMember is InterpretedExtensionMethod) {
+          if (extensionMember.isGetter) {
+            Logger.debug(
+                "[PrefixedIdentifier] Found extension getter '$memberName' for ${bridgedInstance.bridgedClass.name}. Calling...");
+            final extensionArgs = <Object?>[bridgedInstance];
+            return extensionMember.call(this, extensionArgs, {});
+          } else if (!extensionMember.isOperator && !extensionMember.isSetter) {
+            Logger.debug(
+                "[PrefixedIdentifier] Found extension method '$memberName' for ${bridgedInstance.bridgedClass.name}. Returning callable.");
+            return BoundExtensionMethodCallable(
+                bridgedInstance, extensionMember);
+          }
+        }
+      } on RuntimeError catch (findError) {
+        Logger.debug(
+            "[PrefixedIdentifier] Error finding extension '$memberName' for ${bridgedInstance.bridgedClass.name}: ${findError.message}");
+      }
+
       throw RuntimeError(
           "Undefined property or method '$memberName' on bridged instance of '${bridgedInstance.bridgedClass.name}'.");
     } else if (prefixValue is InterpretedRecord) {
@@ -763,12 +773,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             "[PrefixedIdentifier] Error finding extension '$memberName' (fallback): ${findError.message}. Trying Stdlib...");
       }
 
-      // This will now only be reached if the prefix isn't a class, instance, enum, bridge, record,
-      // AND no suitable extension getter/method was found.
-      return Stdlib(environment).evalMethod(
-          prefixValue, memberName, [], {}, this, [],
-          error:
-              "Cannot access property '$memberName' on target of type ${prefixValue?.runtimeType}.");
+      throw RuntimeError(
+          "Cannot access property '$memberName' on target of type ${prefixValue?.runtimeType}.");
     }
   }
 
@@ -2113,9 +2119,29 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                 "Native error during bridged method call '$methodName' on ${bridgedClass.name}: $e");
           }
         } else {
-          // No adapter found for this method name
-          throw RuntimeError(
-              "Bridged class '${bridgedClass.name}' has no instance method named '$methodName'.");
+          // No adapter found for this method name, try extension methods
+          Logger.debug(
+              "[visitMethodInvocation] Bridged method '$methodName' not found directly for ${bridgedClass.name}. Trying extensions.");
+          try {
+            final extensionMethod =
+                environment.findExtensionMember(targetValue, methodName);
+            if (extensionMethod is InterpretedExtensionMethod) {
+              Logger.debug(
+                  "[visitMethodInvocation] Found extension method '$methodName' for ${bridgedClass.name}. Calling...");
+              final (positionalArgs, namedArgs) =
+                  _evaluateArguments(node.argumentList);
+
+              final extensionArgs = <Object?>[targetValue];
+              extensionArgs.addAll(positionalArgs);
+              return extensionMethod.call(this, extensionArgs, namedArgs);
+            } else {
+              throw RuntimeError(
+                  "Bridged class '${bridgedClass.name}' has no instance method named '$methodName'.");
+            }
+          } on RuntimeError catch (findError) {
+            throw RuntimeError(
+                "Bridged class '${bridgedClass.name}' has no instance method named '$methodName'. Error during extension lookup: ${findError.message}");
+          }
         }
         // Note: This block returns directly or throws, it does not set calleeValue.
       }
@@ -2332,41 +2358,30 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               .toList();
         }
 
-        // Attempt call via stdlib first (for built-in types primarily)
-        try {
-          Logger.debug(
-              "[MethodInvocation] Trying stdlib evalMethod for '$methodName' on ${targetValue.runtimeType}");
-          // Ensure type arguments are passed to stdlib if available
-          return Stdlib(environment).evalMethod(targetValue, methodName,
-              positionalArgs, namedArgs, this, evaluatedTypeArguments ?? []);
-        } on RuntimeError catch (stdlibError) {
-          // Stdlib failed, NOW try to find an extension method
-          Logger.debug(
-              "[MethodInvocation] Stdlib evalMethod failed ('${stdlibError.message}'). Looking for extension method '$methodName' for target type ${targetValue.runtimeType}.");
-          final extensionCallable =
-              environment.findExtensionMember(targetValue, methodName);
+        final extensionCallable =
+            environment.findExtensionMember(targetValue, methodName);
 
-          if (extensionCallable is InterpretedExtensionMethod) {
-            Logger.debug(
-                "[MethodInvocation] Found extension method '$methodName'. Calling...");
-            // Prepend the target instance to the positional arguments for the extension call
-            final extensionPositionalArgs = [targetValue, ...positionalArgs];
-            try {
-              // Call the extension method
-              return extensionCallable.call(this, extensionPositionalArgs,
-                  namedArgs, evaluatedTypeArguments);
-            } on ReturnException catch (e) {
-              return e.value;
-            } catch (e) {
-              throw RuntimeError(
-                  "Error executing extension method '$methodName': $e");
-            }
-          } else {
-            // No extension method found either, rethrow the original stdlib error
-            Logger.debug(
-                "[MethodInvocation] Extension method '$methodName' not found. Rethrowing original error.");
-            rethrow; // Rethrow the stdlibError
+        if (extensionCallable is InterpretedExtensionMethod) {
+          Logger.debug(
+              "[MethodInvocation] Found extension method '$methodName'. Calling...");
+          // Prepend the target instance to the positional arguments for the extension call
+          final extensionPositionalArgs = [targetValue, ...positionalArgs];
+          try {
+            // Call the extension method
+            return extensionCallable.call(this, extensionPositionalArgs,
+                namedArgs, evaluatedTypeArguments);
+          } on ReturnException catch (e) {
+            return e.value;
+          } catch (e) {
+            throw RuntimeError(
+                "Error executing extension method '$methodName': $e");
           }
+        } else {
+          // No extension method found either, rethrow the original stdlib error
+          Logger.debug(
+              "[MethodInvocation] Extension method '$methodName' not found. Rethrowing original error.");
+          throw RuntimeError(
+              "Undefined property or method '$methodName' on ${targetValue.runtimeType}.");
         }
       }
     }
@@ -2844,45 +2859,34 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       throw RuntimeError(
           "Undefined property or method '$propertyName' accessed via 'super' on bridged superclass '${bridgedSuper.name}'.");
     } else {
-      //  Target is not a known instance/class/super/bridge/record type
-      //  Try Stdlib first
-      try {
-        Logger.debug(
-            "[PropertyAccess] Trying stdlib evalMethod for getter '$propertyName' on ${target.runtimeType}");
-        // Use evalMethod which might handle properties/getters for basic types
-        return Stdlib(environment)
-            .evalMethod(target, propertyName, [], {}, this, []);
-      } on RuntimeError catch (stdlibError) {
-        // Stdlib failed, try extension getter
-        // This block remains for types that are not InterpretedInstance
-        Logger.debug(
-            "[PropertyAccess] Stdlib evalMethod failed ('${stdlibError.message}'). Looking for extension getter '$propertyName' for target type ${target.runtimeType}.");
-        final extensionCallable =
-            environment.findExtensionMember(target, propertyName);
+      Logger.debug(
+          "[PropertyAccess] Looking for extension getter '$propertyName' for target type ${target.runtimeType}.");
+      final extensionCallable =
+          environment.findExtensionMember(target, propertyName);
 
-        if (extensionCallable is InterpretedExtensionMethod &&
-            extensionCallable.isGetter) {
-          Logger.debug(
-              "[PropertyAccess] Found extension getter '$propertyName'. Calling...");
-          // Prepend the target instance to the positional arguments for the extension call
-          final extensionPositionalArgs = [
-            target
-          ]; // Getters take no explicit args
-          try {
-            // Call the extension getter
-            return extensionCallable.call(this, extensionPositionalArgs, {});
-          } on ReturnException catch (e) {
-            return e.value;
-          } catch (e) {
-            throw RuntimeError(
-                "Error executing extension getter '$propertyName': $e");
-          }
-        } else {
-          // No extension getter found either, rethrow the original stdlib error
-          Logger.debug(
-              "[PropertyAccess] Extension getter '$propertyName' not found. Rethrowing original error.");
-          rethrow; // Rethrow the stdlibError
+      if (extensionCallable is InterpretedExtensionMethod &&
+          extensionCallable.isGetter) {
+        Logger.debug(
+            "[PropertyAccess] Found extension getter '$propertyName'. Calling...");
+        // Prepend the target instance to the positional arguments for the extension call
+        final extensionPositionalArgs = [
+          target
+        ]; // Getters take no explicit args
+        try {
+          // Call the extension getter
+          return extensionCallable.call(this, extensionPositionalArgs, {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError(
+              "Error executing extension getter '$propertyName': $e");
         }
+      } else {
+        // No extension getter found either, rethrow the original stdlib error
+        Logger.debug(
+            "[PropertyAccess] Extension getter '$propertyName' not found. Rethrowing original error.");
+        throw RuntimeError(
+            "Undefined property or method '$propertyName' on ${target.runtimeType}.");
       }
     }
   }
@@ -3391,10 +3395,6 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         throw RuntimeError(
             "Bridged instance method '$methodName' not found in cascade.");
       }
-    } else {
-      // Attempt call via stdlib (might handle basic types)
-      Stdlib(environment).evalMethod(targetValue, methodName, positionalArgs,
-          namedArgs, this, evaluatedTypeArguments ?? []);
     }
     // Ignore the return value of the method call in a cascade
   }
@@ -3428,11 +3428,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       throw RuntimeError(
           "Bridged instance property '$propertyName' (getter) not found in cascade.");
     } else {
-      // Attempt access via stdlib (might handle basic types)
-      return Stdlib(environment)
-          .evalMethod(targetValue, propertyName, [], {}, this, []);
+      throw RuntimeError(
+          "property '$propertyName' (getter) not found in cascade.");
     }
-    // Return the accessed value (might be needed by assignment)
   }
 
   Object? _executeCascadeIndexAccess(

@@ -1,107 +1,116 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
+import 'package:d4rt/d4rt.dart';
 
-class DoubleCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'double',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Similar to other types, return the Dart type for now.
-          return double;
-        }, arity: 0, name: 'double'));
-    // Static members like constants and parse are handled in evalMethod
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is double) {
-      switch (name) {
-        case 'abs':
-          return target.abs();
-        case 'ceil':
-          return target.ceil();
-        case 'floor':
-          return target.floor();
-        case 'round':
-          return target.round();
-        case 'toInt':
-          return target.toInt();
-        case 'toDouble':
-          return target.toDouble();
-        case 'toString':
-          return target.toString();
-        case 'isFinite':
-          return target.isFinite;
-        case 'isInfinite':
-          return target.isInfinite;
-        case 'isNaN':
-          return target.isNaN;
-        case 'isNegative':
-          return target.isNegative;
-        case 'clamp':
-          return target.clamp(arguments[0] as num, arguments[1] as num);
-        case 'remainder':
-          return target.remainder(arguments[0] as num);
-        case 'truncate':
-          return target.truncate();
-        case 'truncateToDouble':
-          return target.truncateToDouble();
-        case 'ceilToDouble':
-          return target.ceilToDouble();
-        case 'floorToDouble':
-          return target.floorToDouble();
-        case 'roundToDouble':
-          return target.roundToDouble();
-        case 'compareTo':
-          return target.compareTo(arguments[0] as num);
-        // 'parse' is static
-        case 'sign':
-          return target.sign;
-        case 'toStringAsFixed':
-          return target.toStringAsFixed(arguments[0] as int);
-        case 'toStringAsExponential':
-          // Optional parameter requires List extension or check
-          return target.toStringAsExponential(arguments.get<int?>(0));
-        case 'toStringAsPrecision':
-          return target.toStringAsPrecision(arguments[0] as int);
-        case 'hashCode':
-          return target.hashCode;
-        default:
-          throw RuntimeError(
-              'double has no instance method mapping for "$name"');
-      }
-    } else {
-      // static methods and constants
-      switch (name) {
-        case 'parse':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError("double.parse expects one String argument.");
-          }
-          return double.parse(arguments[0] as String);
-        case 'tryParse':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError("double.tryParse expects one String argument.");
-          }
-          return double.tryParse(arguments[0] as String);
-        case 'maxFinite':
-          return double.maxFinite;
-        case 'infinity':
-          return double.infinity;
-        case 'minPositive':
-          return double.minPositive;
-        case 'nan':
-          return double.nan;
-        case 'negativeInfinity':
-          return double.negativeInfinity;
-        default:
-          throw RuntimeError('double has no static member mapping for "$name"');
-      }
-    }
-  }
+class DoubleCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: double,
+        name: 'double',
+        typeParameterCount: 0,
+        constructors: {},
+        staticMethods: {
+          'parse': (visitor, positionalArgs, namedArgs) {
+            return double.parse(positionalArgs[0] as String);
+          },
+          'tryParse': (visitor, positionalArgs, namedArgs) {
+            return double.tryParse(positionalArgs[0] as String);
+          },
+        },
+        staticGetters: {
+          'infinity': (visitor) => double.infinity,
+          'negativeInfinity': (visitor) => double.negativeInfinity,
+          'nan': (visitor) => double.nan,
+          'maxFinite': (visitor) => double.maxFinite,
+          'minPositive': (visitor) => double.minPositive,
+        },
+        methods: {
+          'abs': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).abs();
+          },
+          'ceil': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).ceil();
+          },
+          'floor': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).floor();
+          },
+          'round': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).round();
+          },
+          'truncate': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).truncate();
+          },
+          'ceilToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).ceilToDouble();
+          },
+          'floorToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).floorToDouble();
+          },
+          'roundToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).roundToDouble();
+          },
+          'truncateToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).truncateToDouble();
+          },
+          'toDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).toDouble();
+          },
+          'toInt': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).toInt();
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).toString();
+          },
+          'toStringAsFixed': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).toStringAsFixed(positionalArgs[0] as int);
+          },
+          'toStringAsExponential':
+              (visitor, target, positionalArgs, namedArgs) {
+            final fractionDigits =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as int? : null;
+            return (target as double).toStringAsExponential(fractionDigits);
+          },
+          'toStringAsPrecision': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double)
+                .toStringAsPrecision(positionalArgs[0] as int);
+          },
+          'compareTo': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).compareTo(positionalArgs[0] as num);
+          },
+          'clamp': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double)
+                .clamp(positionalArgs[0] as num, positionalArgs[1] as num);
+          },
+          'remainder': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double).remainder(positionalArgs[0] as num);
+          },
+          '+': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double) + (positionalArgs[0] as num);
+          },
+          '-': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double) - (positionalArgs[0] as num);
+          },
+          '*': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double) * (positionalArgs[0] as num);
+          },
+          '/': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double) / (positionalArgs[0] as num);
+          },
+          '~/': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double) ~/ (positionalArgs[0] as num);
+          },
+          '%': (visitor, target, positionalArgs, namedArgs) {
+            return (target as double) % (positionalArgs[0] as num);
+          },
+          'unary-': (visitor, target, positionalArgs, namedArgs) {
+            return -(target as double);
+          },
+        },
+        getters: {
+          'hashCode': (visitor, target) => (target as double).hashCode,
+          'runtimeType': (visitor, target) => (target as double).runtimeType,
+          'sign': (visitor, target) => (target as double).sign,
+          'isFinite': (visitor, target) => (target as double).isFinite,
+          'isInfinite': (visitor, target) => (target as double).isInfinite,
+          'isNaN': (visitor, target) => (target as double).isNaN,
+          'isNegative': (visitor, target) => (target as double).isNegative,
+        },
+      );
 }

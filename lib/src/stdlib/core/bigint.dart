@@ -1,83 +1,145 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/map.dart'; // Assuming extension is here
+import 'package:d4rt/d4rt.dart';
 
-class BigIntCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'BigInt',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return BigInt;
-        }, arity: 0, name: 'BigInt'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is BigInt) {
-      switch (name) {
-        case 'toInt':
-          return target.toInt();
-        case 'toDouble':
-          return target.toDouble();
-        case 'isEven':
-          return target.isEven;
-        case 'isOdd':
-          return target.isOdd;
-        case 'abs':
-          return target.abs();
-        case 'compareTo':
-          return target.compareTo(arguments[0] as BigInt);
-        case 'toString':
-          return target.toString();
-        // case 'parse': // 'parse' is static, not instance
-        //   return BigInt.parse(arguments[0] as String);
-        case 'bitLength':
-          return target.bitLength;
-        case 'sign':
-          return target.sign;
-        case 'gcd':
-          return target.gcd(arguments[0] as BigInt);
-        case 'modPow':
-          return target.modPow(arguments[0] as BigInt, arguments[1] as BigInt);
-        case 'modInverse':
-          return target.modInverse(arguments[0] as BigInt);
-        case 'remainder':
-          return target.remainder(arguments[0] as BigInt);
-        case 'toRadixString':
-          return target.toRadixString(arguments[0] as int);
-        case 'pow':
-          return target.pow(arguments[0] as int);
-        case 'toUnsigned':
-          return target.toUnsigned(arguments[0] as int);
-        case 'toSigned':
-          return target.toSigned(arguments[0] as int);
-        case 'isValidInt':
-          return target.isValidInt;
-        default:
-          // Use RuntimeError as per ListCore
-          throw RuntimeError(
-              'BigInt has no instance method mapping for "$name"');
-      }
-    } else {
-      // static methods
-      switch (name) {
-        case 'parse':
-          return BigInt.parse(arguments[0] as String,
-              radix: namedArguments.get<int?>('radix'));
-        case 'tryParse':
-          return BigInt.tryParse(arguments[0] as String,
-              radix: namedArguments.get<int?>('radix'));
-        case 'from':
-          return BigInt.from(arguments[0] as int);
-        default:
-          // Use RuntimeError as per ListCore
-          throw RuntimeError('BigInt has no static method mapping for "$name"');
-      }
-    }
-  }
+class BigIntCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: BigInt,
+        name: 'BigInt',
+        typeParameterCount: 0,
+        constructors: {},
+        staticMethods: {
+          'from': (visitor, positionalArgs, namedArgs) {
+            return BigInt.from(positionalArgs[0] as num);
+          },
+          'parse': (visitor, positionalArgs, namedArgs) {
+            final source = positionalArgs[0] as String;
+            final radix = namedArgs['radix'] as int?;
+            return BigInt.parse(source, radix: radix);
+          },
+          'tryParse': (visitor, positionalArgs, namedArgs) {
+            final source = positionalArgs[0] as String;
+            final radix = namedArgs['radix'] as int?;
+            return BigInt.tryParse(source, radix: radix);
+          },
+        },
+        staticGetters: {
+          'zero': (visito) => BigInt.zero,
+          'one': (visito) => BigInt.one,
+          'two': (visito) => BigInt.two,
+        },
+        methods: {
+          '+': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) + (positionalArgs[0] as BigInt);
+          },
+          '-': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) - (positionalArgs[0] as BigInt);
+          },
+          '*': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) * (positionalArgs[0] as BigInt);
+          },
+          '~/': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) ~/ (positionalArgs[0] as BigInt);
+          },
+          '%': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) % (positionalArgs[0] as BigInt);
+          },
+          'remainder': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).remainder(positionalArgs[0] as BigInt);
+          },
+          'pow': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).pow(positionalArgs[0] as int);
+          },
+          'modPow': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).modPow(
+                positionalArgs[0] as BigInt, positionalArgs[1] as BigInt);
+          },
+          'modInverse': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).modInverse(positionalArgs[0] as BigInt);
+          },
+          'gcd': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).gcd(positionalArgs[0] as BigInt);
+          },
+          'abs': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).abs();
+          },
+          'compareTo': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).compareTo(positionalArgs[0] as BigInt);
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).toString();
+          },
+          'toRadixString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).toRadixString(positionalArgs[0] as int);
+          },
+          'toInt': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).toInt();
+          },
+          'toDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).toDouble();
+          },
+          'toUnsigned': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).toUnsigned(positionalArgs[0] as int);
+          },
+          'toSigned': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt).toSigned(positionalArgs[0] as int);
+          },
+          'unary-': (visitor, target, positionalArgs, namedArgs) {
+            return -(target as BigInt);
+          },
+          '&': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) & (positionalArgs[0] as BigInt);
+          },
+          '|': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) | (positionalArgs[0] as BigInt);
+          },
+          '^': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) ^ (positionalArgs[0] as BigInt);
+          },
+          '~': (visitor, target, positionalArgs, namedArgs) {
+            return ~(target as BigInt);
+          },
+          '<<': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) << (positionalArgs[0] as int);
+          },
+          '>>': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) >> (positionalArgs[0] as int);
+          },
+          '==': (visitor, target, positionalArgs, namedArgs) {
+            return (target as BigInt) == positionalArgs[0];
+          },
+          '<': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs[0] is BigInt) {
+              return (target as BigInt) < (positionalArgs[0] as BigInt);
+            }
+            throw RuntimeError("BigInt comparison requires another BigInt");
+          },
+          '<=': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs[0] is BigInt) {
+              return (target as BigInt) <= (positionalArgs[0] as BigInt);
+            }
+            throw RuntimeError("BigInt comparison requires another BigInt");
+          },
+          '>': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs[0] is BigInt) {
+              return (target as BigInt) > (positionalArgs[0] as BigInt);
+            }
+            throw RuntimeError("BigInt comparison requires another BigInt");
+          },
+          '>=': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs[0] is BigInt) {
+              return (target as BigInt) >= (positionalArgs[0] as BigInt);
+            }
+            throw RuntimeError("BigInt comparison requires another BigInt");
+          },
+        },
+        getters: {
+          'sign': (visitor, target) => (target as BigInt).sign,
+          'isEven': (visitor, target) => (target as BigInt).isEven,
+          'isOdd': (visitor, target) => (target as BigInt).isOdd,
+          'isNegative': (visitor, target) => (target as BigInt).isNegative,
+          'bitLength': (visitor, target) => (target as BigInt).bitLength,
+          'isValidInt': (visitor, target) => (target as BigInt).isValidInt,
+          'hashCode': (visitor, target) => (target as BigInt).hashCode,
+          'runtimeType': (visitor, target) => (target as BigInt).runtimeType,
+        },
+      );
 }

@@ -12,15 +12,20 @@ export 'package:d4rt/src/stdlib/io/file.dart';
 export 'package:d4rt/src/stdlib/io/stdio.dart';
 export 'package:d4rt/src/stdlib/io/http.dart';
 
-void registerIoLibs(Environment environment) {
-  DirectoryIo().setEnvironment(environment);
-  FileSystemEntityIo().setEnvironment(environment);
-  FileIo().setEnvironment(environment);
-  StdinIo().setEnvironment(environment);
-  StdoutIo().setEnvironment(environment);
-  StdioTypeIo().setEnvironment(environment);
-  HttpClientIo().setEnvironment(environment);
-  HttpServerIo().setEnvironment(environment);
-  HttpClientRequestIo().setEnvironment(environment);
-  HttpClientResponseIo().setEnvironment(environment);
+class IoStdlib {
+  static void register(Environment environment) {
+    // Register FileSystemEntity classes (converted)
+    environment.defineBridge(FileSystemEntityIo.definition);
+    environment.defineBridge(FileStatIo.definition);
+    environment.defineBridge(FileSystemEntityTypeIo.definition);
+    environment.defineBridge(FileSystemEventIo.definition);
+    environment.defineBridge(DirectoryIo.definition);
+    environment.defineBridge(FileIo.definition);
+
+    // Register Stdio classes (converted)
+    IoStdioStdlib.register(environment);
+
+    // Register HTTP classes (converted)
+    IoHttpStdlib.register(environment);
+  }
 }

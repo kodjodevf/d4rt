@@ -15,8 +15,8 @@ dynamic execute(String source, {Object? args}) {
 }
 
 void main() {
-  group('Interprétation de base', () {
-    test('Déclaration et récupération de variable', () {
+  group('Basic Interpreter', () {
+    test('Variable declaration and retrieval', () {
       final source = '''
         main() {
           var x = 10;
@@ -26,7 +26,7 @@ void main() {
       expect(execute(source), equals(10));
     });
 
-    test('Assignation de variable', () {
+    test('Variable assignment', () {
       final source = '''
         main() {
           var y = 5;
@@ -37,7 +37,7 @@ void main() {
       expect(execute(source), equals(20));
     });
 
-    test('Expression binaire simple', () {
+    test('Simple binary expression', () {
       // Note: Top-level var declaration is handled before main
       final source = '''
         var z = 10 + 5 * 2; 
@@ -48,7 +48,7 @@ void main() {
       expect(execute(source), equals(20));
     });
 
-    test('Utilisation de variable dans une expression', () {
+    test('Variable usage in expression', () {
       final source = '''
         main() {
           var a = 7;
@@ -59,7 +59,7 @@ void main() {
       expect(execute(source), equals(4));
     });
 
-    test('Gestion de null', () {
+    test('Null handling', () {
       final source = '''
         main() {
           var n = null; 
@@ -69,7 +69,7 @@ void main() {
       expect(execute(source), isNull);
     });
 
-    test('Assignation de null', () {
+    test('Null assignment', () {
       final source = '''
         main() {
           var val = 100;

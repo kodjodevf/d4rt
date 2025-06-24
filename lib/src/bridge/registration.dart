@@ -61,6 +61,24 @@ typedef BridgedInstanceSetterAdapter = void Function(
 class BridgedClassDefinition {
   final Type nativeType;
   final String name;
+
+  /// Additional native class names that should map to this bridged class.
+  /// This is essential for mapping Dart's internal implementation classes to their public interfaces.
+  ///
+  /// For example, Stream has many internal implementations like '_MultiStream', '_ControllerStream',
+  /// '_BroadcastStream', etc. When the interpreter encounters these native objects at runtime,
+  /// it needs to know they should be treated as 'Stream' instances.
+  ///
+  /// Without nativeNames:
+  /// - runtime error: "No registered bridged class found for native type _MultiStream"
+  ///
+  /// With nativeNames: ['_MultiStream', '_ControllerStream', ...]:
+  /// - The environment can map these internal types to the Stream bridge
+  /// - Methods like toList(), listen(), etc. become available on these objects
+  ///
+  /// Used by Environment.toBridgedClass() to perform fallback lookups when
+  /// the exact nativeType doesn't match any registered bridge.
+  final List<String>? nativeNames;
   // Number of expected type parameters
   final int typeParameterCount;
 
@@ -86,6 +104,7 @@ class BridgedClassDefinition {
   BridgedClassDefinition({
     required this.nativeType,
     required this.name,
+    this.nativeNames,
     this.typeParameterCount = 0,
     this.canBeUsedAsMixin = false,
     this.constructors = const {},
@@ -101,6 +120,7 @@ class BridgedClassDefinition {
   BridgedClass buildBridgedClass() {
     final bridgedClass = BridgedClass(nativeType,
         name: name,
+        nativeNames: nativeNames,
         typeParameterCount: typeParameterCount,
         canBeUsedAsMixin: canBeUsedAsMixin);
     // Copy ALL adapters

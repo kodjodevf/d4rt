@@ -10,9 +10,11 @@ export 'package:d4rt/src/stdlib/math/point.dart';
 export 'package:d4rt/src/stdlib/math/rectangle.dart';
 export 'package:d4rt/src/stdlib/math/random.dart';
 
-void registerMathLibs(Environment environment) {
-  MathMath().setEnvironment(environment);
-  PointMath().setEnvironment(environment);
-  RectangleMath().setEnvironment(environment);
-  RandomMath().setEnvironment(environment);
+class MathStdlib {
+  static void register(Environment environment) {
+    MathMath.register(environment);
+    environment.defineBridge(RandomMath.definition);
+    environment.defineBridge(PointMath.definition);
+    environment.defineBridge(RectangleMath.definition);
+  }
 }

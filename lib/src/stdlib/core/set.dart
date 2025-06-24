@@ -1,216 +1,206 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
-import 'package:d4rt/src/utils/extensions/map.dart';
+import 'package:d4rt/d4rt.dart';
 
-class SetCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'Set',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Actual Set construction handled by literals or static methods
-          return Set;
-        }, arity: 0, name: 'Set'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is Set) {
-      target = target.cast<dynamic>(); // Ensure dynamic elements
-      switch (name) {
-        case 'add':
-          return target.add(arguments[0]); // Returns bool
-        case 'addAll':
-          target.addAll(arguments[0] as Iterable);
-          return null;
-        case 'remove':
-          return target.remove(arguments[0]); // Returns bool
-        case 'clear':
-          target.clear();
-          return null;
-        case 'contains':
-          return target.contains(arguments[0]);
-        case 'length':
-          return target.length;
-        case 'isEmpty':
-          return target.isEmpty;
-        case 'isNotEmpty':
-          return target.isNotEmpty;
-        case 'union':
-          return target.union(arguments.get<Set<Object?>>(0)!);
-        case 'intersection':
-          return target.intersection(arguments.get<Set<Object?>>(0)!);
-        case 'difference':
-          return target.difference(arguments.get<Set<Object?>>(0)!);
-        case 'join':
-          return target.join(arguments.get<String?>(0) ?? '');
-        case 'retainWhere':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError(
-                'Expected an InterpretedFunction for retainWhere');
-          }
-          target
-              .retainWhere((element) => test.call(visitor, [element]) as bool);
-          return null;
-        case 'removeWhere':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError(
-                'Expected an InterpretedFunction for removeWhere');
-          }
-          target
-              .removeWhere((element) => test.call(visitor, [element]) as bool);
-          return null;
-        case 'lookup':
-          return target.lookup(arguments[0]);
-        case 'toList':
-          return target.toList(
-              growable: namedArguments.get<bool?>('growable') ?? true);
-        case 'toSet':
-          return target.toSet();
-        case 'containsAll':
-          return target.containsAll(arguments[0] as Iterable);
-        // Inherited from Iterable, but implement directly for clarity/potential overrides
-        case 'followedBy':
-          return target.followedBy(arguments[0] as Iterable);
-        case 'cast':
-          return target.cast<dynamic>();
-        case 'hashCode':
-          return target.hashCode;
-        case 'toString':
-          return target.toString();
-        case 'any':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for any');
-          }
-          return target.any((element) => test.call(visitor, [element]) as bool);
-        case 'every':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for every');
-          }
-          return target
-              .every((element) => test.call(visitor, [element]) as bool);
-        case 'where':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for where');
-          }
-          return target
-              .where((element) => test.call(visitor, [element]) as bool);
-        case 'map':
-          final transform = arguments[0];
-          if (transform is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for map');
-          }
-          return target.map((element) => transform.call(visitor, [element]));
-        case 'expand':
-          final transform = arguments[0];
-          if (transform is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for expand');
-          }
-          return target.expand(
-              (element) => transform.call(visitor, [element]) as Iterable);
-        case 'reduce':
-          final combine = arguments[0];
-          if (combine is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for reduce');
-          }
-          return target.reduce(
-              (value, element) => combine.call(visitor, [value, element]));
-        case 'fold':
-          final initialValue = arguments[0];
-          final combine = arguments[1];
-          if (combine is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for fold');
-          }
-          return target.fold(initialValue,
-              (value, element) => combine.call(visitor, [value, element]));
-        case 'take':
-          return target.take(arguments[0] as int);
-        case 'takeWhile':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for takeWhile');
-          }
-          return target
-              .takeWhile((element) => test.call(visitor, [element]) as bool);
-        case 'skip':
-          return target.skip(arguments[0] as int);
-        case 'skipWhile':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError('Expected an InterpretedFunction for skipWhile');
-          }
-          return target
-              .skipWhile((element) => test.call(visitor, [element]) as bool);
-        case 'firstWhere':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError(
-                'Expected an InterpretedFunction for firstWhere test');
-          }
-          final orElse = namedArguments.get<InterpretedFunction?>("orElse");
-          return target.firstWhere(
+class SetCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: Set,
+        name: 'Set',
+        typeParameterCount: 1,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            return <dynamic>{};
+          },
+        },
+        staticMethods: {
+          'from': (visitor, positionalArgs, namedArgs) {
+            return Set.from(positionalArgs[0] as Iterable);
+          },
+          'of': (visitor, positionalArgs, namedArgs) {
+            return Set.of(positionalArgs[0] as Iterable);
+          },
+          'identity': (visitor, positionalArgs, namedArgs) {
+            return Set.identity();
+          },
+          'unmodifiable': (visitor, positionalArgs, namedArgs) {
+            return Set.unmodifiable(positionalArgs[0] as Iterable);
+          },
+        },
+        methods: {
+          'add': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).add(positionalArgs[0]);
+          },
+          'addAll': (visitor, target, positionalArgs, namedArgs) {
+            (target as Set).addAll(positionalArgs[0] as Iterable);
+            return null;
+          },
+          'clear': (visitor, target, positionalArgs, namedArgs) {
+            (target as Set).clear();
+            return null;
+          },
+          'contains': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).contains(positionalArgs[0]);
+          },
+          'containsAll': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).containsAll(positionalArgs[0] as Iterable);
+          },
+          'difference': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).difference(positionalArgs[0] as Set);
+          },
+          'intersection': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).intersection(positionalArgs[0] as Set);
+          },
+          'lookup': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).lookup(positionalArgs[0]);
+          },
+          'remove': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).remove(positionalArgs[0]);
+          },
+          'removeAll': (visitor, target, positionalArgs, namedArgs) {
+            (target as Set).removeAll(positionalArgs[0] as Iterable);
+            return null;
+          },
+          'removeWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            (target as Set).removeWhere((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+            return null;
+          },
+          'retainAll': (visitor, target, positionalArgs, namedArgs) {
+            (target as Set).retainAll(positionalArgs[0] as Iterable);
+            return null;
+          },
+          'retainWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            (target as Set).retainWhere((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+            return null;
+          },
+          'union': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).union(positionalArgs[0] as Set);
+          },
+          'toSet': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).toSet();
+          },
+          'toList': (visitor, target, positionalArgs, namedArgs) {
+            final growable = namedArgs['growable'] as bool? ?? true;
+            return (target as Set).toList(growable: growable);
+          },
+          'forEach': (visitor, target, positionalArgs, namedArgs) {
+            final action = positionalArgs[0] as InterpretedFunction;
+            for (var element in (target as Set)) {
+              action.call(visitor, [element]);
+            }
+            return null;
+          },
+          'map': (visitor, target, positionalArgs, namedArgs) {
+            final f = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).map((element) {
+              return f.call(visitor, [element]);
+            });
+          },
+          'where': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).where((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+          },
+          'expand': (visitor, target, positionalArgs, namedArgs) {
+            final f = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).expand((element) {
+              return f.call(visitor, [element]) as Iterable;
+            });
+          },
+          'every': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).every((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+          },
+          'any': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).any((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+          },
+          'firstWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            return (target as Set).firstWhere(
               (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []));
-        case 'lastWhere':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError(
-                'Expected an InterpretedFunction for lastWhere test');
-          }
-          final orElse = namedArguments.get<InterpretedFunction?>("orElse");
-          return target.lastWhere(
+              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+            );
+          },
+          'lastWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            return (target as Set).lastWhere(
               (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []));
-        case 'singleWhere':
-          final test = arguments[0];
-          if (test is! InterpretedFunction) {
-            throw RuntimeError(
-                'Expected an InterpretedFunction for singleWhere test');
-          }
-          final orElse = namedArguments.get<InterpretedFunction?>("orElse");
-          return target.singleWhere(
+              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+            );
+          },
+          'singleWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            return (target as Set).singleWhere(
               (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []));
-        case 'elementAt':
-          return target.elementAt(arguments[0] as int);
-        case 'iterator':
-          return target.iterator;
-        case 'first':
-          return target.first;
-        case 'last':
-          return target.last;
-        case 'single':
-          return target.single;
-        default:
-          throw RuntimeError('Set has no instance method mapping for "$name"');
-      }
-    } else {
-      // static methods
-      switch (name) {
-        case 'castFrom': // Not standard dart:core Set
-          throw RuntimeError('Static method castFrom is not standard on Set.');
-        // return Set.castFrom<dynamic, dynamic>(arguments[0] as Set);
-        case 'from':
-          return Set<dynamic>.from(arguments[0] as Iterable);
-        case 'of':
-          return Set.of(arguments[0] as Iterable);
-        case 'unmodifiable':
-          return Set<dynamic>.unmodifiable(arguments[0] as Iterable);
-        case 'identity':
-          return Set<dynamic>.identity();
-        default:
-          throw RuntimeError('Set has no static method mapping for "$name"');
-      }
-    }
-  }
+              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+            );
+          },
+          'elementAt': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).elementAt(positionalArgs[0] as int);
+          },
+          'take': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).take(positionalArgs[0] as int);
+          },
+          'skip': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).skip(positionalArgs[0] as int);
+          },
+          'takeWhile': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).takeWhile((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+          },
+          'skipWhile': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).skipWhile((element) {
+              return test.call(visitor, [element]) as bool;
+            });
+          },
+          'fold': (visitor, target, positionalArgs, namedArgs) {
+            final initialValue = positionalArgs[0];
+            final combine = positionalArgs[1] as InterpretedFunction;
+            return (target as Set).fold(initialValue, (previousValue, element) {
+              return combine.call(visitor, [previousValue, element]);
+            });
+          },
+          'reduce': (visitor, target, positionalArgs, namedArgs) {
+            final combine = positionalArgs[0] as InterpretedFunction;
+            return (target as Set).reduce((value, element) {
+              return combine.call(visitor, [value, element]);
+            });
+          },
+          'join': (visitor, target, positionalArgs, namedArgs) {
+            final separator =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as String : '';
+            return (target as Set).join(separator);
+          },
+          'followedBy': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).followedBy(positionalArgs[0] as Iterable);
+          },
+          'cast': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Set).cast();
+          },
+        },
+        getters: {
+          'length': (visitor, target) => (target as Set).length,
+          'isEmpty': (visitor, target) => (target as Set).isEmpty,
+          'isNotEmpty': (visitor, target) => (target as Set).isNotEmpty,
+          'first': (visitor, target) => (target as Set).first,
+          'last': (visitor, target) => (target as Set).last,
+          'single': (visitor, target) => (target as Set).single,
+          'iterator': (visitor, target) => (target as Set).iterator,
+        },
+      );
 }

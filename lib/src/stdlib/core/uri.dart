@@ -1,194 +1,176 @@
 import 'dart:convert';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
-import 'package:d4rt/src/utils/extensions/map.dart';
+import 'package:d4rt/d4rt.dart';
 
-class UriCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Define Uri type and constructors/factories as native functions
-    environment.define(
-        'Uri',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Default constructor using named arguments
-          return namedArguments.isEmpty
-              ? Uri
-              : Uri(
-                  scheme: namedArguments.get<String?>('scheme'),
-                  userInfo: namedArguments.get<String?>('userInfo'),
-                  host: namedArguments.get<String?>('host'),
-                  port: namedArguments.get<int?>('port'),
-                  path: namedArguments.get<String?>('path'),
-                  pathSegments: (namedArguments.get<List?>('pathSegments'))
-                      ?.cast<String>(),
-                  query: namedArguments.get<String?>('query'),
-                  queryParameters: (namedArguments.get<Map?>('queryParameters'))
-                      ?.cast<String, dynamic>(),
-                  fragment: namedArguments.get<String?>('fragment'),
-                );
+class UriCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: Uri,
+        name: 'Uri',
+        typeParameterCount: 0,
+        nativeNames: ['_SimpleUri'],
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            return Uri(
+              scheme: namedArgs['scheme'] as String?,
+              userInfo: namedArgs['userInfo'] as String?,
+              host: namedArgs['host'] as String?,
+              port: namedArgs['port'] as int?,
+              path: namedArgs['path'] as String?,
+              pathSegments: namedArgs['pathSegments'] as Iterable<String>?,
+              query: namedArgs['query'] as String?,
+              queryParameters:
+                  namedArgs['queryParameters'] as Map<String, dynamic>?,
+              fragment: namedArgs['fragment'] as String?,
+            );
+          },
+          'http': (visitor, positionalArgs, namedArgs) {
+            final host = positionalArgs[0] as String;
+            final path =
+                positionalArgs.length > 1 ? positionalArgs[1] as String : '';
+            return Uri.http(host, path, positionalArgs.get<Map?>(2)?.cast());
+          },
+          'https': (visitor, positionalArgs, namedArgs) {
+            final host = positionalArgs[0] as String;
+            final path =
+                positionalArgs.length > 1 ? positionalArgs[1] as String : '';
+
+            return Uri.https(host, path, positionalArgs.get<Map?>(2)?.cast());
+          },
+          'file': (visitor, positionalArgs, namedArgs) {
+            final path = positionalArgs[0] as String;
+            final windows = namedArgs['windows'] as bool?;
+            return Uri.file(path, windows: windows);
+          },
+          'directory': (visitor, positionalArgs, namedArgs) {
+            final path = positionalArgs[0] as String;
+            final windows = namedArgs['windows'] as bool?;
+            return Uri.directory(path, windows: windows);
+          },
+          'dataFromBytes': (visitor, positionalArgs, namedArgs) {
+            return Uri.dataFromBytes((positionalArgs[0] as List).cast(),
+                mimeType: positionalArgs.get<String?>(1) ??
+                    'application/octet-stream',
+                parameters: positionalArgs.get<Map?>(2)?.cast(),
+                percentEncoded: positionalArgs.get<bool?>(3) ?? false);
+          },
+          'dataFromString': (visitor, positionalArgs, namedArgs) {
+            return Uri.dataFromString(positionalArgs[0] as String,
+                mimeType: namedArgs.get<String?>('mimeType'),
+                parameters:
+                    (namedArgs.get<Map?>('parameters'))?.cast<String, String>(),
+                encoding: namedArgs.get<Encoding?>('encoding') ?? utf8,
+                base64: namedArgs.get<bool?>('base64') ?? false);
+          },
         },
-            arity: 0, // Positional arity 0, uses named args
-            name: 'Uri'));
-
-    // Define static factories like Uri.http, Uri.https, Uri.file etc. if needed
-    // These are currently handled in evalMethod static part
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is Uri) {
-      switch (name) {
-        case 'toString':
-          return target.toString();
-        case 'host':
-          return target.host;
-        case 'port':
-          return target.port;
-        case 'scheme':
-          return target.scheme;
-        case 'path':
-          return target.path;
-        case 'query':
-          return target.query;
-        case 'fragment':
-          return target.fragment;
-        case 'authority':
-          return target.authority;
-        case 'userInfo':
-          return target.userInfo;
-        case 'hasScheme':
-          return target.hasScheme;
-        case 'hasAuthority':
-          return target.hasAuthority;
-        case 'hasPort':
-          return target.hasPort;
-        case 'hasQuery':
-          return target.hasQuery;
-        case 'hasFragment':
-          return target.hasFragment;
-        case 'isAbsolute': // Added from dart:core
-          return target.isAbsolute;
-        case 'origin':
-          return target.origin;
-        case 'pathSegments':
-          return target.pathSegments;
-        case 'queryParameters':
-          return target.queryParameters;
-        case 'queryParametersAll':
-          return target.queryParametersAll;
-        case 'replace':
-          return target.replace(
-            scheme: namedArguments.get<String?>('scheme'),
-            userInfo: namedArguments.get<String?>('userInfo'),
-            host: namedArguments.get<String?>('host'),
-            port: namedArguments.get<int?>('port'),
-            path: namedArguments.get<String?>('path'),
-            pathSegments:
-                (namedArguments.get<List?>('pathSegments'))?.cast<String>(),
-            query: namedArguments.get<String?>('query'),
-            queryParameters: (namedArguments.get<Map?>('queryParameters'))
-                ?.cast<String, String>(),
-            fragment: namedArguments.get<String?>('fragment'),
-          );
-        case 'removeFragment': // Added from dart:core
-          return target.removeFragment();
-        case 'resolve':
-          return target.resolve(arguments[0] as String);
-        case 'resolveUri':
-          return target.resolveUri(arguments[0] as Uri);
-        case 'normalizePath': // Added from dart:core
-          return target.normalizePath();
-        case 'toFilePath':
-          return target.toFilePath(
-              windows: namedArguments.get<bool?>('windows') ?? false);
-        case 'data': // Accessor for UriData
-          if (!target.isScheme("data")) return null;
-          return target
-              .data; // Returns UriData? object - might need specific handling
-        case 'hashCode':
-          return target.hashCode;
-        default:
-          throw RuntimeError(
-              'Uri has no instance method/getter mapping for "$name"');
-      }
-    } else if (target == Uri) {
-      // Check if calling on the Uri type itself (static)
-      // static methods
-      switch (name) {
-        case 'dataFromBytes':
-          return Uri.dataFromBytes(
-              (arguments[0] as List).cast<int>(), // Ensure List<int>
-              mimeType: namedArguments.get<String?>('mimeType') ??
-                  "application/octet-stream",
-              parameters: (namedArguments.get<Map?>('parameters'))
-                  ?.cast<String, String>(),
-              percentEncoded:
-                  namedArguments.get<bool?>('percentEncoded') ?? false);
-        case 'dataFromString':
-          return Uri.dataFromString(arguments[0] as String,
-              mimeType: namedArguments.get<String?>('mimeType') ??
-                  "text/plain", // Default changed
-              parameters: (namedArguments.get<Map?>('parameters'))
-                  ?.cast<String, String>(),
-              encoding: namedArguments.get<Encoding?>('encoding') ?? utf8,
-              base64: namedArguments.get<bool?>('base64') ?? false);
-        case 'parse':
-          // Uri.parse has start and end optional positional args
-          return Uri.parse(arguments[0] as String, arguments.get<int>(1) ?? 0,
-              arguments.get<int?>(2));
-        case 'tryParse':
-          // Uri.tryParse has start and end optional positional args
-          return Uri.tryParse(arguments[0] as String,
-              arguments.get<int>(1) ?? 0, arguments.get<int?>(2));
-        case 'encodeComponent':
-          return Uri.encodeComponent(arguments[0] as String);
-        case 'decodeComponent':
-          return Uri.decodeComponent(arguments[0] as String);
-        case 'encodeQueryComponent':
-          return Uri.encodeQueryComponent(arguments[0] as String,
-              encoding: namedArguments.get<Encoding?>('encoding') ?? utf8);
-        case 'decodeQueryComponent':
-          return Uri.decodeQueryComponent(arguments[0] as String,
-              encoding: namedArguments.get<Encoding?>('encoding') ?? utf8);
-        case 'encodeFull':
-          return Uri.encodeFull(arguments[0] as String);
-        case 'decodeFull':
-          return Uri.decodeFull(arguments[0] as String);
-        case 'splitQueryString':
-          return Uri.splitQueryString(arguments[0] as String,
-              encoding: namedArguments.get<Encoding?>('encoding') ?? utf8);
-        case 'parseIPv4Address': // Added from dart:core
-          return Uri.parseIPv4Address(arguments[0] as String);
-        case 'parseIPv6Address': // Added from dart:core
-          return Uri.parseIPv6Address(arguments[0] as String,
-              arguments.get<int>(1) ?? 0, arguments.get<int?>(2));
-        // queryParametersAll removed as static, it's instance method
-        case 'https':
-          return Uri.https(arguments[0] as String, arguments[1] as String,
-              (arguments.get<Map?>(2))?.cast<String, dynamic>());
-        case 'http':
-          return Uri.http(arguments[0] as String, arguments[1] as String,
-              (arguments.get<Map?>(2))?.cast<String, dynamic>());
-        case 'file':
-          return Uri.file(arguments[0] as String,
-              windows: namedArguments.get<bool?>('windows') ?? false);
-        case 'directory':
-          return Uri.directory(arguments[0] as String,
-              windows: namedArguments.get<bool?>('windows') ?? false);
-        case 'base': // Added from dart:core
-          return Uri.base;
-        default:
-          throw RuntimeError(
-              'Uri has no static method/factory mapping for "$name"');
-      }
-    } else {
-      throw RuntimeError(
-          'Invalid target for Uri method call: ${target?.runtimeType}');
-    }
-  }
+        staticMethods: {
+          'parse': (visitor, positionalArgs, namedArgs) {
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int?;
+            return Uri.parse(positionalArgs[0] as String, start, end);
+          },
+          'tryParse': (visitor, positionalArgs, namedArgs) {
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int?;
+            return Uri.tryParse(positionalArgs[0] as String, start, end);
+          },
+          'parseIPv4Address': (visitor, positionalArgs, namedArgs) {
+            return Uri.parseIPv4Address(positionalArgs[0] as String);
+          },
+          'parseIPv6Address': (visitor, positionalArgs, namedArgs) {
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int?;
+            return Uri.parseIPv6Address(
+                positionalArgs[0] as String, start, end);
+          },
+          'encodeComponent': (visitor, positionalArgs, namedArgs) {
+            return Uri.encodeComponent(positionalArgs[0] as String);
+          },
+          'encodeQueryComponent': (visitor, positionalArgs, namedArgs) {
+            final encoding = namedArgs['encoding'] as Encoding? ?? utf8;
+            return Uri.encodeQueryComponent(positionalArgs[0] as String,
+                encoding: encoding);
+          },
+          'decodeComponent': (visitor, positionalArgs, namedArgs) {
+            return Uri.decodeComponent(positionalArgs[0] as String);
+          },
+          'decodeQueryComponent': (visitor, positionalArgs, namedArgs) {
+            final encoding = namedArgs['encoding'] as Encoding? ?? utf8;
+            return Uri.decodeQueryComponent(positionalArgs[0] as String,
+                encoding: encoding);
+          },
+          'encodeFull': (visitor, positionalArgs, namedArgs) {
+            return Uri.encodeFull(positionalArgs[0] as String);
+          },
+          'decodeFull': (visitor, positionalArgs, namedArgs) {
+            return Uri.decodeFull(positionalArgs[0] as String);
+          },
+          'splitQueryString': (visitor, positionalArgs, namedArgs) {
+            final encoding = namedArgs['encoding'] as Encoding? ?? utf8;
+            return Uri.splitQueryString(positionalArgs[0] as String,
+                encoding: encoding);
+          },
+        },
+        methods: {
+          'replace': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Uri).replace(
+              scheme: namedArgs['scheme'] as String?,
+              userInfo: namedArgs['userInfo'] as String?,
+              host: namedArgs['host'] as String?,
+              port: namedArgs['port'] as int?,
+              path: namedArgs['path'] as String?,
+              pathSegments: namedArgs['pathSegments'] as Iterable<String>?,
+              query: namedArgs['query'] as String?,
+              queryParameters:
+                  namedArgs['queryParameters'] as Map<String, dynamic>?,
+              fragment: namedArgs['fragment'] as String?,
+            );
+          },
+          'removeFragment': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Uri).removeFragment();
+          },
+          'resolve': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Uri).resolve(positionalArgs[0] as String);
+          },
+          'resolveUri': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Uri).resolveUri(positionalArgs[0] as Uri);
+          },
+          'toFilePath': (visitor, target, positionalArgs, namedArgs) {
+            final windows = namedArgs['windows'] as bool?;
+            return (target as Uri).toFilePath(windows: windows);
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Uri).toString();
+          },
+          'normalizePath': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Uri).normalizePath();
+          },
+        },
+        getters: {
+          'scheme': (visitor, target) => (target as Uri).scheme,
+          'authority': (visitor, target) => (target as Uri).authority,
+          'userInfo': (visitor, target) => (target as Uri).userInfo,
+          'host': (visitor, target) => (target as Uri).host,
+          'port': (visitor, target) => (target as Uri).port,
+          'path': (visitor, target) => (target as Uri).path,
+          'query': (visitor, target) => (target as Uri).query,
+          'fragment': (visitor, target) => (target as Uri).fragment,
+          'pathSegments': (visitor, target) => (target as Uri).pathSegments,
+          'queryParameters': (visitor, target) =>
+              (target as Uri).queryParameters,
+          'queryParametersAll': (visitor, target) =>
+              (target as Uri).queryParametersAll,
+          'isAbsolute': (visitor, target) => (target as Uri).isAbsolute,
+          'hasScheme': (visitor, target) => (target as Uri).hasScheme,
+          'hasAuthority': (visitor, target) => (target as Uri).hasAuthority,
+          'hasPort': (visitor, target) => (target as Uri).hasPort,
+          'hasQuery': (visitor, target) => (target as Uri).hasQuery,
+          'hasFragment': (visitor, target) => (target as Uri).hasFragment,
+          'hasEmptyPath': (visitor, target) => (target as Uri).hasEmptyPath,
+          'hasAbsolutePath': (visitor, target) =>
+              (target as Uri).hasAbsolutePath,
+          'origin': (visitor, target) => (target as Uri).origin,
+          'isScheme': (visitor, target) => (target as Uri).isScheme,
+          'hashCode': (visitor, target) => (target as Uri).hashCode,
+          'runtimeType': (visitor, target) => (target as Uri).runtimeType,
+        },
+      );
 }

@@ -1,13 +1,8 @@
 import 'dart:math';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
+import 'package:d4rt/d4rt.dart';
 
-class MathMath implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
+class MathMath {
+  static void register(Environment environment) {
     // Constants
     environment.define('pi', pi);
     environment.define('e', e);
@@ -83,14 +78,5 @@ class MathMath implements MethodInterface {
                 min(arguments[0] as num, arguments[1] as num),
             arity: 2,
             name: 'min'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    // This method should not be called for top-level math functions/constants
-    // defined in setEnvironment.
-    throw RuntimeError(
-        'Cannot call instance methods on the Math library itself.');
   }
 }

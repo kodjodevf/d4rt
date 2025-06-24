@@ -393,9 +393,7 @@ void main() {
         // No static members or getters/setters for this example
         staticGetters: {},
         staticSetters: {},
-        staticMethods: {},
         getters: {},
-        setters: {},
       );
 
       // Register AsyncProcessor

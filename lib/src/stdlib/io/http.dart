@@ -1,32 +1,451 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
-import 'package:d4rt/src/utils/extensions/map.dart';
+import 'package:d4rt/d4rt.dart';
 
-class HttpClientIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'HttpClient',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Constructor: HttpClient({SecurityContext? context})
-          final context = namedArguments.get<SecurityContext?>('context');
-          return HttpClient(context: context);
-        }, arity: 0, name: 'HttpClient'));
+class HttpClientIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: HttpClient,
+        name: 'HttpClient',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final context = namedArgs['context'] as SecurityContext?;
+            return HttpClient(context: context);
+          },
+        },
+        staticMethods: {
+          'findProxyFromEnvironment': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError(
+                  'HttpClient.findProxyFromEnvironment requires a Uri argument.');
+            }
+            final environmentMap =
+                namedArgs['environment'] as Map<String, String>?;
+            return HttpClient.findProxyFromEnvironment(
+              positionalArgs[0] as Uri,
+              environment: environmentMap,
+            );
+          },
+        },
+        methods: {
+          'getUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError('getUrl requires a Uri argument.');
+            }
+            return (target as HttpClient).getUrl(positionalArgs[0] as Uri);
+          },
+          'postUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError('postUrl requires a Uri argument.');
+            }
+            return (target as HttpClient).postUrl(positionalArgs[0] as Uri);
+          },
+          'putUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError('putUrl requires a Uri argument.');
+            }
+            return (target as HttpClient).putUrl(positionalArgs[0] as Uri);
+          },
+          'deleteUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError('deleteUrl requires a Uri argument.');
+            }
+            return (target as HttpClient).deleteUrl(positionalArgs[0] as Uri);
+          },
+          'headUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError('headUrl requires a Uri argument.');
+            }
+            return (target as HttpClient).headUrl(positionalArgs[0] as Uri);
+          },
+          'patchUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
+              throw RuntimeError('patchUrl requires a Uri argument.');
+            }
+            return (target as HttpClient).patchUrl(positionalArgs[0] as Uri);
+          },
+          'open': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! String ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'open requires method, host, and path arguments.');
+            }
+            final port =
+                namedArgs['port'] as int? ?? HttpClient.defaultHttpPort;
+            return (target as HttpClient).open(
+              positionalArgs[0] as String,
+              positionalArgs[1] as String,
+              port,
+              positionalArgs[2] as String,
+            );
+          },
+          'openUrl': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 2 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! Uri) {
+              throw RuntimeError('openUrl requires method and Uri arguments.');
+            }
+            return (target as HttpClient).openUrl(
+              positionalArgs[0] as String,
+              positionalArgs[1] as Uri,
+            );
+          },
+          'addCredentials': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! Uri ||
+                positionalArgs[1] is! String ||
+                positionalArgs[2] is! HttpClientCredentials) {
+              throw RuntimeError(
+                  'addCredentials requires Uri, realm String, and HttpClientCredentials arguments.');
+            }
+            (target as HttpClient).addCredentials(
+              positionalArgs[0] as Uri,
+              positionalArgs[1] as String,
+              positionalArgs[2] as HttpClientCredentials,
+            );
+            return null;
+          },
+          'addProxyCredentials': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 4 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String ||
+                positionalArgs[3] is! HttpClientCredentials) {
+              throw RuntimeError(
+                  'addProxyCredentials requires host, port, realm, and HttpClientCredentials arguments.');
+            }
+            (target as HttpClient).addProxyCredentials(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
+              positionalArgs[3] as HttpClientCredentials,
+            );
+            return null;
+          },
+          'close': (visitor, target, positionalArgs, namedArgs) {
+            (target as HttpClient).close(
+              force: namedArgs['force'] as bool? ?? false,
+            );
+            return null;
+          },
+        },
+        getters: {
+          'idleTimeout': (visitor, target) =>
+              (target as HttpClient).idleTimeout,
+          'connectionTimeout': (visitor, target) =>
+              (target as HttpClient).connectionTimeout,
+          'maxConnectionsPerHost': (visitor, target) =>
+              (target as HttpClient).maxConnectionsPerHost,
+          'autoUncompress': (visitor, target) =>
+              (target as HttpClient).autoUncompress,
+          'userAgent': (visitor, target) => (target as HttpClient).userAgent,
+          'defaultHttpPort': (visitor, target) => HttpClient.defaultHttpPort,
+          'defaultHttpsPort': (visitor, target) => HttpClient.defaultHttpsPort,
+        },
+        setters: {
+          'idleTimeout': (visitor, target, value) {
+            (target as HttpClient).idleTimeout = value as Duration;
+            return;
+          },
+          'connectionTimeout': (visitor, target, value) {
+            (target as HttpClient).connectionTimeout = value as Duration?;
+            return;
+          },
+          'maxConnectionsPerHost': (visitor, target, value) {
+            (target as HttpClient).maxConnectionsPerHost = value as int?;
+            return;
+          },
+          'autoUncompress': (visitor, target, value) {
+            (target as HttpClient).autoUncompress = value as bool;
+            return;
+          },
+          'userAgent': (visitor, target, value) {
+            (target as HttpClient).userAgent = value as String?;
+            return;
+          },
+        },
+      );
+}
 
-    // Define HttpClientCredentials and related classes if needed
+class HttpServerIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: HttpServer,
+        name: 'HttpServer',
+        typeParameterCount: 0,
+        constructors: {},
+        staticMethods: {
+          'bind': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 2 || positionalArgs[1] is! int) {
+              throw RuntimeError(
+                  'HttpServer.bind requires address and port arguments.');
+            }
+            return HttpServer.bind(
+              positionalArgs[0],
+              positionalArgs[1] as int,
+              backlog: namedArgs['backlog'] as int? ?? 0,
+              v6Only: namedArgs['v6Only'] as bool? ?? false,
+              shared: namedArgs['shared'] as bool? ?? false,
+            );
+          },
+          'bindSecure': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! SecurityContext) {
+              throw RuntimeError(
+                  'HttpServer.bindSecure requires address, port, and context arguments.');
+            }
+            return HttpServer.bindSecure(
+              positionalArgs[0],
+              positionalArgs[1] as int,
+              positionalArgs[2] as SecurityContext,
+              backlog: namedArgs['backlog'] as int? ?? 0,
+              v6Only: namedArgs['v6Only'] as bool? ?? false,
+              requestClientCertificate:
+                  namedArgs['requestClientCertificate'] as bool? ?? false,
+              shared: namedArgs['shared'] as bool? ?? false,
+            );
+          },
+        },
+        methods: {
+          'listen': (visitor, target, positionalArgs, namedArgs) {
+            final onData = positionalArgs[0] as InterpretedFunction?;
+            final onError = namedArgs['onError'] as InterpretedFunction?;
+            final onDone = namedArgs['onDone'] as InterpretedFunction?;
+            final cancelOnError = namedArgs['cancelOnError'] as bool?;
+
+            if (onData == null) {
+              throw RuntimeError('listen requires an onData callback.');
+            }
+
+            return (target as HttpServer).listen(
+              (request) => onData.call(visitor, [request]),
+              onError: onError == null
+                  ? null
+                  : (error, stackTrace) =>
+                      onError.call(visitor, [error, stackTrace]),
+              onDone: onDone == null ? null : () => onDone.call(visitor, []),
+              cancelOnError: cancelOnError,
+            );
+          },
+          'close': (visitor, target, positionalArgs, namedArgs) =>
+              (target as HttpServer).close(
+                force: namedArgs['force'] as bool? ?? false,
+              ),
+        },
+        getters: {
+          'port': (visitor, target) => (target as HttpServer).port,
+          'address': (visitor, target) => (target as HttpServer).address,
+          'autoCompress': (visitor, target) =>
+              (target as HttpServer).autoCompress,
+          'idleTimeout': (visitor, target) =>
+              (target as HttpServer).idleTimeout,
+          'serverHeader': (visitor, target) =>
+              (target as HttpServer).serverHeader,
+        },
+        setters: {
+          'autoCompress': (visitor, target, value) {
+            (target as HttpServer).autoCompress = value as bool;
+            return;
+          },
+          'idleTimeout': (visitor, target, value) {
+            (target as HttpServer).idleTimeout = value as Duration?;
+            return;
+          },
+          'serverHeader': (visitor, target, value) {
+            (target as HttpServer).serverHeader = value as String?;
+            return;
+          },
+        },
+      );
+}
+
+class HttpClientRequestIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: HttpClientRequest,
+        name: 'HttpClientRequest',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {
+          'write': (visitor, target, positionalArgs, namedArgs) {
+            (target as HttpClientRequest).write(positionalArgs[0]);
+            return null;
+          },
+          'writeln': (visitor, target, positionalArgs, namedArgs) {
+            (target as HttpClientRequest).writeln(
+              positionalArgs.isNotEmpty ? positionalArgs[0] : '',
+            );
+            return null;
+          },
+          'writeAll': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! Iterable) {
+              throw RuntimeError('writeAll requires an Iterable argument.');
+            }
+            (target as HttpClientRequest).writeAll(
+              positionalArgs[0] as Iterable<dynamic>,
+              positionalArgs.length > 1 ? positionalArgs[1] as String : '',
+            );
+            return null;
+          },
+          'add': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! List) {
+              throw RuntimeError('add requires a List<int> argument.');
+            }
+            (target as HttpClientRequest).add(positionalArgs[0] as List<int>);
+            return null;
+          },
+          'addStream': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 ||
+                positionalArgs[0] is! Stream<List<int>>) {
+              throw RuntimeError(
+                  'addStream requires a Stream<List<int>> argument.');
+            }
+            return (target as HttpClientRequest).addStream(
+              positionalArgs[0] as Stream<List<int>>,
+            );
+          },
+          'flush': (visitor, target, positionalArgs, namedArgs) =>
+              (target as HttpClientRequest).flush(),
+          'close': (visitor, target, positionalArgs, namedArgs) =>
+              (target as HttpClientRequest).close(),
+          'addError': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw RuntimeError(
+                  'addError requires at least one argument (error).');
+            }
+            (target as HttpClientRequest).addError(
+              positionalArgs[0]!,
+              positionalArgs.length > 1
+                  ? positionalArgs[1] as StackTrace?
+                  : null,
+            );
+            return null;
+          },
+        },
+        getters: {
+          'persistentConnection': (visitor, target) =>
+              (target as HttpClientRequest).persistentConnection,
+          'followRedirects': (visitor, target) =>
+              (target as HttpClientRequest).followRedirects,
+          'maxRedirects': (visitor, target) =>
+              (target as HttpClientRequest).maxRedirects,
+          'contentLength': (visitor, target) =>
+              (target as HttpClientRequest).contentLength,
+          'encoding': (visitor, target) =>
+              (target as HttpClientRequest).encoding,
+          'bufferOutput': (visitor, target) =>
+              (target as HttpClientRequest).bufferOutput,
+          'method': (visitor, target) => (target as HttpClientRequest).method,
+          'uri': (visitor, target) => (target as HttpClientRequest).uri,
+          'headers': (visitor, target) => (target as HttpClientRequest).headers,
+          'cookies': (visitor, target) => (target as HttpClientRequest).cookies,
+          'done': (visitor, target) => (target as HttpClientRequest).done,
+        },
+        setters: {
+          'persistentConnection': (visitor, target, value) {
+            (target as HttpClientRequest).persistentConnection = value as bool;
+            return;
+          },
+          'followRedirects': (visitor, target, value) {
+            (target as HttpClientRequest).followRedirects = value as bool;
+            return;
+          },
+          'maxRedirects': (visitor, target, value) {
+            (target as HttpClientRequest).maxRedirects = value as int;
+            return;
+          },
+          'contentLength': (visitor, target, value) {
+            (target as HttpClientRequest).contentLength = value as int;
+            return;
+          },
+          'encoding': (visitor, target, value) {
+            (target as HttpClientRequest).encoding = value as Encoding;
+            return;
+          },
+          'bufferOutput': (visitor, target, value) {
+            (target as HttpClientRequest).bufferOutput = value as bool;
+            return;
+          },
+        },
+      );
+}
+
+class HttpClientResponseIo {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: HttpClientResponse,
+        name: 'HttpClientResponse',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {
+          'listen': (visitor, target, positionalArgs, namedArgs) {
+            final onData = positionalArgs[0] as InterpretedFunction?;
+            final onError = namedArgs['onError'] as InterpretedFunction?;
+            final onDone = namedArgs['onDone'] as InterpretedFunction?;
+            final cancelOnError = namedArgs['cancelOnError'] as bool?;
+
+            if (onData == null) {
+              throw RuntimeError('listen requires an onData callback.');
+            }
+
+            return (target as HttpClientResponse).listen(
+              (data) => onData.call(visitor, [data]),
+              onError: onError == null
+                  ? null
+                  : (error, stackTrace) =>
+                      onError.call(visitor, [error, stackTrace]),
+              onDone: onDone == null ? null : () => onDone.call(visitor, []),
+              cancelOnError: cancelOnError,
+            );
+          },
+          'transform': (visitor, target, positionalArgs, namedArgs) {
+            // Implementation for transform would be complex, placeholder
+            throw RuntimeError(
+                'transform not yet implemented in interpreted environment');
+          },
+        },
+        getters: {
+          'statusCode': (visitor, target) =>
+              (target as HttpClientResponse).statusCode,
+          'reasonPhrase': (visitor, target) =>
+              (target as HttpClientResponse).reasonPhrase,
+          'contentLength': (visitor, target) =>
+              (target as HttpClientResponse).contentLength,
+          'compressionState': (visitor, target) =>
+              (target as HttpClientResponse).compressionState,
+          'persistentConnection': (visitor, target) =>
+              (target as HttpClientResponse).persistentConnection,
+          'isRedirect': (visitor, target) =>
+              (target as HttpClientResponse).isRedirect,
+          'redirects': (visitor, target) =>
+              (target as HttpClientResponse).redirects,
+          'headers': (visitor, target) =>
+              (target as HttpClientResponse).headers,
+          'cookies': (visitor, target) =>
+              (target as HttpClientResponse).cookies,
+          'certificate': (visitor, target) =>
+              (target as HttpClientResponse).certificate,
+          'connectionInfo': (visitor, target) =>
+              (target as HttpClientResponse).connectionInfo,
+        },
+      );
+}
+
+class IoHttpStdlib {
+  static void register(Environment environment) {
+    environment.defineBridge(HttpClientIo.definition);
+    environment.defineBridge(HttpServerIo.definition);
+    environment.defineBridge(HttpClientRequestIo.definition);
+    environment.defineBridge(HttpClientResponseIo.definition);
+
+    // Define constructor functions for credentials
     environment.define(
         'HttpClientCredentials',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Abstract class, maybe define concrete implementations if constructible
           return HttpClientCredentials;
         }, arity: 0, name: 'HttpClientCredentials'));
+
     environment.define(
         'HttpClientBasicCredentials',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
@@ -39,6 +458,7 @@ class HttpClientIo implements MethodInterface {
           return HttpClientBasicCredentials(
               arguments[0] as String, arguments[1] as String);
         }, arity: 2, name: 'HttpClientBasicCredentials'));
+
     environment.define(
         'HttpClientDigestCredentials',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
@@ -51,456 +471,5 @@ class HttpClientIo implements MethodInterface {
           return HttpClientDigestCredentials(
               arguments[0] as String, arguments[1] as String);
         }, arity: 2, name: 'HttpClientDigestCredentials'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is HttpClient) {
-      switch (name) {
-        // HTTP verb methods
-        case 'getUrl':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError('getUrl requires a Uri argument.');
-          }
-          return target.getUrl(arguments[0] as Uri);
-        case 'postUrl':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError('postUrl requires a Uri argument.');
-          }
-          return target.postUrl(arguments[0] as Uri);
-        case 'putUrl':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError('putUrl requires a Uri argument.');
-          }
-          return target.putUrl(arguments[0] as Uri);
-        case 'deleteUrl':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError('deleteUrl requires a Uri argument.');
-          }
-          return target.deleteUrl(arguments[0] as Uri);
-        case 'headUrl':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError('headUrl requires a Uri argument.');
-          }
-          return target.headUrl(arguments[0] as Uri);
-        case 'patchUrl':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError('patchUrl requires a Uri argument.');
-          }
-          return target.patchUrl(arguments[0] as Uri);
-        // General open methods
-        case 'open':
-          if (arguments.length != 3 ||
-              arguments[0] is! String ||
-              arguments[1] is! String ||
-              arguments[2] is! String) {
-            throw RuntimeError(
-                'open requires method, host, and path arguments.');
-          }
-          final port = namedArguments.get<int?>('port') ??
-              HttpClient
-                  .defaultHttpPort; // Default might depend on scheme implicitly handled by open
-          return target.open(arguments[0] as String, arguments[1] as String,
-              port, arguments[2] as String);
-        case 'openUrl':
-          if (arguments.length != 2 ||
-              arguments[0] is! String ||
-              arguments[1] is! Uri) {
-            throw RuntimeError('openUrl requires method and Uri arguments.');
-          }
-          return target.openUrl(arguments[0] as String, arguments[1] as Uri);
-        // Configuration getters/setters
-        case 'idleTimeout':
-          return target.idleTimeout;
-        case 'connectionTimeout':
-          return target.connectionTimeout;
-        case 'maxConnectionsPerHost':
-          return target.maxConnectionsPerHost;
-        case 'autoUncompress':
-          return target.autoUncompress;
-        case 'userAgent':
-          return target.userAgent;
-        case 'addCredentials':
-          if (arguments.length != 3 ||
-              arguments[0] is! Uri ||
-              arguments[1] is! String ||
-              arguments[2] is! HttpClientCredentials) {
-            throw RuntimeError(
-                'addCredentials requires Uri, realm String, and HttpClientCredentials arguments.');
-          }
-          target.addCredentials(arguments[0] as Uri, arguments[1] as String,
-              arguments[2] as HttpClientCredentials);
-          return null;
-        case 'addProxyCredentials':
-          if (arguments.length != 4 ||
-              arguments[0] is! String ||
-              arguments[1] is! int ||
-              arguments[2] is! String ||
-              arguments[3] is! HttpClientCredentials) {
-            throw RuntimeError(
-                'addProxyCredentials requires host, port, realm, and HttpClientCredentials arguments.');
-          }
-          target.addProxyCredentials(
-              arguments[0] as String,
-              arguments[1] as int,
-              arguments[2] as String,
-              arguments[3] as HttpClientCredentials);
-          return null;
-        // Other methods
-        case 'close':
-          target.close(force: namedArguments.get<bool?>('force') ?? false);
-          return null;
-        default:
-          throw RuntimeError(
-              'HttpClient has no method/getter mapping for "$name"');
-      }
-    } else {
-      switch (name) {
-        // HTTP verb methods
-        case 'findProxyFromEnvironment':
-          if (arguments.length != 1 || arguments[0] is! Uri) {
-            throw RuntimeError(
-                'HttpClient.findProxyFromEnvironment requires a Uri argument.');
-          }
-          final environmentMap =
-              namedArguments.get<Map<String, String>?>('environment');
-          return HttpClient.findProxyFromEnvironment(arguments[0] as Uri,
-              environment: environmentMap);
-        case 'defaultHttpPort':
-          return HttpClient.defaultHttpPort;
-        case 'defaultHttpsPort':
-          return HttpClient.defaultHttpsPort;
-
-        default:
-          throw RuntimeError(
-              'HttpClient has no static method/getter mapping for "$name"');
-      }
-    }
-  }
-}
-
-class HttpServerIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Define HttpServer type (used for static methods like bind)
-    environment.define(
-        'HttpServer',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return HttpServer;
-        }, arity: 0, name: 'HttpServer'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is HttpServer) {
-      // HttpServer is a Stream<HttpRequest>
-      switch (name) {
-        // Stream method
-        case 'listen':
-          final onData = arguments.get<InterpretedFunction?>(0);
-          final onError = namedArguments.get<InterpretedFunction?>('onError');
-          final onDone = namedArguments.get<InterpretedFunction?>('onDone');
-          final cancelOnError = namedArguments.get<bool?>('cancelOnError');
-          if (onData == null) {
-            throw RuntimeError(
-                'HttpServer.listen requires an onData callback.');
-          }
-          // Return the StreamSubscription
-          return target.listen(
-              (request) => onData
-                  .call(visitor, [request]), // Pass HttpRequest to callback
-              onError: onError == null
-                  ? null
-                  : (error, stackTrace) =>
-                      onError.call(visitor, [error, stackTrace]),
-              onDone: onDone == null ? null : () => onDone.call(visitor, []),
-              cancelOnError: cancelOnError);
-        // HttpServer specific methods/getters/setters
-        case 'close':
-          return target.close(
-              force: namedArguments.get<bool?>('force') ?? false);
-        case 'port':
-          return target.port; // Getter
-        case 'address':
-          return target.address; // Getter
-        case 'serverHeader':
-          return target.serverHeader; // Getter
-        case 'set:serverHeader':
-          if (arguments.length != 1) {
-            throw RuntimeError('serverHeader setter requires one argument.');
-          }
-          target.serverHeader = arguments[0] as String?;
-          return null;
-        case 'autoCompress':
-          return target.autoCompress; // Getter
-        case 'set:autoCompress':
-          if (arguments.length != 1 || arguments[0] is! bool) {
-            throw RuntimeError(
-                'autoCompress setter requires a boolean argument.');
-          }
-          target.autoCompress = arguments[0] as bool;
-          return null;
-        case 'defaultResponseHeaders':
-          return target.defaultResponseHeaders; // Getter (HttpHeaders)
-        case 'connectionsInfo': // Method added later
-          return target.connectionsInfo();
-        // Handle other Stream methods if necessary (map, where, etc.)
-        default:
-          throw RuntimeError(
-              'HttpServer has no method/getter mapping for "$name"');
-      }
-    } else {
-      switch (name) {
-        case 'bind':
-          if (arguments.length != 2) {
-            throw RuntimeError(
-                'HttpServer.bind requires address and port arguments.');
-          }
-          final address = arguments[0]; // dynamic: String or InternetAddress
-          final port = arguments[1] as int;
-          final backlog = namedArguments.get<int?>('backlog') ?? 0;
-          final v6Only = namedArguments.get<bool?>('v6Only') ?? false;
-          final shared = namedArguments.get<bool?>('shared') ?? false;
-          return HttpServer.bind(address, port,
-              backlog: backlog, v6Only: v6Only, shared: shared);
-
-        case 'bindSecure':
-          if (arguments.length != 3) {
-            throw RuntimeError(
-                'HttpServer.bindSecure requires address, port, and SecurityContext arguments.');
-          }
-          final address = arguments[0]; // dynamic: String or InternetAddress
-          final port = arguments[1] as int;
-          final context = arguments[2] as SecurityContext;
-          final backlog = namedArguments.get<int?>('backlog') ?? 0;
-          final v6Only = namedArguments.get<bool?>('v6Only') ?? false;
-          final shared = namedArguments.get<bool?>('shared') ?? false;
-          final requestClientCertificate =
-              namedArguments.get<bool?>('requestClientCertificate') ?? false;
-          return HttpServer.bindSecure(address, port, context,
-              backlog: backlog,
-              v6Only: v6Only,
-              requestClientCertificate: requestClientCertificate,
-              shared: shared);
-
-        default:
-          throw RuntimeError(
-              'HttpServer has no static method/getter mapping for "$name"');
-      }
-    }
-  }
-}
-
-class HttpClientRequestIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Define type (usually obtained from HttpClient methods)
-    environment.define(
-        'HttpClientRequest',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return HttpClientRequest;
-        }, arity: 0, name: 'HttpClientRequest'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is HttpClientRequest) {
-      // HttpClientRequest extends IOSink
-      switch (name) {
-        // Getters
-        case 'headers':
-          return target.headers;
-        case 'method':
-          return target.method;
-        case 'uri':
-          return target.uri;
-        case 'connectionInfo':
-          return target.connectionInfo;
-        case 'cookies':
-          return target.cookies; // List<Cookie>
-        case 'contentLength':
-          return target.contentLength;
-        case 'encoding':
-          return target.encoding;
-        case 'followRedirects':
-          return target.followRedirects;
-        case 'maxRedirects':
-          return target.maxRedirects;
-        case 'persistentConnection':
-          return target.persistentConnection;
-        case 'done':
-          return target.done; // Future<HttpClientResponse>
-
-        // Setters
-        case 'set:contentLength':
-          if (arguments.length != 1 || arguments[0] is! int) {
-            throw RuntimeError(
-                'contentLength setter requires an int argument.');
-          }
-          target.contentLength = arguments[0] as int;
-          return null;
-        case 'set:encoding':
-          if (arguments.length != 1 || arguments[0] is! Encoding) {
-            throw RuntimeError(
-                'encoding setter requires an Encoding argument.');
-          }
-          target.encoding = arguments[0] as Encoding;
-          return null;
-        case 'set:followRedirects':
-          if (arguments.length != 1 || arguments[0] is! bool) {
-            throw RuntimeError(
-                'followRedirects setter requires a bool argument.');
-          }
-          target.followRedirects = arguments[0] as bool;
-          return null;
-        case 'set:maxRedirects':
-          if (arguments.length != 1 || arguments[0] is! int) {
-            throw RuntimeError('maxRedirects setter requires an int argument.');
-          }
-          target.maxRedirects = arguments[0] as int;
-          return null;
-        case 'set:persistentConnection':
-          if (arguments.length != 1 || arguments[0] is! bool) {
-            throw RuntimeError(
-                'persistentConnection setter requires a bool argument.');
-          }
-          target.persistentConnection = arguments[0] as bool;
-          return null;
-
-        // IOSink methods
-        case 'add':
-          if (arguments.length != 1 || arguments[0] is! List) {
-            throw RuntimeError('add requires a List argument.');
-          }
-          target.add((arguments[0] as List).cast());
-          return null;
-        case 'write':
-          target.write(arguments.get<Object?>(0));
-          return null;
-        case 'writeln':
-          target.writeln(arguments.get<Object?>(0) ?? '');
-          return null;
-        case 'writeAll':
-          if (arguments.isEmpty || arguments[0] is! Iterable) {
-            throw RuntimeError('writeAll requires an Iterable argument.');
-          }
-          target.writeAll(arguments[0] as Iterable<dynamic>,
-              arguments.get<String?>(1) ?? '');
-          return null;
-        case 'writeCharCode':
-          if (arguments.length != 1 || arguments[0] is! int) {
-            throw RuntimeError('writeCharCode requires an int argument.');
-          }
-          target.writeCharCode(arguments[0] as int);
-          return null;
-        case 'addStream':
-          if (arguments.length != 1 || arguments[0] is! Stream) {
-            throw RuntimeError('addStream requires a Stream argument.');
-          }
-          return target.addStream((arguments[0] as Stream).cast());
-        case 'addError':
-          if (arguments.isEmpty) {
-            throw RuntimeError(
-                'addError requires at least one argument (error).');
-          }
-          target.addError(arguments[0]!, arguments.get<StackTrace?>(1));
-          return null;
-        case 'flush':
-          return target.flush(); // Future<void>
-        case 'close':
-          return target.close(); // Future<HttpClientResponse>
-
-        default:
-          throw RuntimeError(
-              'HttpClientRequest has no method/getter/setter mapping for "$name"');
-      }
-    } else {
-      throw RuntimeError(
-          'Unsupported target for HttpClientRequestIo: ${target?.runtimeType}');
-    }
-  }
-}
-
-class HttpClientResponseIo implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Define type (usually obtained from HttpClientRequest.close())
-    environment.define(
-        'HttpClientResponse',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return HttpClientResponse;
-        }, arity: 0, name: 'HttpClientResponse'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is HttpClientResponse) {
-      // HttpClientResponse is a Stream<List<int>>
-      switch (name) {
-        // Getters
-        case 'statusCode':
-          return target.statusCode;
-        case 'reasonPhrase':
-          return target.reasonPhrase;
-        case 'contentLength':
-          return target.contentLength;
-        case 'headers':
-          return target.headers;
-        case 'isRedirect':
-          return target.isRedirect;
-        case 'persistentConnection':
-          return target.persistentConnection;
-        case 'redirects':
-          return target.redirects; // List<RedirectInfo>
-        case 'compressionState':
-          return target.compressionState;
-        case 'connectionInfo':
-          return target.connectionInfo;
-        case 'cookies':
-          return target.cookies; // List<Cookie>
-
-        // Methods
-        case 'redirect':
-          if (arguments.length != 2 ||
-              arguments[0] is! String ||
-              arguments[1] is! Uri) {
-            throw RuntimeError(
-                'redirect requires method String and location Uri arguments.');
-          }
-          return target.redirect(arguments[0] as String,
-              arguments[1] as Uri); // Future<HttpClientResponse>
-        case 'detachSocket':
-          return target.detachSocket(); // Future<Socket>
-
-        // Inherited Stream methods (partial list)
-        case 'listen':
-          final onData = arguments.get<InterpretedFunction?>(0);
-          final onError = namedArguments.get<InterpretedFunction?>('onError');
-          final onDone = namedArguments.get<InterpretedFunction?>('onDone');
-          final cancelOnError = namedArguments.get<bool?>('cancelOnError');
-          if (onData == null) {
-            throw RuntimeError('listen requires an onData callback.');
-          }
-          return target.listen((data) => onData.call(visitor, [data]),
-              onError: onError == null
-                  ? null
-                  : (error, stackTrace) =>
-                      onError.call(visitor, [error, stackTrace]),
-              onDone: onDone == null ? null : () => onDone.call(visitor, []),
-              cancelOnError: cancelOnError);
-        // Add other Stream methods if needed (e.g., pipe, transform)
-
-        default:
-          throw RuntimeError(
-              'HttpClientResponse has no method/getter mapping for "$name"');
-      }
-    } else {
-      throw RuntimeError(
-          'Unsupported target for HttpClientResponseIo: ${target?.runtimeType}');
-    }
   }
 }

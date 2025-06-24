@@ -1,93 +1,109 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
+import 'package:d4rt/d4rt.dart';
 
-class NumCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'num',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return num;
-        }, arity: 0, name: 'num'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is num) {
-      switch (name) {
-        case 'abs':
-          return target.abs();
-        case 'ceil':
-          return target.ceil();
-        case 'floor':
-          return target.floor();
-        case 'round':
-          return target.round();
-        case 'toInt':
-          return target.toInt();
-        case 'toDouble':
-          return target.toDouble();
-        case 'toString':
-          return target.toString();
-        case 'isFinite':
-          return target.isFinite;
-        case 'isInfinite':
-          return target.isInfinite;
-        case 'isNaN':
-          return target.isNaN;
-        case 'isNegative':
-          return target.isNegative;
-        case 'clamp':
-          return target.clamp(arguments[0] as num, arguments[1] as num);
-        case 'remainder':
-          return target.remainder(arguments[0] as num);
-        case 'compareTo':
-          return target.compareTo(arguments[0] as num);
-        case 'sign':
-          return target.sign;
-        case 'toStringAsFixed':
-          return target.toStringAsFixed(arguments[0] as int);
-        case 'toStringAsExponential':
-          return target.toStringAsExponential(arguments.get<int?>(0));
-        case 'toStringAsPrecision':
-          return target.toStringAsPrecision(arguments[0] as int);
-        case 'hashCode':
-          return target.hashCode;
-        case 'truncate':
-          return target.truncate();
-        case 'truncateToDouble':
-          return target.truncateToDouble();
-        case 'ceilToDouble':
-          return target.ceilToDouble();
-        case 'floorToDouble':
-          return target.floorToDouble();
-        case 'roundToDouble':
-          return target.roundToDouble();
-        default:
-          throw RuntimeError('num has no instance method mapping for "$name"');
-      }
-    } else {
-      // static methods
-      switch (name) {
-        case 'parse':
-          // Handle onError named parameter
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError('num.parse expects one String argument.');
-          }
-          return num.parse(arguments[0] as String);
-        case 'tryParse':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError('num.tryParse expects one String argument.');
-          }
-          return num.tryParse(arguments[0] as String);
-        default:
-          throw RuntimeError('num has no static method mapping for "$name"');
-      }
-    }
-  }
+class NumCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: num,
+        name: 'num',
+        typeParameterCount: 0,
+        constructors: {},
+        staticMethods: {
+          'parse': (visitor, positionalArgs, namedArgs) {
+            return num.parse(positionalArgs[0] as String);
+          },
+          'tryParse': (visitor, positionalArgs, namedArgs) {
+            return num.tryParse(positionalArgs[0] as String);
+          },
+        },
+        methods: {
+          'abs': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).abs();
+          },
+          'ceil': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).ceil();
+          },
+          'floor': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).floor();
+          },
+          'round': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).round();
+          },
+          'truncate': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).truncate();
+          },
+          'ceilToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).ceilToDouble();
+          },
+          'floorToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).floorToDouble();
+          },
+          'roundToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).roundToDouble();
+          },
+          'truncateToDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).truncateToDouble();
+          },
+          'toDouble': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).toDouble();
+          },
+          'toInt': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).toInt();
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).toString();
+          },
+          'toStringAsFixed': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).toStringAsFixed(positionalArgs[0] as int);
+          },
+          'toStringAsExponential':
+              (visitor, target, positionalArgs, namedArgs) {
+            final fractionDigits =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as int? : null;
+            return (target as num).toStringAsExponential(fractionDigits);
+          },
+          'toStringAsPrecision': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num)
+                .toStringAsPrecision(positionalArgs[0] as int);
+          },
+          'compareTo': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).compareTo(positionalArgs[0] as num);
+          },
+          'clamp': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num)
+                .clamp(positionalArgs[0] as num, positionalArgs[1] as num);
+          },
+          'remainder': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num).remainder(positionalArgs[0] as num);
+          },
+          '+': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num) + (positionalArgs[0] as num);
+          },
+          '-': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num) - (positionalArgs[0] as num);
+          },
+          '*': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num) * (positionalArgs[0] as num);
+          },
+          '/': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num) / (positionalArgs[0] as num);
+          },
+          '~/': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num) ~/ (positionalArgs[0] as num);
+          },
+          '%': (visitor, target, positionalArgs, namedArgs) {
+            return (target as num) % (positionalArgs[0] as num);
+          },
+          'unary-': (visitor, target, positionalArgs, namedArgs) {
+            return -(target as num);
+          },
+        },
+        getters: {
+          'hashCode': (visitor, target) => (target as num).hashCode,
+          'runtimeType': (visitor, target) => (target as num).runtimeType,
+          'sign': (visitor, target) => (target as num).sign,
+          'isFinite': (visitor, target) => (target as num).isFinite,
+          'isInfinite': (visitor, target) => (target as num).isInfinite,
+          'isNaN': (visitor, target) => (target as num).isNaN,
+          'isNegative': (visitor, target) => (target as num).isNegative,
+        },
+      );
 }

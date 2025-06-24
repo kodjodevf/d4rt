@@ -1,104 +1,65 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart'; // Assuming extension is here
+import 'package:d4rt/d4rt.dart';
 
-class PatternCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Define Pattern and Match types
-    environment.define(
-        'Pattern',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return Pattern;
-        }, arity: 0, name: 'Pattern'));
-    environment.define(
-        'Match',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Match objects are usually returned by Pattern methods, not constructed directly.
-          return Match;
-        }, arity: 0, name: 'Match'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is Pattern) {
-      // Note: Pattern itself doesn't have many methods, usually implemented by String or RegExp
-      switch (name) {
-        case 'allMatches':
-          return target.allMatches(
-              arguments[0] as String, arguments.get<int>(1) ?? 0);
-        case 'matchAsPrefix':
-          // Caution: matchAsPrefix returns Match?, handle null
-          return target.matchAsPrefix(
-              arguments[0] as String, arguments.get<int>(1) ?? 0);
-        // Add hashCode, toString if needed
-        case 'hashCode':
-          return target.hashCode;
-        case 'toString':
-          return target.toString();
-        default:
-          throw RuntimeError(
-              'Pattern has no instance method mapping for "$name"');
-      }
-    }
-    // Should not happen if target is Match or Pattern
-    throw RuntimeError(
-        'Target must be a Match or Pattern, but was ${target?.runtimeType}');
-  }
+class PatternCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: Pattern,
+        name: 'Pattern',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {
+          'allMatches': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Pattern).allMatches(
+                positionalArgs[0] as String, positionalArgs.get<int>(1) ?? 0);
+          },
+          'matchAsPrefix': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Pattern).matchAsPrefix(
+                positionalArgs[0] as String, positionalArgs.get<int>(1) ?? 0);
+          },
+          'hashCode': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Pattern).hashCode,
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Pattern).toString(),
+        },
+        getters: {
+          'hashCode': (visitor, target) => (target as Pattern).hashCode,
+          'runtimeType': (visitor, target) => (target as Pattern).runtimeType,
+        },
+      );
 }
 
-class MatchCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'Match',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Match objects are usually returned by Pattern methods, not constructed directly.
-          return Match;
-        }, arity: 0, name: 'Match'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is Match) {
-      switch (name) {
-        case 'end':
-          return target.end;
-        case 'groupCount':
-          return target.groupCount;
-        case 'input':
-          return target.input;
-        case 'start':
-          return target.start;
-        case 'group':
-          return target.group(arguments[0] as int);
-        case 'groups':
-          return target.groups(arguments[0] as List<int>);
-        // Add pattern, [], hashCode, toString if needed
-        case 'pattern':
-          return target.pattern; // Assuming Match has pattern property
-        case '[]': // Index operator for groups
-          if (arguments.length != 1 || arguments[0] is! int) {
-            throw RuntimeError(
-                'Match index operator [] requires one integer argument (group index).');
-          }
-          return target[arguments[0] as int];
-        case 'hashCode':
-          return target.hashCode;
-        case 'toString':
-          return target.toString();
-        default:
-          throw RuntimeError(
-              'Match has no instance method mapping for "$name"');
-      }
-    }
-    // Should not happen if target is Match or Pattern
-    throw RuntimeError(
-        'Target must be a Match or Pattern, but was ${target?.runtimeType}');
-  }
+class MatchCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: Match,
+        name: 'Match',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {
+          'group': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Match).group(positionalArgs[0] as int);
+          },
+          'groups': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Match).groups(positionalArgs[0] as List<int>);
+          },
+          '[]': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'Match index operator [] requires one integer argument (group index).');
+            }
+            return (target as Match)[positionalArgs[0] as int];
+          },
+          'hashCode': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Match).hashCode,
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Match).toString(),
+        },
+        getters: {
+          'end': (visitor, target) => (target as Match).end,
+          'groupCount': (visitor, target) => (target as Match).groupCount,
+          'input': (visitor, target) => (target as Match).input,
+          'start': (visitor, target) => (target as Match).start,
+          'pattern': (visitor, target) => (target as Match).pattern,
+          'hashCode': (visitor, target) => (target as Match).hashCode,
+          'runtimeType': (visitor, target) => (target as Match).runtimeType,
+        },
+      );
 }

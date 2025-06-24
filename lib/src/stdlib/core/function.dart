@@ -1,61 +1,46 @@
 import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
 import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
+import 'package:d4rt/src/bridge/registration.dart';
 
-class FunctionCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    // Defining 'Function' itself might be complex depending on desired semantics.
-    // Just making the name resolve for now.
-    environment.define(
-        'Function',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return Function;
-        }, arity: 0, name: 'Function'));
-  }
+class FunctionCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: Function,
+        name: 'Function',
+        typeParameterCount: 0,
+        constructors: {},
+        staticMethods: {
+          'apply': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! Callable) {
+              throw RuntimeError(
+                  'Function.apply requires a Callable as the first argument.');
+            }
+            final functionToApply = positionalArgs[0] as Callable;
+            final argumentsToPass = positionalArgs.length > 1
+                ? positionalArgs[1] as List<Object?>
+                : <Object?>[];
+            final namedArgumentsToPass = positionalArgs.length > 2
+                ? positionalArgs[2] as Map<String, Object?>
+                : namedArgs;
 
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    // The target of a method call on a function should be the function itself.
-    // We expect it to be a Callable (NativeFunction or InterpretedFunction).
-    if (target is Callable) {
-      switch (name) {
-        case 'call':
-          // Directly call the Callable target using the visitor
-          // Assumes the arguments passed are positional.
-          // Named argument handling for Function.call would need more logic.
-          return target.call(visitor, arguments, {});
-        case 'hashCode':
-          return target.hashCode; // Use the callable's hashCode
-        case 'toString':
-          return target.toString(); // Use the callable's toString
-        default:
-          throw RuntimeError(
-              'Function has no instance method mapping for "$name"');
-      }
-    } else {
-      switch (name) {
-        case 'apply':
-          if (arguments.isEmpty || arguments[0] is! Callable) {
-            throw RuntimeError(
-                'Function.apply requires a Callable as the first argument.');
-          }
-          final functionToApply = arguments[0] as Callable;
-          final positionalArgs = (arguments.length > 1 && arguments[1] is List)
-              ? arguments[1] as List<Object?>
-              : <Object?>[];
-          final namedArgsMap = (arguments.length > 2 && arguments[2] is Map)
-              ? (arguments[2] as Map).cast<String, Object?>()
-              : <String, Object?>{};
-
-          return functionToApply.call(visitor, positionalArgs, namedArgsMap);
-        default:
-          throw RuntimeError(
-              'Function has no static method mapping for "$name"');
-      }
-    }
-  }
+            return functionToApply.call(
+                visitor, argumentsToPass, namedArgumentsToPass);
+          },
+        },
+        methods: {
+          'call': (visitor, target, positionalArgs, namedArgs) {
+            if (target is Callable) {
+              return target.call(visitor, positionalArgs, namedArgs);
+            }
+            throw RuntimeError('Cannot call non-Callable Function');
+          },
+          'hashCode': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Function).hashCode,
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Function).toString(),
+        },
+        getters: {
+          'hashCode': (visitor, target) => (target as Function).hashCode,
+          'runtimeType': (visitor, target) => (target as Function).runtimeType,
+        },
+      );
 }

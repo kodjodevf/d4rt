@@ -65,13 +65,23 @@ class Environment {
           .firstWhereOrNull((e) =>
               (e.value.name ==
                   nativeTypeName.substring(1).substringBefore('<')) ||
-              nativeTypeName.contains('${e.value.name}<'))
+              (e.value.nativeNames
+                      ?.any((name) => nativeTypeName.startsWith(name)) ??
+                  false))
           ?.value;
     } else if (bridgedClass == null && nativeTypeName.contains('<')) {
       bridgedClass = _bridgedClassesLookupByType.entries
           .firstWhereOrNull((e) => nativeTypeName.contains('${e.value.name}<'))
           ?.value;
     }
+    bridgedClass ??= _bridgedClassesLookupByType.entries
+        .firstWhereOrNull((e) =>
+            (e.value.name == nativeTypeName) ||
+            (e.value.nativeNames
+                    ?.any((name) => nativeTypeName.startsWith(name)) ??
+                false))
+        ?.value;
+
     if (bridgedClass == null) {
       throw RuntimeError(
           'Cannot bridge native object: No registered bridged class found for native type $nativeType.');

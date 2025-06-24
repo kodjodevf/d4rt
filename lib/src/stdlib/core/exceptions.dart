@@ -1,62 +1,55 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
+import 'package:d4rt/src/bridge/registration.dart';
 
-class ExceptionCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'Exception',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return arguments.isEmpty
-              ? Exception
-              : Exception(arguments[0] as String);
+class ExceptionCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: Exception,
+        name: 'Exception',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final message =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as String? : null;
+            return Exception(message);
+          },
         },
-            arity: 0, // Arity is 0 positional, but named args are used
-            name: 'Exception'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    throw RuntimeError('Exception has no instance method mapping for "$name"');
-  }
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Exception).toString();
+          },
+        },
+        getters: {
+          'hashCode': (visitor, target) => (target as Exception).hashCode,
+          'runtimeType': (visitor, target) => (target as Exception).runtimeType,
+        },
+      );
 }
 
-class FormatExceptionCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'FormatException',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return arguments.isEmpty
-              ? FormatException
-              : FormatException(arguments.get<String?>(0) ?? '',
-                  arguments.get<dynamic>(1), arguments.get<int>(2));
+class FormatExceptionCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: FormatException,
+        name: 'FormatException',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final message =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as String : '';
+            final source = namedArgs['source'];
+            final offset = namedArgs['offset'] as int?;
+            return FormatException(message, source, offset);
+          },
         },
-            arity: 0, // Arity is 0 positional, but named args are used
-            name: 'FormatException'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is FormatException) {
-      switch (name) {
-        case 'message':
-          return target.message;
-        case 'offset':
-          return target.offset;
-        case 'source':
-          return target.source;
-        default:
-          throw RuntimeError(
-              'FormatException has no instance method mapping for "$name"');
-      }
-    }
-    throw RuntimeError('Exception has no instance method mapping for "$name"');
-  }
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as FormatException).toString();
+          },
+        },
+        getters: {
+          'message': (visitor, target) => (target as FormatException).message,
+          'source': (visitor, target) => (target as FormatException).source,
+          'offset': (visitor, target) => (target as FormatException).offset,
+          'hashCode': (visitor, target) => (target as FormatException).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as FormatException).runtimeType,
+        },
+      );
 }

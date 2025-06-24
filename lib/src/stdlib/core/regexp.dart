@@ -1,79 +1,130 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
-import 'package:d4rt/src/utils/extensions/map.dart';
-import 'dart:core'; // For RegExp, RegExpMatch
+import 'package:d4rt/d4rt.dart';
 
-class RegExpCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'RegExp',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return arguments.isEmpty
-              ? RegExp
-              : RegExp(arguments[0] as String,
-                  multiLine: namedArguments.get<bool?>('multiLine') ?? false,
-                  caseSensitive:
-                      namedArguments.get<bool?>('caseSensitive') ?? true,
-                  unicode: namedArguments.get<bool?>('unicode') ?? false,
-                  dotAll: namedArguments.get<bool?>('dotAll') ?? false);
+class RegExpCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: RegExp,
+        name: 'RegExp',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final source = positionalArgs[0] as String;
+            final multiLine = namedArgs['multiLine'] as bool? ?? false;
+            final caseSensitive = namedArgs['caseSensitive'] as bool? ?? true;
+            final unicode = namedArgs['unicode'] as bool? ?? false;
+            final dotAll = namedArgs['dotAll'] as bool? ?? false;
+            return RegExp(source,
+                multiLine: multiLine,
+                caseSensitive: caseSensitive,
+                unicode: unicode,
+                dotAll: dotAll);
+          },
         },
-            arity: 1, // 1 required positional, rest named
-            name: 'RegExp'));
+        staticMethods: {
+          'escape': (visitor, positionalArgs, namedArgs) {
+            return RegExp.escape(positionalArgs[0] as String);
+          },
+        },
+        methods: {
+          'hasMatch': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExp).hasMatch(positionalArgs[0] as String);
+          },
+          'firstMatch': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExp).firstMatch(positionalArgs[0] as String);
+          },
+          'allMatches': (visitor, target, positionalArgs, namedArgs) {
+            final input = positionalArgs[0] as String;
+            final start =
+                positionalArgs.length > 1 ? positionalArgs[1] as int : 0;
+            return (target as RegExp).allMatches(input, start);
+          },
+          'stringMatch': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExp).stringMatch(positionalArgs[0] as String);
+          },
+          'matchAsPrefix': (visitor, target, positionalArgs, namedArgs) {
+            final string = positionalArgs[0] as String;
+            final start =
+                positionalArgs.length > 1 ? positionalArgs[1] as int : 0;
+            return (target as RegExp).matchAsPrefix(string, start);
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExp).toString();
+          },
+          'noSuchMethod': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExp)
+                .noSuchMethod(positionalArgs[0] as Invocation);
+          },
+          '==': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExp) == positionalArgs[0];
+          },
+        },
+        getters: {
+          'pattern': (visitor, target) => (target as RegExp).pattern,
+          'isMultiLine': (visitor, target) => (target as RegExp).isMultiLine,
+          'isCaseSensitive': (visitor, target) =>
+              (target as RegExp).isCaseSensitive,
+          'isUnicode': (visitor, target) => (target as RegExp).isUnicode,
+          'isDotAll': (visitor, target) => (target as RegExp).isDotAll,
+          'hashCode': (visitor, target) => (target as RegExp).hashCode,
+          'runtimeType': (visitor, target) => (target as RegExp).runtimeType,
+        },
+      );
+}
 
-    environment.define(
-        'RegExpMatch',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return RegExpMatch;
-        }, arity: 0, name: 'RegExpMatch'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is RegExp) {
-      switch (name) {
-        case 'hasMatch':
-          return target.hasMatch(arguments[0] as String);
-        case 'allMatches':
-          return target.allMatches(
-              arguments[0] as String, arguments.get<int>(1) ?? 0);
-        case 'stringMatch':
-          return target.stringMatch(arguments[0] as String);
-        case 'toString':
-          return target.toString();
-        case 'matchAsPrefix':
-          return target.matchAsPrefix(
-              arguments[0] as String, arguments.get<int>(1) ?? 0);
-        case 'firstMatch':
-          return target.firstMatch(arguments[0] as String);
-        case 'isCaseSensitive':
-          return target.isCaseSensitive;
-        case 'isDotAll':
-          return target.isDotAll;
-        case 'isMultiLine':
-          return target.isMultiLine;
-        case 'isUnicode':
-          return target.isUnicode;
-        case 'pattern':
-          return target.pattern;
-        case 'hashCode':
-          return target.hashCode;
-        default:
-          throw RuntimeError(
-              'RegExp has no instance method/getter mapping for "$name"');
-      }
-    } else {
-      switch (name) {
-        case 'escape':
-          return RegExp.escape(arguments[0] as String);
-        default:
-          throw RuntimeError('RegExp has no static method mapping for "$name"');
-      }
-    }
-  }
+class RegExpMatchCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: RegExpMatch,
+        name: 'RegExpMatch',
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {
+          // Methods inherited from Match
+          'group': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExpMatch).group(positionalArgs[0] as int);
+          },
+          'groups': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExpMatch)
+                .groups(positionalArgs[0] as List<int>);
+          },
+          '[]': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RegExpMatch index operator [] requires one integer argument (group index).');
+            }
+            return (target as RegExpMatch)[positionalArgs[0] as int];
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExpMatch).toString();
+          },
+          'noSuchMethod': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExpMatch)
+                .noSuchMethod(positionalArgs[0] as Invocation);
+          },
+          '==': (visitor, target, positionalArgs, namedArgs) {
+            return (target as RegExpMatch) == positionalArgs[0];
+          },
+          // RegExpMatch-specific methods
+          'namedGroup': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'RegExpMatch.namedGroup requires one String argument (group name).');
+            }
+            return (target as RegExpMatch)
+                .namedGroup(positionalArgs[0] as String);
+          },
+        },
+        getters: {
+          // Properties inherited from Match
+          'end': (visitor, target) => (target as RegExpMatch).end,
+          'groupCount': (visitor, target) => (target as RegExpMatch).groupCount,
+          'input': (visitor, target) => (target as RegExpMatch).input,
+          'start': (visitor, target) => (target as RegExpMatch).start,
+          'hashCode': (visitor, target) => (target as RegExpMatch).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as RegExpMatch).runtimeType,
+          // pattern property returns RegExp instead of Pattern for RegExpMatch
+          'pattern': (visitor, target) => (target as RegExpMatch).pattern,
+          // RegExpMatch-specific properties
+          'groupNames': (visitor, target) => (target as RegExpMatch).groupNames,
+        },
+      );
 }

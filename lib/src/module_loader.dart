@@ -5,10 +5,10 @@ import 'package:analyzer/dart/analysis/features.dart';
 import 'package:d4rt/src/stdlib/convert.dart';
 import 'package:d4rt/src/stdlib/math.dart';
 import 'package:d4rt/src/stdlib/collection.dart';
-import 'package:d4rt/src/stdlib/stdlib_io.dart'
-    if (dart.library.html) 'package:d4rt/src/stdlib/stdlib_web.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:analyzer/error/error.dart';
+import 'package:d4rt/src/stdlib/stdlib_io.dart'
+    if (dart.library.html) 'package:d4rt/src/stdlib/stdlib_web.dart';
 
 // Represent an module of source code loaded and parsed.
 class LoadedModule {
@@ -207,19 +207,19 @@ class ModuleLoader {
       ];
       if (knownStdlibDartLibs.contains(uri.path)) {
         if (uri.path == 'convert') {
-          registerConvertLibs(globalEnvironment);
+          ConvertStdlib.register(globalEnvironment);
           return '';
         }
         if (uri.path == 'math') {
-          registerMathLibs(globalEnvironment);
+          MathStdlib.register(globalEnvironment);
           return '';
         }
         if (uri.path == 'io') {
-          StdlibIo.registerStdIoLibs(globalEnvironment);
+          StdlibIo.register(globalEnvironment);
           return '';
         }
         if (uri.path == 'collection') {
-          registerCollectionLibs(globalEnvironment);
+          CollectionStdlib.register(globalEnvironment);
           return '';
         }
         Logger.info(

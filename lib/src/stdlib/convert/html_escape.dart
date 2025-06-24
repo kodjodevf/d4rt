@@ -1,103 +1,92 @@
 import 'dart:convert';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
-import 'package:d4rt/src/utils/extensions/map.dart';
+import 'package:d4rt/d4rt.dart';
 
-class HtmlEscapeConvert implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
+class HtmlEscapeConvert {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: HtmlEscape,
+        name: 'HtmlEscape',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final mode = positionalArgs.isNotEmpty
+                ? positionalArgs[0] as HtmlEscapeMode?
+                : HtmlEscapeMode.unknown;
+            return HtmlEscape(mode ?? HtmlEscapeMode.unknown);
+          },
+        },
+        methods: {
+          'convert': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'HtmlEscape.convert requires a String argument.');
+            }
+            return (target as HtmlEscape).convert(positionalArgs[0] as String);
+          },
+          'startChunkedConversion':
+              (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 ||
+                positionalArgs[0] is! Sink<String>) {
+              throw RuntimeError(
+                  'startChunkedConversion requires a Sink<String> argument.');
+            }
+            return (target as HtmlEscape)
+                .startChunkedConversion(positionalArgs[0] as Sink<String>);
+          },
+          'bind': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 ||
+                positionalArgs[0] is! Stream<String>) {
+              throw RuntimeError('bind requires a Stream<String> argument.');
+            }
+            return (target as HtmlEscape)
+                .bind(positionalArgs[0] as Stream<String>);
+          },
+          'fuse': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 ||
+                positionalArgs[0] is! Converter<String, dynamic>) {
+              throw RuntimeError(
+                  'HtmlEscape.fuse requires another Converter<String, dynamic> as argument.');
+            }
+            return (target as HtmlEscape)
+                .fuse(positionalArgs[0] as Converter<String, dynamic>);
+          },
+          'cast': (visitor, target, positionalArgs, namedArgs) {
+            return (target as HtmlEscape).cast<String, String>();
+          },
+        },
+        getters: {
+          'hashCode': (visitor, target) => (target as HtmlEscape).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as HtmlEscape).runtimeType,
+        },
+      );
+
+  static BridgedClassDefinition get modeDefinition => BridgedClassDefinition(
+        nativeType: HtmlEscapeMode,
+        name: 'HtmlEscapeMode',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            return HtmlEscapeMode(
+                name: namedArgs['name'] as String? ?? 'custom',
+                escapeQuot: namedArgs['escapeQuot'] as bool? ?? false,
+                escapeApos: namedArgs['escapeApos'] as bool? ?? false,
+                escapeLtGt: namedArgs['escapeLtGt'] as bool? ?? false,
+                escapeSlash: namedArgs['escapeSlash'] as bool? ?? false);
+          },
+        },
+        methods: {},
+        getters: {
+          'attribute': (visitor, target) => HtmlEscapeMode.attribute,
+          'element': (visitor, target) => HtmlEscapeMode.element,
+          'unknown': (visitor, target) => HtmlEscapeMode.unknown,
+        },
+      );
+
+  static void register(Environment environment) {
+    environment.defineBridge(definition);
+    environment.defineBridge(modeDefinition);
+
     // Define the default instance
     environment.define('htmlEscape', htmlEscape);
-
-    // Define the type and constructor
-    environment.define(
-        'HtmlEscape',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          // Constructor: HtmlEscape([HtmlEscapeMode mode = HtmlEscapeMode.unknown])
-          final mode =
-              arguments.get<HtmlEscapeMode?>(0) ?? HtmlEscapeMode.unknown;
-          return HtmlEscape(mode);
-        }, arity: 1, name: 'HtmlEscape') // 0 or 1 positional arg
-        );
-
-    environment.define(
-        'HtmlEscapeMode',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return HtmlEscapeMode(
-              name: namedArguments.get<String?>('name') ?? 'custom',
-              escapeQuot: namedArguments.get<bool?>('escapeQuot') ?? false,
-              escapeApos: namedArguments.get<bool?>('escapeApos') ?? false,
-              escapeLtGt: namedArguments.get<bool?>('escapeLtGt') ?? false,
-              escapeSlash: namedArguments.get<bool?>('escapeSlash') ?? false);
-        }, arity: 1, name: 'HtmlEscapeMode'));
-  }
-
-  @override
-  Object? evalMethod(target, String name, List<Object?> arguments,
-      Map<String, Object?> namedArguments, InterpreterVisitor visitor) {
-    if (target is HtmlEscape) {
-      // HtmlEscape extends Converter<String, String>
-      switch (name) {
-        case 'convert':
-          if (arguments.length != 1 || arguments[0] is! String) {
-            throw RuntimeError(
-                'HtmlEscape.convert requires a String argument.');
-          }
-          return target.convert(arguments[0] as String);
-        case 'startChunkedConversion': // Added
-          if (arguments.length != 1 || arguments[0] is! Sink<String>) {
-            throw RuntimeError(
-                'startChunkedConversion requires a Sink<String> argument.');
-          }
-          return target.startChunkedConversion(arguments[0] as Sink<String>);
-        case 'bind': // Added
-          if (arguments.length != 1 || arguments[0] is! Stream<String>) {
-            throw RuntimeError('bind requires a Stream<String> argument.');
-          }
-          return target.bind(arguments[0] as Stream<String>);
-        case 'fuse': // Added
-          // Converter<String, String> fuses with Converter<String, T>
-          if (arguments.length != 1 ||
-              arguments[0] is! Converter<String, dynamic>) {
-            throw RuntimeError(
-                'HtmlEscape.fuse requires another Converter<String, dynamic> as argument.');
-          }
-          return target.fuse(arguments[0] as Converter<String, dynamic>);
-        case 'cast': // Added
-          return target.cast<String, String>();
-        default:
-          throw RuntimeError(
-              'HtmlEscape has no method/getter mapping for "$name"');
-      }
-    } else if (target is HtmlEscapeMode) {
-      // Simple class, only basic methods like toString, hashCode
-      switch (name) {
-        // case 'index': // Not an enum
-        //  return target.index;
-        case 'toString':
-          return target.toString();
-        case 'hashCode':
-          return target.hashCode;
-        default:
-          throw RuntimeError(
-              'HtmlEscapeMode has no method/getter mapping for "$name"');
-      }
-    } else {
-      switch (name) {
-        case 'attribute':
-          return HtmlEscapeMode.attribute;
-        case 'element':
-          return HtmlEscapeMode.element;
-        case 'unknown':
-          return HtmlEscapeMode.unknown;
-        default:
-          throw RuntimeError(
-              'HtmlEscapeMode has no static method mapping for "$name"');
-      }
-    }
   }
 }

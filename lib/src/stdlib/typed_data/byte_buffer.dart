@@ -1,49 +1,84 @@
 import 'dart:typed_data';
+import 'package:d4rt/d4rt.dart';
 
-import 'package:d4rt/src/bridge/registration.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-import 'package:d4rt/src/exceptions.dart';
-
-void registerByteBuffer(Environment environment) {
-  final byteBufferDefinition = BridgedClassDefinition(
-    name: 'ByteBuffer',
-    nativeType: ByteBuffer,
-    methods: {
-      'asUint8List': (InterpreterVisitor visitor, Object target,
-          List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-        if (target is ByteBuffer) {
-          int offsetInBytes = 0;
-          int? length;
-          if (positionalArgs.isNotEmpty) {
-            if (positionalArgs[0] is int) {
-              offsetInBytes = positionalArgs[0] as int;
-            } else {
-              throw RuntimeError("asUint8List: offsetInBytes must be an int.");
+class ByteBufferTypedData {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        name: 'ByteBuffer',
+        nativeType: ByteBuffer,
+        typeParameterCount: 0,
+        constructors: {},
+        methods: {
+          'asUint8List': (visitor, target, positionalArgs, namedArgs) {
+            if (target is ByteBuffer) {
+              int offsetInBytes = 0;
+              int? length;
+              if (positionalArgs.isNotEmpty) {
+                if (positionalArgs[0] is int) {
+                  offsetInBytes = positionalArgs[0] as int;
+                } else {
+                  throw RuntimeError(
+                      "asUint8List: offsetInBytes must be an int.");
+                }
+              }
+              if (positionalArgs.length > 1) {
+                if (positionalArgs[1] is int?) {
+                  length = positionalArgs[1] as int?;
+                } else if (positionalArgs[1] != null) {
+                  throw RuntimeError(
+                      "asUint8List: length must be an int or null.");
+                }
+              }
+              return target.asUint8List(offsetInBytes, length);
             }
-          }
-          if (positionalArgs.length > 1) {
-            if (positionalArgs[1] is int?) {
-              length = positionalArgs[1] as int?;
-            } else if (positionalArgs[1] != null) {
-              throw RuntimeError("asUint8List: length must be an int or null.");
+            throw RuntimeError("Target is not a ByteBuffer for asUint8List");
+          },
+          'asByteData': (visitor, target, positionalArgs, namedArgs) {
+            if (target is ByteBuffer) {
+              int offsetInBytes = 0;
+              int? length;
+              if (positionalArgs.isNotEmpty) {
+                if (positionalArgs[0] is int) {
+                  offsetInBytes = positionalArgs[0] as int;
+                } else {
+                  throw RuntimeError(
+                      "asByteData: offsetInBytes must be an int.");
+                }
+              }
+              if (positionalArgs.length > 1) {
+                if (positionalArgs[1] is int?) {
+                  length = positionalArgs[1] as int?;
+                } else if (positionalArgs[1] != null) {
+                  throw RuntimeError(
+                      "asByteData: length must be an int or null.");
+                }
+              }
+              return target.asByteData(offsetInBytes, length);
             }
-          }
-          return target.asUint8List(offsetInBytes, length);
-        }
-        throw RuntimeError("Target is not a ByteBuffer for asUint8List");
-      },
-    },
-    getters: {
-      'lengthInBytes': (InterpreterVisitor? visitor, Object target) {
-        if (target is ByteBuffer) {
-          return target.lengthInBytes;
-        }
-        throw RuntimeError(
-            "Target is not a ByteBuffer for getter 'lengthInBytes'");
-      },
-    },
-  );
-
-  environment.defineBridge(byteBufferDefinition);
+            throw RuntimeError("Target is not a ByteBuffer for asByteData");
+          },
+        },
+        getters: {
+          'lengthInBytes': (visitor, target) {
+            if (target is ByteBuffer) {
+              return target.lengthInBytes;
+            }
+            throw RuntimeError(
+                "Target is not a ByteBuffer for getter 'lengthInBytes'");
+          },
+          'hashCode': (visitor, target) {
+            if (target is ByteBuffer) {
+              return target.hashCode;
+            }
+            throw RuntimeError(
+                "Target is not a ByteBuffer for getter 'hashCode'");
+          },
+          'runtimeType': (visitor, target) {
+            if (target is ByteBuffer) {
+              return target.runtimeType;
+            }
+            throw RuntimeError(
+                "Target is not a ByteBuffer for getter 'runtimeType'");
+          },
+        },
+      );
 }

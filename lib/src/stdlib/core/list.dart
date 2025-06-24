@@ -1,244 +1,341 @@
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/model/method.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
-import 'package:d4rt/src/utils/extensions/map.dart';
+import 'package:d4rt/d4rt.dart';
 
-class ListCore implements MethodInterface {
-  @override
-  void setEnvironment(Environment environment) {
-    environment.define(
-        'List',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          return List;
-        }, arity: 0, name: 'List'));
-  }
-
-  @override
-  Object? evalMethod(target, name, arguments, namedArguments, visitor) {
-    if (target is List) {
-      target = target.cast<dynamic>();
-      switch (name) {
-        case 'add':
-          target.add(arguments[0]);
-          return null;
-        case 'addAll':
-          target.addAll(arguments[0] as Iterable);
-          return null;
-        case 'remove':
-          return target.remove(arguments[0]);
-        case 'removeAt':
-          return target.removeAt(arguments[0] as int);
-        case 'removeLast':
-          return target.removeLast();
-        case 'clear':
-          target.clear();
-          return null;
-        case 'contains':
-          return target.contains(arguments[0]);
-        case 'indexOf':
-          int start = arguments.length == 2 ? arguments[1] as int : 0;
-          return target.indexOf(arguments[0], start);
-        case 'lastIndexOf':
-          int? start = arguments.length == 2 ? arguments[1] as int? : null;
-          return target.lastIndexOf(arguments[0], start);
-        case 'length':
-          return target.length;
-        case 'isEmpty':
-          return target.isEmpty;
-        case 'isNotEmpty':
-          return target.isNotEmpty;
-        case 'sublist':
-          int? end = arguments.length == 2 ? arguments[1] as int? : null;
-          return target.sublist(arguments[0] as int, end);
-        case 'forEach':
-          final callback = arguments[0];
-          if (callback is! InterpretedFunction) {
-            throw RuntimeError('Expected a InterpretedFunction for forEach');
-          }
-          for (final element in target) {
-            callback.call(visitor, [element]);
-          }
-          return null;
-        case 'any':
-          final test = arguments[0] as InterpretedFunction;
-          return target.any((element) => test.call(visitor, [element]) as bool);
-        case 'every':
-          final test = arguments[0] as InterpretedFunction;
-          return target
-              .every((element) => test.call(visitor, [element]) as bool);
-        case 'map':
-          final toElement = arguments[0] as InterpretedFunction;
-          return target.map((element) => toElement.call(visitor, [element]));
-        case 'where':
-          final test = arguments[0] as InterpretedFunction;
-          return target
-              .where((element) => test.call(visitor, [element]) as bool);
-        case 'expand':
-          final toElements = arguments[0] as InterpretedFunction;
-          return target.expand(
-              (element) => toElements.call(visitor, [element]) as Iterable);
-        case 'reduce':
-          final combine = arguments[0] as InterpretedFunction;
-          return target.reduce(
-              (value, element) => combine.call(visitor, [value, element]));
-        case 'fold':
-          final initialValue = arguments[0];
-          final combine = arguments[1] as InterpretedFunction;
-          return target.fold(
+class ListCore {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        nativeType: List,
+        name: 'List',
+        typeParameterCount: 1,
+        staticMethods: {
+          'castFrom': (visitor, positionalArgs, namedArgs) {
+            return List.castFrom<dynamic, dynamic>(positionalArgs[0] as List);
+          },
+          'from': (visitor, positionalArgs, namedArgs) {
+            return List<dynamic>.from(
+              positionalArgs[0] as Iterable,
+              growable: namedArgs['growable'] as bool? ?? true,
+            );
+          },
+          'empty': (visitor, positionalArgs, namedArgs) {
+            return List<dynamic>.empty();
+          },
+          'generate': (visitor, positionalArgs, namedArgs) {
+            final generator = positionalArgs[1];
+            if (generator is! InterpretedFunction) {
+              throw RuntimeError('Expected a InterpretedFunction for generate');
+            }
+            return List<dynamic>.generate(
+              positionalArgs[0] as int,
+              (i) => generator.call(visitor, [i]),
+              growable: namedArgs['growable'] as bool? ?? true,
+            );
+          },
+          'copyRange': (visitor, positionalArgs, namedArgs) {
+            List.copyRange(
+              positionalArgs[0] as List,
+              positionalArgs[1] as int,
+              positionalArgs[2] as List,
+              positionalArgs.length > 3 ? positionalArgs[3] as int? : null,
+              positionalArgs.length > 4 ? positionalArgs[4] as int? : null,
+            );
+            return null;
+          },
+          'filled': (visitor, positionalArgs, namedArgs) {
+            return List.filled(
+              positionalArgs[0] as int,
+              positionalArgs[1],
+              growable: namedArgs['growable'] as bool? ?? true,
+            );
+          },
+          'of': (visitor, positionalArgs, namedArgs) {
+            return List.of(
+              positionalArgs[0] as Iterable,
+              growable: namedArgs['growable'] as bool? ?? true,
+            );
+          },
+          'unmodifiable': (visitor, positionalArgs, namedArgs) {
+            return List<dynamic>.unmodifiable(positionalArgs[0] as Iterable);
+          },
+          'writeIterable': (visitor, positionalArgs, namedArgs) {
+            List.writeIterable(
+              positionalArgs[0] as List,
+              positionalArgs[1] as int,
+              positionalArgs[2] as Iterable,
+            );
+            return null;
+          },
+        },
+        methods: {
+          '[]': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List)[positionalArgs[0] as int];
+          },
+          '[]=': (visitor, target, positionalArgs, namedArgs) {
+            (target as List)[positionalArgs[0] as int] = positionalArgs[1];
+            return null;
+          },
+          'add': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).add(positionalArgs[0]);
+            return null;
+          },
+          'addAll': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).addAll(positionalArgs[0] as Iterable);
+            return null;
+          },
+          'remove': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).remove(positionalArgs[0]);
+          },
+          'removeAt': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).removeAt(positionalArgs[0] as int);
+          },
+          'removeLast': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).removeLast();
+          },
+          'clear': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).clear();
+            return null;
+          },
+          'contains': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).contains(positionalArgs[0]);
+          },
+          'indexOf': (visitor, target, positionalArgs, namedArgs) {
+            int start =
+                positionalArgs.length == 2 ? positionalArgs[1] as int : 0;
+            return (target as List).indexOf(positionalArgs[0], start);
+          },
+          'lastIndexOf': (visitor, target, positionalArgs, namedArgs) {
+            int? start =
+                positionalArgs.length == 2 ? positionalArgs[1] as int? : null;
+            return (target as List).lastIndexOf(positionalArgs[0], start);
+          },
+          'sublist': (visitor, target, positionalArgs, namedArgs) {
+            int? end =
+                positionalArgs.length == 2 ? positionalArgs[1] as int? : null;
+            return (target as List).sublist(positionalArgs[0] as int, end);
+          },
+          'forEach': (visitor, target, positionalArgs, namedArgs) {
+            final callback = positionalArgs[0];
+            if (callback is! InterpretedFunction) {
+              throw RuntimeError('Expected a InterpretedFunction for forEach');
+            }
+            for (final element in target as List) {
+              callback.call(visitor, [element]);
+            }
+            return null;
+          },
+          'any': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as List)
+                .any((element) => test.call(visitor, [element]) as bool);
+          },
+          'every': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as List)
+                .every((element) => test.call(visitor, [element]) as bool);
+          },
+          'map': (visitor, target, positionalArgs, namedArgs) {
+            final toElement = positionalArgs[0] as InterpretedFunction;
+            return (target as List)
+                .map((element) => toElement.call(visitor, [element]));
+          },
+          'where': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as List)
+                .where((element) => test.call(visitor, [element]) as bool);
+          },
+          'expand': (visitor, target, positionalArgs, namedArgs) {
+            final toElements = positionalArgs[0] as InterpretedFunction;
+            return (target as List).expand(
+                (element) => toElements.call(visitor, [element]) as Iterable);
+          },
+          'reduce': (visitor, target, positionalArgs, namedArgs) {
+            final combine = positionalArgs[0] as InterpretedFunction;
+            return (target as List).reduce(
+                (value, element) => combine.call(visitor, [value, element]));
+          },
+          'fold': (visitor, target, positionalArgs, namedArgs) {
+            final initialValue = positionalArgs[0];
+            final combine = positionalArgs[1] as InterpretedFunction;
+            return (target as List).fold(
               initialValue,
               (previousValue, element) =>
-                  combine.call(visitor, [previousValue, element]));
-        case 'join':
-          final separator = arguments.isNotEmpty ? arguments[0] as String : '';
-          return target.join(separator);
-        case 'take':
-          return target.take(arguments[0] as int);
-        case 'takeWhile':
-          final test = arguments[0] as InterpretedFunction;
-          return target
-              .takeWhile((value) => test.call(visitor, [value]) as bool);
-        case 'skip':
-          return target.skip(arguments[0] as int);
-        case 'skipWhile':
-          final test = arguments[0] as InterpretedFunction;
-          return target
-              .skipWhile((value) => test.call(visitor, [value]) as bool);
-        case 'toList':
-          return target.toList(
-              growable: namedArguments.get<bool?>("growable") ?? true);
-        case 'toSet':
-          return target.toSet();
-        case 'first':
-          return target.first;
-        case 'last':
-          return target.last;
-        case 'single':
-          return target.single;
-        case 'firstWhere':
-          final test = arguments[0] as InterpretedFunction;
-          final orElse = namedArguments.get<InterpretedFunction?>("orElse");
-          return target.firstWhere(
-            (element) => test.call(visitor, [element]) as bool,
-            orElse: orElse == null ? null : () => orElse.call(visitor, []),
-          );
-        case 'lastWhere':
-          final test = arguments[0] as InterpretedFunction;
-          final orElse = namedArguments.get<InterpretedFunction?>("orElse");
-          return target.lastWhere(
+                  combine.call(visitor, [previousValue, element]),
+            );
+          },
+          'join': (visitor, target, positionalArgs, namedArgs) {
+            final separator =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as String : '';
+            return (target as List).join(separator);
+          },
+          'take': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).take(positionalArgs[0] as int);
+          },
+          'takeWhile': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as List)
+                .takeWhile((value) => test.call(visitor, [value]) as bool);
+          },
+          'skip': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).skip(positionalArgs[0] as int);
+          },
+          'skipWhile': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            return (target as List)
+                .skipWhile((value) => test.call(visitor, [value]) as bool);
+          },
+          'toList': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List)
+                .toList(growable: namedArgs['growable'] as bool? ?? true);
+          },
+          'toSet': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).toSet();
+          },
+          'firstWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+
+            // Implémentation manuelle pour éviter les problèmes de types génériques
+            final list = target as List;
+            for (final element in list) {
+              if (test.call(visitor, [element]) as bool) {
+                return element;
+              }
+            }
+
+            // Si aucun élément trouvé, utilise orElse ou lance une exception
+            if (orElse != null) {
+              return orElse.call(visitor, []);
+            } else {
+              throw RuntimeError(
+                  'No element found matching the test condition');
+            }
+          },
+          'lastWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            return (target as List).lastWhere(
               (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []));
-        case 'singleWhere':
-          final test = arguments[0] as InterpretedFunction;
-          final orElse = namedArguments.get<InterpretedFunction?>("orElse");
-          return target.singleWhere(
+              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+            );
+          },
+          'singleWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            return (target as List).singleWhere(
               (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []));
-        case 'insert':
-          target.insert(arguments[0] as int, arguments[1]);
-          return null;
-        case 'insertAll':
-          target.insertAll(arguments[0] as int, arguments[1] as Iterable);
-          return null;
-        case 'setAll':
-          target.setAll(arguments[0] as int, arguments[1] as Iterable);
-          return null;
-        case 'fillRange':
-          target.fillRange(arguments[0] as int, arguments[1] as int,
-              arguments.get<dynamic>(2));
-          return null;
-        case 'replaceRange':
-          target.replaceRange(arguments[0] as int, arguments[1] as int,
-              arguments[2] as Iterable);
-          return null;
-        case 'removeRange':
-          target.removeRange(arguments[0] as int, arguments[1] as int);
-          return null;
-        case 'retainWhere':
-          final test = arguments[0] as InterpretedFunction;
-          target
-              .retainWhere((element) => test.call(visitor, [element]) as bool);
-          return null;
-        case 'removeWhere':
-          final test = arguments[0] as InterpretedFunction;
-          target
-              .removeWhere((element) => test.call(visitor, [element]) as bool);
-          return null;
-        case 'sort':
-          if (arguments.isEmpty) {
-            target.sort();
-          } else {
-            final compare = arguments[0] as InterpretedFunction;
-            target.sort((a, b) => compare.call(visitor, [a, b]) as int);
-          }
-          return null;
-        case 'shuffle':
-          target.shuffle();
-          return null;
-        case 'asMap':
-          return target.asMap();
-        case 'cast':
-          return target.cast<dynamic>();
-        case 'followedBy':
-          return target.followedBy(arguments[0] as Iterable);
-        case 'elementAt':
-          return target.elementAt(arguments[0] as int);
-        case 'setRange':
-          int skipCount = arguments.get<int>(3) ?? 0;
-          target.setRange(arguments[0] as int, arguments[1] as int,
-              arguments[2] as Iterable, skipCount);
-          return null;
-        case 'getRange':
-          return target.getRange(arguments[0] as int, arguments[1] as int);
-        case 'reversed':
-          return target.reversed;
-        case 'iterator':
-          return target.iterator;
-        default:
-          throw RuntimeError('List has no method mapping for "$name"');
-      }
-    } else {
-      // static methods
-      switch (name) {
-        case 'castFrom':
-          return List.castFrom<dynamic, dynamic>(arguments[0] as List);
-        case 'from':
-          return List<dynamic>.from(arguments[0] as Iterable,
-              growable: namedArguments.get<bool?>("growable") ?? true);
-        case 'empty':
-          return List<dynamic>.empty();
-        case 'generate':
-          final generator = arguments[1];
-          if (generator is! InterpretedFunction) {
-            throw RuntimeError('Expected a InterpretedFunction for generate');
-          }
-          return List<dynamic>.generate(
-              arguments[0] as int, (i) => generator.call(visitor, [i]),
-              growable: namedArguments.get<bool?>("growable") ?? true);
-        case 'copyRange':
-          List.copyRange(
-              arguments[0] as List,
-              arguments[1] as int,
-              arguments[2] as List,
-              arguments.get<int?>(3),
-              arguments.get<int?>(4));
-          return null;
-        case 'filled':
-          return List.filled(arguments[0] as int, arguments[1],
-              growable: namedArguments.get<bool?>("growable") ?? true);
-        case 'of':
-          return List.of(arguments[0] as Iterable,
-              growable: namedArguments.get<bool?>("growable") ?? true);
-        case 'unmodifiable':
-          return List<dynamic>.unmodifiable(arguments[0] as Iterable);
-        case 'writeIterable':
-          List.writeIterable(arguments[0] as List, arguments[1] as int,
-              arguments[2] as Iterable);
-          return null;
-        default:
-          throw RuntimeError('List has no static method mapping for "$name"');
-      }
-    }
-  }
+              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+            );
+          },
+          'insert': (visitor, target, positionalArgs, namedArgs) {
+            (target as List)
+                .insert(positionalArgs[0] as int, positionalArgs[1]);
+            return null;
+          },
+          'insertAll': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).insertAll(
+                positionalArgs[0] as int, positionalArgs[1] as Iterable);
+            return null;
+          },
+          'setAll': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).setAll(
+                positionalArgs[0] as int, positionalArgs[1] as Iterable);
+            return null;
+          },
+          'fillRange': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).fillRange(
+              positionalArgs[0] as int,
+              positionalArgs[1] as int,
+              positionalArgs.length > 2 ? positionalArgs[2] : null,
+            );
+            return null;
+          },
+          'replaceRange': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).replaceRange(
+              positionalArgs[0] as int,
+              positionalArgs[1] as int,
+              positionalArgs[2] as Iterable,
+            );
+            return null;
+          },
+          'removeRange': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).removeRange(
+                positionalArgs[0] as int, positionalArgs[1] as int);
+            return null;
+          },
+          'retainWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            (target as List).retainWhere(
+                (element) => test.call(visitor, [element]) as bool);
+            return null;
+          },
+          'removeWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as InterpretedFunction;
+            (target as List).removeWhere(
+                (element) => test.call(visitor, [element]) as bool);
+            return null;
+          },
+          'sort': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              (target as List).sort();
+            } else {
+              final compare = positionalArgs[0] as InterpretedFunction;
+              (target as List)
+                  .sort((a, b) => compare.call(visitor, [a, b]) as int);
+            }
+            return null;
+          },
+          'shuffle': (visitor, target, positionalArgs, namedArgs) {
+            (target as List).shuffle();
+            return null;
+          },
+          'asMap': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).asMap();
+          },
+          'cast': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).cast<dynamic>();
+          },
+          'followedBy': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).followedBy(positionalArgs[0] as Iterable);
+          },
+          'elementAt': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List).elementAt(positionalArgs[0] as int);
+          },
+          'setRange': (visitor, target, positionalArgs, namedArgs) {
+            int skipCount =
+                positionalArgs.length > 3 ? positionalArgs[3] as int? ?? 0 : 0;
+            (target as List).setRange(
+              positionalArgs[0] as int,
+              positionalArgs[1] as int,
+              positionalArgs[2] as Iterable,
+              skipCount,
+            );
+            return null;
+          },
+          'getRange': (visitor, target, positionalArgs, namedArgs) {
+            return (target as List)
+                .getRange(positionalArgs[0] as int, positionalArgs[1] as int);
+          },
+        },
+        getters: {
+          'length': (visitor, target) => (target as List).length,
+          'isEmpty': (visitor, target) => (target as List).isEmpty,
+          'isNotEmpty': (visitor, target) => (target as List).isNotEmpty,
+          'first': (visitor, target) => (target as List).first,
+          'last': (visitor, target) => (target as List).last,
+          'single': (visitor, target) => (target as List).single,
+          'reversed': (visitor, target) => (target as List).reversed,
+          'iterator': (visitor, target) => (target as List).iterator,
+          'runtimeType': (visitor, target) => (target as List).runtimeType,
+          'hashCode': (visitor, target) => (target as List).hashCode,
+        },
+        setters: {
+          'length': (visitor, target, value) {
+            (target as List).length = value as int;
+          },
+          'first': (visitor, target, value) {
+            (target as List).first = value;
+          },
+          'last': (visitor, target, value) {
+            (target as List).last = value;
+          },
+        },
+      );
 }

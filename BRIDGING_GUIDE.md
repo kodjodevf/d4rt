@@ -32,6 +32,14 @@ This guide provides a comprehensive overview of how to bridge your native Dart c
   - [Extending Bridged Classes](#extending-bridged-classes)
   - [Accessing the Native Object](#accessing-the-native-object)
   - [Using `interpreter.invoke()`](#using-interpreterinvoke)
+- [Advanced Feature: Native Names Mapping](#advanced-feature-native-names-mapping)
+  - [Understanding `nativeNames`](#understanding-nativenames)
+  - [The Problem](#the-problem)
+  - [The Solution: `nativeNames`](#the-solution-nativenames)
+  - [How It Works](#how-it-works)
+  - [When to Use `nativeNames`](#when-to-use-nativenames)
+  - [Real-World Examples](#real-world-examples)
+  - [Best Practices for `nativeNames`](#best-practices-for-nativenames)
 - [Best Practices](#best-practices)
 
 ---
@@ -677,6 +685,138 @@ print(formatted); // "INFO: New Value"
 ```
 
 If `interpreter.execute()` returns an instance of an interpreted class that overrides methods from a bridged superclass, `interpreter.invoke()` will call the *overridden* versions.
+
+---
+
+## Advanced Feature: Native Names Mapping
+
+### Understanding `nativeNames`
+
+When working with complex Dart libraries, you may encounter a situation where the interpreter fails to recognize certain native objects with errors like:
+
+```
+RuntimeError: No registered bridged class found for native type _MultiStream
+```
+
+This happens because many Dart classes have internal implementation classes that are not directly exposed in the public API, but are used internally by the Dart runtime. For example, the `Stream` class has many internal implementations:
+
+- `_MultiStream` (created by `Stream.fromIterable()`)
+- `_ControllerStream` (created by `StreamController`)
+- `_BroadcastStream` (created by broadcast streams)
+- `_AsBroadcastStream` (created by `stream.asBroadcastStream()`)
+- And many more...
+
+### The Problem
+
+When your d4rt script creates a Stream using native methods, the actual object returned might be one of these internal implementations. The interpreter tries to bridge this object, but finds no registered bridge for `_MultiStream` - it only knows about `Stream`.
+
+### The Solution: `nativeNames`
+
+The `nativeNames` parameter in `BridgedClassDefinition` solves this by providing a list of alternative class names that should be mapped to the same bridge:
+
+```dart
+// Example from Stream bridging
+class StreamAsync {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+    nativeType: Stream,
+    name: 'Stream',
+    // Map all these internal Stream implementations to the same Stream bridge
+    nativeNames: [
+      '_MultiStream',
+      '_ControllerStream', 
+      '_BroadcastStream',
+      '_AsBroadcastStream',
+      '_StreamHandlerTransformer',
+      '_BoundSinkStream',
+      '_ForwardingStream',
+      '_MapStream',
+      '_WhereStream',
+      '_ExpandStream',
+      '_TakeStream',
+      '_SkipStream',
+      '_DistinctStream',
+    ],
+    methods: {
+      // ... your stream methods
+    },
+  );
+}
+```
+
+### How It Works
+
+When the interpreter encounters a native object:
+
+1. **First attempt**: Look for an exact match by `nativeType`
+2. **Second attempt**: If no exact match, check if the runtime type name starts with `_` (indicating internal class)
+3. **Third attempt**: Search through all registered bridges and check their `nativeNames` lists
+4. **Fallback**: If still no match, check for generic type patterns
+
+This is implemented in `Environment.toBridgedClass()`:
+
+### When to Use `nativeNames`
+
+You should consider using `nativeNames` when:
+
+1. **Library Integration**: You're bridging classes from complex Dart libraries (like `dart:async`, `dart:collection`, `dart:io`)
+
+2. **Runtime Errors**: You see "No registered bridged class found" errors for types starting with `_`
+
+3. **Generic Classes**: You're working with generic classes that have multiple internal implementations
+
+4. **Abstract Classes**: You're bridging abstract classes that have concrete implementations
+
+### Real-World Examples
+
+#### Stream Example
+```dart
+// Without nativeNames: 
+// RuntimeError: No registered bridged class found for native type _MultiStream
+
+// With nativeNames:
+static BridgedClassDefinition get definition => BridgedClassDefinition(
+  nativeType: Stream,
+  name: 'Stream',
+  nativeNames: ['_MultiStream', '_ControllerStream', /* ... */],
+  // Now Stream.fromIterable([1,2,3]).toList() works in scripts!
+);
+```
+
+### Best Practices for `nativeNames`
+
+1. **Research the Library**: Use `runtimeType.toString()` to discover internal class names when testing
+
+2. **Be Comprehensive**: Include all common internal implementations you encounter
+
+3. **Stay Updated**: Internal class names may change between Dart versions
+
+4. **Document Your Mappings**: Comment why specific `nativeNames` are needed
+
+5. **Test Thoroughly**: Verify that methods work correctly on all mapped types
+
+```dart
+// Good example with documentation
+static BridgedClassDefinition get definition => BridgedClassDefinition(
+  nativeType: Stream,
+  name: 'Stream',
+  // Internal Stream implementations discovered through testing:
+  // _MultiStream: Stream.fromIterable()
+  // _ControllerStream: StreamController().stream  
+  // _BroadcastStream: broadcast streams
+  nativeNames: [
+    '_MultiStream',      // fromIterable, fromFuture
+    '_ControllerStream', // StreamController
+    '_BroadcastStream',  // broadcast streams
+    // ... add more as discovered
+  ],
+  methods: {
+    'toList': (visitor, target) => (target as Stream).toList(),
+    // This now works for ALL the mapped internal types!
+  },
+);
+```
+
+This feature is essential for creating robust bridges that work with the full ecosystem of Dart's internal implementations, ensuring your interpreted scripts can seamlessly interact with complex native objects.
 
 ---
 

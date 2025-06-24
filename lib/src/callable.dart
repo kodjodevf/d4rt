@@ -3,6 +3,16 @@ import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:d4rt/d4rt.dart';
 
+/// Unwraps a BridgedInstance to get the native object if it's an exception
+Object _unwrapExceptionForPropagation(Object? thrownValue) {
+  if (thrownValue is BridgedInstance) {
+    // If it's a bridged instance, return the native object
+    return thrownValue.nativeObject;
+  }
+  // Otherwise, return the value as-is or a default exception
+  return thrownValue ?? Exception('Unknown error');
+}
+
 // Interface or base class for all "callable" entities
 abstract class Callable {
   // Number of expected arguments
@@ -1620,9 +1630,9 @@ class InterpretedFunction implements Callable {
               currentState.isHandlingErrorForRethrow = false;
               currentState.originalErrorForRethrow = null;
               if (!currentState.completer.isCompleted) {
-                // Ensure the error is not null for completeError
-                final errorToComplete = error.originalThrownValue ??
-                    Exception('Unknown rethrown error during accept()');
+                // Unwrap BridgedInstance exceptions to get native objects
+                final errorToComplete =
+                    _unwrapExceptionForPropagation(error.originalThrownValue);
                 currentState.completer
                     .completeError(errorToComplete, stackTrace);
               }
@@ -1765,8 +1775,9 @@ class InterpretedFunction implements Callable {
             // or the current stack trace if the internal one does not have one.
             // Note: InternalInterpreterException does not store the stack trace for now.
             // Using the captured stackTrace here is the best choice.
-            currentState.completer
-                .completeError(error.originalThrownValue!, stackTrace);
+            final errorToComplete =
+                _unwrapExceptionForPropagation(error.originalThrownValue);
+            currentState.completer.completeError(errorToComplete, stackTrace);
           }
           return; // Stop the state machine execution
         } else {

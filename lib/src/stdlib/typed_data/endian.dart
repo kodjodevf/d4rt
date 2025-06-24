@@ -1,24 +1,32 @@
 import 'dart:typed_data';
+import 'package:d4rt/d4rt.dart';
 
-import 'package:d4rt/src/bridge/registration.dart';
-import 'package:d4rt/src/environment.dart';
-import 'package:d4rt/src/interpreter_visitor.dart';
-
-void registerEndian(Environment environment) {
-  final endianDefinition = BridgedClassDefinition(
-    name: 'Endian',
-    nativeType: Endian,
-    constructors: {},
-    staticGetters: {
-      'big': (InterpreterVisitor visitor) => Endian.big,
-      'little': (InterpreterVisitor visitor) => Endian.little,
-      'host': (InterpreterVisitor visitor) => Endian.host,
-    },
-    staticMethods: {},
-    methods: {},
-    getters: {},
-    setters: {},
-  );
-
-  environment.defineBridge(endianDefinition);
+class EndianTypedData {
+  static BridgedClassDefinition get definition => BridgedClassDefinition(
+        name: 'Endian',
+        nativeType: Endian,
+        typeParameterCount: 0,
+        constructors: {},
+        staticGetters: {
+          'big': (InterpreterVisitor visitor) => Endian.big,
+          'little': (InterpreterVisitor visitor) => Endian.little,
+          'host': (InterpreterVisitor visitor) => Endian.host,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Endian).toString();
+          },
+          '==': (visitor, target, positionalArgs, namedArgs) {
+            return (target as Endian) == positionalArgs[0];
+          },
+        },
+        getters: {
+          'hashCode': (visitor, target) {
+            return (target as Endian).hashCode;
+          },
+          'runtimeType': (visitor, target) {
+            return (target as Endian).runtimeType;
+          },
+        },
+      );
 }
