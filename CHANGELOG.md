@@ -1,3 +1,10 @@
+## 0.0.9
+- full support (generic classes/functions, type constraints, runtime validation)
+- use BridgedClassDefinition for all Stdlib
+- Support adjacent string literals in interpreter
+- add operators support for InterpretedClass
+- more features
+
 ## 0.0.8
 - expose visitor getter
 - add support for bridged mixins
