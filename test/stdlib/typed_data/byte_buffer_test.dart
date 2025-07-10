@@ -7,6 +7,7 @@ void main() {
 
   dynamic executeTestScript(String scriptBody) {
     final fullScript = '''
+      import 'dart:typed_data';
       // For Uint8List and ByteBuffer if they are used explicitly in script
       // However, Endian is accessed like a class with static members.
       // ByteBuffer is usually obtained from other TypedData objects.

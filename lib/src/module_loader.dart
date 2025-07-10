@@ -5,6 +5,7 @@ import 'package:analyzer/dart/analysis/features.dart';
 import 'package:d4rt/src/stdlib/convert.dart';
 import 'package:d4rt/src/stdlib/math.dart';
 import 'package:d4rt/src/stdlib/collection.dart';
+import 'package:d4rt/src/stdlib/typed_data.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/stdlib/stdlib_io.dart'
@@ -204,6 +205,7 @@ class ModuleLoader {
         'convert',
         'io',
         'collection',
+        'typed_data',
       ];
       if (knownStdlibDartLibs.contains(uri.path)) {
         if (uri.path == 'convert') {
@@ -220,6 +222,10 @@ class ModuleLoader {
         }
         if (uri.path == 'collection') {
           CollectionStdlib.register(globalEnvironment);
+          return '';
+        }
+        if (uri.path == 'typed_data') {
+          TypedDataStdlib.register(globalEnvironment);
           return '';
         }
         Logger.info(

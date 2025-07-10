@@ -996,6 +996,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         throw RuntimeError('Unsupported binary operator "$operator"');
       case '>>>':
         if (left is int && right is int) return left >>> right;
+        // Note: BigInt doesn't support >>> operator in Dart
         throw RuntimeError('Unsupported binary operator "$operator"');
       default:
         break;
@@ -1757,6 +1758,30 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                     'Cannot read current value for compound index assignment on ${targetValue.klass.name}: ${e.message}');
               }
             }
+          } else if (toBridgedInstance(targetValue).$2) {
+            // Handle BridgedInstance for reading current value via [] operator
+            final bridgedInstance = toBridgedInstance(targetValue).$1!;
+            final bridgedClass = bridgedInstance.bridgedClass;
+            final operatorName = '[]';
+
+            final methodAdapter =
+                bridgedClass.findInstanceMethodAdapter(operatorName);
+            if (methodAdapter != null) {
+              Logger.debug(
+                  "[visitAssignmentExpression-Index] Found bridged operator '$operatorName' for ${bridgedClass.name}. Calling adapter for compound read...");
+              try {
+                currentValue = methodAdapter(
+                    this, bridgedInstance.nativeObject, [indexValue], {});
+              } catch (e, s) {
+                Logger.error(
+                    "[visitAssignmentExpression-Index] Native exception during bridged operator '$operatorName' read on ${bridgedClass.name}: $e\\n$s");
+                throw RuntimeError(
+                    "Native error during bridged operator '$operatorName' read on ${bridgedClass.name}: $e");
+              }
+            } else {
+              throw RuntimeError(
+                  'Cannot read current value for compound index assignment on ${bridgedClass.name}: No bridged operator [] found.');
+            }
           } else {
             try {
               final extensionGetter =
@@ -2145,7 +2170,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
         // Note: This block returns directly or throws, it does not set calleeValue.
       }
-      // Handle static method call OR Named Constructor call
+      // Handle static method call OR NAMED CONSTRUCTOR call
       else if (targetValue is InterpretedClass) {
         // Check for NAMED CONSTRUCTOR first
         final namedConstructor = targetValue.findConstructor(methodName);
@@ -5565,13 +5590,54 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       } else {
         return currentValue; // If left is not null, keep left
       }
+    } else if (operatorType == TokenType.AMPERSAND_EQ) {
+      // Bitwise AND assignment (&=)
+      if (left is int && right is int) {
+        return left & right;
+      } else if (left is BigInt && right is BigInt) {
+        return left & right;
+      }
+      // Fall through to extension search
+    } else if (operatorType == TokenType.BAR_EQ) {
+      // Bitwise OR assignment (|=)
+      if (left is int && right is int) {
+        return left | right;
+      } else if (left is BigInt && right is BigInt) {
+        return left | right;
+      }
+      // Fall through to extension search
+    } else if (operatorType == TokenType.CARET_EQ) {
+      // Bitwise XOR assignment (^=)
+      if (left is int && right is int) {
+        return left ^ right;
+      } else if (left is BigInt && right is BigInt) {
+        return left ^ right;
+      }
+      // Fall through to extension search
+    } else if (operatorType == TokenType.GT_GT_EQ) {
+      // Right shift assignment (>>=)
+      if (left is int && right is int) {
+        return left >> right;
+      } else if (left is BigInt && right is int) {
+        return left >> right;
+      }
+      // Fall through to extension search
+    } else if (operatorType == TokenType.LT_LT_EQ) {
+      // Left shift assignment (<<=)
+      if (left is int && right is int) {
+        return left << right;
+      } else if (left is BigInt && right is int) {
+        return left << right;
+      }
+      // Fall through to extension search
+    } else if (operatorType == TokenType.GT_GT_GT_EQ) {
+      // Unsigned right shift assignment (>>>=)
+      if (left is int && right is int) {
+        return left >>> right;
+      }
+      // Note: BigInt doesn't support >>> operator
+      // Fall through to extension search
     }
-    // Other bitwise/logical operators could be added here
-    // else if (operatorType == TokenType.AMPERSAND_EQ) { ... }
-    // else if (operatorType == TokenType.BAR_EQ) { ... }
-    // else if (operatorType == TokenType.CARET_EQ) { ... }
-    // else if (operatorType == TokenType.GT_GT_EQ) { ... }
-    // else if (operatorType == TokenType.LT_LT_EQ) { ... }
 
     Logger.debug(
         "[CompoundAssign] Standard op failed for $operatorType. Trying extension operator.");
@@ -5636,7 +5702,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         return '>>';
       case TokenType.LT_LT_EQ:
         return '<<';
-      // Add GT_GT_GT_EQ if needed
+      case TokenType.GT_GT_GT_EQ:
+        return '>>>';
       // TokenType.QUESTION_QUESTION_EQ (??=) doesn't map to a binary operator method.
       default:
         return null;
@@ -6314,7 +6381,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               klass.createAndInitializeInstance(this, evaluatedTypeArguments);
           // Bind 'this' and call the constructor logic
           final boundConstructor = constructor.bind(instance);
-          boundConstructor.call(this, positionalArgs, namedArgs);
+          boundConstructor.call(
+              this, positionalArgs, namedArgs, evaluatedTypeArguments);
           // The constructor call returns the instance
           return instance;
         }

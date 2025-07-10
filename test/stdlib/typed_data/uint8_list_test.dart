@@ -7,6 +7,7 @@ void main() {
 
   dynamic executeTestScript(String scriptBody) {
     final fullScript = '''
+      import 'dart:typed_data';
       main() {
         $scriptBody
       }

@@ -259,6 +259,19 @@ class InterpretedFunction implements Callable {
     final boundEnvironment = Environment(enclosing: closure);
     boundEnvironment.define('this', instance);
 
+    // Define class type parameters in bound environment
+    if (instance is InterpretedInstance && ownerType is InterpretedClass) {
+      final klass = ownerType as InterpretedClass;
+      final instTypeArgs = instance.typeArguments ?? [];
+      for (int i = 0; i < klass.typeParameterNames.length; i++) {
+        final paramName = klass.typeParameterNames[i];
+        final typeArg = i < instTypeArgs.length
+            ? instTypeArgs[i]
+            : TypeParameter(paramName);
+        boundEnvironment.define(paramName, typeArg);
+      }
+    }
+
     // Create a new function *instance* that uses the bound environment
     // Need to ensure all relevant properties (isGetter, isSetter, etc.) are copied.
     final boundFunction = InterpretedFunction._internal(

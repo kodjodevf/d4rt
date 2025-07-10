@@ -19,6 +19,38 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
     if (environment.isDefinedLocally(className)) {
       return;
     }
+
+    // Extract type parameter information
+    final typeParameters = node.typeParameters;
+    Environment? tempEnvironment;
+
+    if (typeParameters != null) {
+      Logger.debug(
+          "[DeclarationVisitor.visitClassDeclaration] Class '$className' has ${typeParameters.typeParameters.length} type parameters");
+
+      // Create a temporary environment for type resolution
+      tempEnvironment = Environment(enclosing: environment);
+
+      // Create temporary type parameter placeholders
+      for (final typeParam in typeParameters.typeParameters) {
+        final paramName = typeParam.name.lexeme;
+        final typeParamPlaceholder = TypeParameter(paramName);
+        tempEnvironment.define(paramName, typeParamPlaceholder);
+
+        Logger.debug(
+            "[DeclarationVisitor.visitClassDeclaration]   Defined type parameter '$paramName' in temp environment");
+      }
+    }
+
+    // Use the temp environment (if any) for type resolution
+    final resolveEnvironment = tempEnvironment ?? environment;
+
+    // Extract type parameter names and bounds
+    final typeParameterNames =
+        InterpretedClass.extractTypeParameterNames(typeParameters);
+    final typeParameterBounds = InterpretedClass.extractTypeParameterBounds(
+        typeParameters, resolveEnvironment);
+
     // Create a placeholder for the class with the required positional arguments
     final placeholder = InterpretedClass(
       className, // name
@@ -46,6 +78,9 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       isInterface: node.interfaceKeyword != null,
       isBase: node.baseKeyword != null,
       isSealed: node.sealedKeyword != null,
+      // Add type parameter information
+      typeParameterNames: typeParameterNames,
+      typeParameterBounds: typeParameterBounds,
     );
     environment.define(className, placeholder);
     Logger.debug(

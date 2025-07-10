@@ -30,6 +30,11 @@ class InterpretedClass implements Callable, RuntimeType {
   // Support for bridged mixins
   List<BridgedClass> bridgedMixins;
 
+  // Add fields for type parameter information (like InterpretedFunction)
+  final List<String> typeParameterNames; // e.g., ['T', 'U', 'V']
+  final Map<String, RuntimeType?>
+      typeParameterBounds; // e.g., {'T': num, 'U': Object}
+
   // Fields for class modifiers
   final bool isFinal;
   final bool isInterface;
@@ -38,6 +43,71 @@ class InterpretedClass implements Callable, RuntimeType {
 
   // Add field for bridged superclass
   BridgedClass? bridgedSuperclass;
+
+  // Helper methods to extract type parameter information from AST (similar to InterpretedFunction)
+  static List<String> extractTypeParameterNames(
+      TypeParameterList? typeParameters) {
+    if (typeParameters == null) return [];
+    return typeParameters.typeParameters
+        .map((param) => param.name.lexeme)
+        .toList();
+  }
+
+  static Map<String, RuntimeType?> extractTypeParameterBounds(
+      TypeParameterList? typeParameters, Environment? resolveEnvironment) {
+    final bounds = <String, RuntimeType?>{};
+    if (typeParameters == null) return bounds;
+
+    for (final typeParam in typeParameters.typeParameters) {
+      final paramName = typeParam.name.lexeme;
+      RuntimeType? bound;
+
+      if (typeParam.bound != null && resolveEnvironment != null) {
+        try {
+          Logger.debug(
+              "[InterpretedClass._extractTypeParameterBounds] Resolving bound for type parameter '$paramName'");
+
+          bound = resolveTypeAnnotationDynamic(
+              typeParam.bound!, resolveEnvironment);
+
+          Logger.debug(
+              "[InterpretedClass._extractTypeParameterBounds] Successfully resolved bound for '$paramName' to: ${bound.name}");
+        } catch (e) {
+          Logger.debug(
+              "[InterpretedClass._extractTypeParameterBounds] Failed to resolve bound for '$paramName': $e");
+          rethrow;
+        }
+      }
+
+      bounds[paramName] = bound;
+    }
+
+    return bounds;
+  }
+
+  // Helper method for dynamic type resolution
+  static RuntimeType resolveTypeAnnotationDynamic(
+      TypeAnnotation typeNode, Environment env) {
+    if (typeNode is NamedType) {
+      final typeName = typeNode.name2.lexeme;
+
+      Logger.debug(
+          "[InterpretedClass._resolveTypeAnnotationDynamic] Resolving NamedType: $typeName");
+
+      final resolved = env.get(typeName);
+      if (resolved is RuntimeType) {
+        Logger.debug(
+            "[InterpretedClass._resolveTypeAnnotationDynamic] Resolved from environment to RuntimeType: ${resolved.name}");
+        return resolved;
+      } else {
+        throw RuntimeError(
+            "Symbol '$typeName' resolved to non-type value: $resolved");
+      }
+    } else {
+      throw RuntimeError(
+          "Unsupported type annotation for constraint: ${typeNode.runtimeType}");
+    }
+  }
 
   // Corrected constructor signature and initialization
   InterpretedClass(
@@ -68,6 +138,9 @@ class InterpretedClass implements Callable, RuntimeType {
     this.isSealed = false,
     // Initialize bridged superclass
     this.bridgedSuperclass, // Can be null
+    // Add type parameter information
+    this.typeParameterNames = const [],
+    this.typeParameterBounds = const {},
   })  : interfaces = interfaces ?? [],
         onClauseTypes = onClauseTypes ?? [],
         mixins = mixins ?? [],
@@ -221,6 +294,98 @@ class InterpretedClass implements Callable, RuntimeType {
     staticFields[name] = value;
   }
 
+  /// Check if a type argument satisfies a bound constraint
+  bool _checkTypeSatisfiesBound(RuntimeType typeArg, RuntimeType bound) {
+    // If the type argument is the same as the bound, it satisfies the constraint
+    if (typeArg == bound || typeArg.name == bound.name) {
+      return true;
+    }
+
+    // Special handling for common native types
+    if (bound.name == 'num') {
+      // Check if typeArg is a numeric type
+      if (typeArg is BridgedClass) {
+        return typeArg.nativeType == int ||
+            typeArg.nativeType == double ||
+            typeArg.nativeType == num;
+      }
+      // For other types, check the name
+      return typeArg.name == 'int' ||
+          typeArg.name == 'double' ||
+          typeArg.name == 'num';
+    }
+
+    if (bound.name == 'Object') {
+      // Everything extends Object (except possibly void/dynamic)
+      return typeArg.name != 'void';
+    }
+
+    if (bound.name == 'String') {
+      // Check if the type is String
+      if (typeArg is BridgedClass) {
+        return typeArg.nativeType == String;
+      }
+      return typeArg.name == 'String';
+    }
+
+    if (bound.name == 'Comparable') {
+      // Check if the type implements Comparable
+      if (typeArg is BridgedClass) {
+        try {
+          // Basic check for common comparable types
+          return typeArg.nativeType == String ||
+              typeArg.nativeType == int ||
+              typeArg.nativeType == double ||
+              typeArg.nativeType == DateTime;
+        } catch (e) {
+          return false;
+        }
+      }
+      return typeArg.name == 'String' ||
+          typeArg.name == 'int' ||
+          typeArg.name == 'double';
+    }
+
+    // Check if the type argument is a subtype of the bound
+    try {
+      return typeArg.isSubtypeOf(bound);
+    } catch (e) {
+      Logger.debug(
+          "[InterpretedClass._checkTypeSatisfiesBound] Error checking subtype relationship: $e");
+      // If we can't determine the relationship, default to false for strict validation
+      return false;
+    }
+  }
+
+  List<RuntimeType> _getValidatedTypeArguments(
+      List<RuntimeType>? providedTypeArguments) {
+    List<RuntimeType> effective;
+    if (providedTypeArguments == null || providedTypeArguments.isEmpty) {
+      effective = List.generate(typeParameterNames.length,
+          (_) => BridgedClass(Object, name: 'dynamic'));
+    } else if (providedTypeArguments.length != typeParameterNames.length) {
+      throw RuntimeError(
+          "Class '$name' requires ${typeParameterNames.length} type argument(s), but ${providedTypeArguments.length} were provided.");
+    } else {
+      effective = providedTypeArguments;
+    }
+
+    // Validate bounds
+    for (int i = 0; i < effective.length; i++) {
+      final typeArg = effective[i];
+      final paramName = typeParameterNames[i];
+      final bound = typeParameterBounds[paramName];
+      if (bound != null) {
+        bool satisfiesBound = _checkTypeSatisfiesBound(typeArg, bound);
+        if (!satisfiesBound) {
+          throw RuntimeError(
+              "Type argument '${typeArg.name}' for type parameter '$paramName' does not satisfy bound '${bound.name}' in class '$name'");
+        }
+      }
+    }
+    return effective;
+  }
+
   // Helper to create instance and run field initializers
   InterpretedInstance createAndInitializeInstance(
       InterpreterVisitor visitor, List<RuntimeType>? typeArguments) {
@@ -229,9 +394,12 @@ class InterpretedClass implements Callable, RuntimeType {
       throw RuntimeError("Cannot instantiate abstract class '$name'.");
     }
 
+    // Get validated effective type arguments
+    final effectiveTypeArgs = _getValidatedTypeArguments(typeArguments);
+
     // 1. Create the instance with a link to the class
     final instance = InterpretedInstance(this,
-        typeArguments: typeArguments); // Pass only the class
+        typeArguments: effectiveTypeArgs); // Pass only the class
 
     // Use the environment where the class was defined as the outer scope
     // for evaluating initializers. We need to traverse the hierarchy.
@@ -344,7 +512,8 @@ class InterpretedClass implements Callable, RuntimeType {
         // enclosing this bound environment.
         final boundConstructor = constructor.bind(instance);
         // Pass initializers to call?
-        boundConstructor.call(visitor, positionalArguments, namedArguments);
+        boundConstructor.call(
+            visitor, positionalArguments, namedArguments, typeArguments);
       } on RuntimeError catch (e) {
         throw RuntimeError(
             "Error during constructor execution for class '$name': ${e.message}");
