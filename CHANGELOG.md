@@ -1,3 +1,8 @@
+## 0.1.0
+- Added runtime checks for generic type constraints.
+- Added support for compound bitwise assignment operators (&=, |=, etc.).
+- Introduced Int16List and Float32List in typed_data.
+
 ## 0.0.9
 - full support (generic classes/functions, type constraints, runtime validation)
 - use BridgedClassDefinition for all Stdlib
