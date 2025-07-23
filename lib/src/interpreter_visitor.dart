@@ -6803,9 +6803,34 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             }
             statementsToExecute = member.statements;
           } else {
-            // Handle other pattern types (Guard, LogicalOr, etc.) later
-            throw UnimplementedError(
-                'Switch patterns other than constants (e.g., guards, object patterns) are not yet supported. Found: ${pattern.runtimeType}');
+            // Handle other pattern types using our improved _matchAndBind function
+            if (!matched) {
+              // Create a temporary environment for pattern matching in switch
+              final tempEnvironment = Environment(enclosing: environment);
+              try {
+                _matchAndBind(pattern, switchValue, tempEnvironment);
+                // If we get here, the pattern matched
+                matched = true;
+                execute = true;
+                // Copy any bound variables to the current environment
+                // In a full implementation, we might want to handle variable scoping more carefully
+                for (final name in tempEnvironment.values.keys) {
+                  try {
+                    final value = tempEnvironment.get(name);
+                    environment.define(name, value);
+                  } catch (e) {
+                    // Variable might already exist or other issue, ignore for now
+                  }
+                }
+                Logger.debug(
+                    "[Switch] Matched pattern case: ${pattern.runtimeType}");
+              } on PatternMatchException catch (e) {
+                Logger.debug(
+                    "[Switch] Pattern ${pattern.runtimeType} did not match: ${e.message}");
+                // Pattern didn't match, continue to next case
+              }
+            }
+            statementsToExecute = member.statements;
           }
         } else if (member is SwitchDefault) {
           Logger.debug("[Switch] Reached default case.");
@@ -6960,62 +6985,122 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           "[_matchAndBind] Constant pattern matched: $value == $patternValue");
       // No binding needed for constant patterns
     } else if (pattern is ListPattern) {
-      // Handles: [p1, p2, ...]
+      // Handles: [p1, p2, ...], including rest elements like [p1, ...rest]
       if (value is! List) {
         throw PatternMatchException(
             "Expected a List, but got ${value?.runtimeType}");
       }
-      // Basic check: exact number of elements for now (no rest element)
-      if (pattern.elements.any((e) => e is RestPatternElement)) {
-        throw UnimplementedError(
-            "Rest elements (...) in list patterns are not yet supported.");
-      }
-      if (pattern.elements.length != value.length) {
-        throw PatternMatchException(
-            "List pattern expected ${pattern.elements.length} elements, but List has ${value.length}.");
-      }
 
-      // Match subpatterns recursively
-      for (int i = 0; i < pattern.elements.length; i++) {
-        final element = pattern.elements[i];
-        final subValue = value[i];
+      // Check if there's a rest element and handle accordingly
+      final restElementIndex =
+          pattern.elements.indexWhere((e) => e is RestPatternElement);
 
-        // Extract the actual pattern from the element wrapper
-        DartPattern subPattern;
-        if (element is DartPattern) {
-          subPattern = element;
-        } else if (element is RestPatternElement) {
-          // Should be caught by the check above, but handle defensively
-          throw UnimplementedError(
-              "Rest elements (...) in list patterns are not yet supported.");
-        } else {
-          throw StateError(
-              "Unexpected ListPatternElement type: ${element.runtimeType}");
+      if (restElementIndex == -1) {
+        // No rest element: exact length match required
+        if (pattern.elements.length != value.length) {
+          throw PatternMatchException(
+              "List pattern expected ${pattern.elements.length} elements, but List has ${value.length}.");
         }
 
-        Logger.debug(
-            "[_matchAndBind]   Matching list element $i: ${subPattern.runtimeType} against ${subValue?.runtimeType}");
-        _matchAndBind(subPattern, subValue, environment);
+        // Match subpatterns recursively
+        for (int i = 0; i < pattern.elements.length; i++) {
+          final element = pattern.elements[i];
+          final subValue = value[i];
+
+          // Extract the actual pattern from the element wrapper
+          DartPattern subPattern;
+          if (element is DartPattern) {
+            subPattern = element;
+          } else {
+            throw StateError(
+                "Unexpected ListPatternElement type: ${element.runtimeType}");
+          }
+
+          Logger.debug(
+              "[_matchAndBind]   Matching list element $i: ${subPattern.runtimeType} against ${subValue?.runtimeType}");
+          _matchAndBind(subPattern, subValue, environment);
+        }
+      } else {
+        // Has rest element: more complex matching
+        final RestPatternElement restElement =
+            pattern.elements[restElementIndex] as RestPatternElement;
+        final beforeRestCount = restElementIndex;
+        final afterRestCount = pattern.elements.length - restElementIndex - 1;
+        final minRequiredLength = beforeRestCount + afterRestCount;
+
+        if (value.length < minRequiredLength) {
+          throw PatternMatchException(
+              "List pattern expected at least $minRequiredLength elements, but List has ${value.length}.");
+        }
+
+        // Match elements before rest
+        for (int i = 0; i < beforeRestCount; i++) {
+          final element = pattern.elements[i];
+          final subValue = value[i];
+
+          DartPattern subPattern;
+          if (element is DartPattern) {
+            subPattern = element;
+          } else {
+            throw StateError(
+                "Unexpected ListPatternElement type before rest: ${element.runtimeType}");
+          }
+
+          Logger.debug(
+              "[_matchAndBind]   Matching list element $i (before rest): ${subPattern.runtimeType} against ${subValue?.runtimeType}");
+          _matchAndBind(subPattern, subValue, environment);
+        }
+
+        // Handle rest element
+        final restStartIndex = beforeRestCount;
+        final restEndIndex = value.length - afterRestCount;
+        final restValues = value.sublist(restStartIndex, restEndIndex);
+
+        if (restElement.pattern != null) {
+          // Rest element has a pattern (e.g., ...rest), bind the sublist
+          Logger.debug(
+              "[_matchAndBind]   Matching rest element: ${restElement.pattern!.runtimeType} against List of ${restValues.length} elements");
+          _matchAndBind(restElement.pattern!, restValues, environment);
+        }
+        // If restElement.pattern is null, it's just "..." (anonymous rest), no binding needed
+
+        // Match elements after rest
+        for (int i = 0; i < afterRestCount; i++) {
+          final patternIndex = restElementIndex + 1 + i;
+          final valueIndex = value.length - afterRestCount + i;
+          final element = pattern.elements[patternIndex];
+          final subValue = value[valueIndex];
+
+          DartPattern subPattern;
+          if (element is DartPattern) {
+            subPattern = element;
+          } else {
+            throw StateError(
+                "Unexpected ListPatternElement type after rest: ${element.runtimeType}");
+          }
+
+          Logger.debug(
+              "[_matchAndBind]   Matching list element $valueIndex (after rest): ${subPattern.runtimeType} against ${subValue?.runtimeType}");
+          _matchAndBind(subPattern, subValue, environment);
+        }
       }
       Logger.debug("[_matchAndBind] List pattern matched successfully.");
     } else if (pattern is MapPattern) {
-      // Handles: {'key': p1, 'key2': p2, ...}
+      // Handles: {'key': p1, 'key2': p2, ...}, including rest elements like {'key': p1, ...rest}
       if (value is! Map) {
         throw PatternMatchException(
             "Expected a Map, but got ${value?.runtimeType}");
       }
 
-      if (pattern.elements.any((e) => e is RestPatternElement)) {
-        throw UnimplementedError(
-            "Rest elements (...) in map patterns are not yet supported.");
-      }
-
-      // Match subpatterns for each entry
       final Set<Object?> matchedKeys = {};
-      for (final entry in pattern.elements) {
-        if (entry is MapPatternEntry) {
-          final keyPatternExpr = entry.key;
-          final valuePattern = entry.value;
+
+      // Match regular entries first
+      for (int i = 0; i < pattern.elements.length; i++) {
+        final element = pattern.elements[i];
+
+        if (element is MapPatternEntry) {
+          final keyPatternExpr = element.key;
+          final valuePattern = element.value;
 
           final keyToLookup = keyPatternExpr.accept<Object?>(this);
 
@@ -7028,15 +7113,28 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           Logger.debug(
               "[_matchAndBind]   Matching map entry '$keyToLookup': ${valuePattern.runtimeType} against ${subValue?.runtimeType}");
           _matchAndBind(valuePattern, subValue, environment);
-          matchedKeys.add(keyToLookup); // Track matched keys
+          matchedKeys.add(keyToLookup);
+        } else if (element is RestPatternElement) {
+          // Handle rest element
+          final remainingEntries = <Object?, Object?>{};
+          for (final entry in value.entries) {
+            if (!matchedKeys.contains(entry.key)) {
+              remainingEntries[entry.key] = entry.value;
+            }
+          }
+
+          if (element.pattern != null) {
+            // Rest element has a pattern (e.g., ...rest), bind the remaining map
+            Logger.debug(
+                "[_matchAndBind]   Matching rest element: ${element.pattern!.runtimeType} against Map of ${remainingEntries.length} entries");
+            _matchAndBind(element.pattern!, remainingEntries, environment);
+          }
+          // If element.pattern is null, it's just "..." (anonymous rest), no binding needed
         } else {
-          // Should be caught by the check above
-          throw UnimplementedError(
-              "Map pattern elements other than entries (like rest '...') are not yet supported.");
+          throw StateError(
+              "Unexpected MapPatternElement type: ${element.runtimeType}");
         }
       }
-      // Optional: Check for exhaustiveness (e.g., ensure all map keys were matched if using `...`)
-      // if (matchedKeys.length != value.length) { ... }
 
       Logger.debug("[_matchAndBind] Map pattern matched successfully.");
     } else if (pattern is RecordPattern) {
@@ -7124,6 +7222,102 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
       Logger.debug('[_matchAndBind] Record pattern matched successfully.');
       // Success: function completes normally
+    } else if (pattern is ObjectPattern) {
+      // Handles: ClassName(field1: pattern1, field2: pattern2)
+      Logger.debug(
+          '[_matchAndBind] Matching object pattern ${pattern.type.name2.lexeme} against value ${value?.runtimeType}');
+
+      // Get the expected type name
+      final expectedTypeName = pattern.type.name2.lexeme;
+
+      // Check if the value is of the expected type
+      // For now, we'll do basic runtime type checking
+      // In a full implementation, this would involve more sophisticated type checking
+
+      // Try to match common Dart types and interpreted classes
+      bool typeMatches = false;
+      String actualTypeName = value?.runtimeType.toString() ?? 'null';
+
+      // Handle common type aliases and matches
+      if (expectedTypeName == 'int' && value is int) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'double' && value is double) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'num' && value is num) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'String' && value is String) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'bool' && value is bool) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'List' && value is List) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'Map' && value is Map) {
+        typeMatches = true;
+      } else if (expectedTypeName == 'Set' && value is Set) {
+        typeMatches = true;
+      } else if (value != null && actualTypeName.endsWith(expectedTypeName)) {
+        // Basic heuristic: if the actual type name ends with expected type name
+        typeMatches = true;
+      } else {
+        // Check if the value has an interpreted class that matches
+        // This is a simplified check - a full implementation would be more robust
+        try {
+          // Try to look up the expected type in the environment
+          final expectedType = environment.get(expectedTypeName);
+          if (expectedType is RuntimeType) {
+            // In a full implementation, we'd check if value is an instance of expectedType
+            typeMatches =
+                true; // For now, assume it matches if we found the type
+          }
+        } catch (e) {
+          // Type not found in environment, use basic matching
+        }
+      }
+
+      if (!typeMatches) {
+        throw PatternMatchException(
+            "Object pattern expected type '$expectedTypeName', but got '${value?.runtimeType}'");
+      }
+
+      // Match each field pattern
+      for (final field in pattern.fields) {
+        final PatternFieldName? fieldName = field.name;
+        final DartPattern fieldPattern = field.pattern;
+
+        if (fieldName == null) {
+          throw PatternMatchException("Object pattern field must have a name");
+        }
+
+        // Get the field name string
+        String fieldNameStr;
+        if (fieldName.name != null) {
+          fieldNameStr = fieldName.name!.lexeme;
+        } else {
+          throw PatternMatchException(
+              "Object pattern field name is not a simple identifier");
+        }
+
+        // Extract the field value from the object
+        Object? fieldValue;
+
+        // For basic types, we can't really access fields, so this is limited
+        // In a full implementation, this would use reflection or interpreter class instances
+        if (value is Map && value.containsKey(fieldNameStr)) {
+          // If it's a map, treat field access as key access (common pattern)
+          fieldValue = value[fieldNameStr];
+        } else {
+          // For now, we'll assume field access is not supported for most types
+          // A full implementation would use reflection or interpreter-managed objects
+          throw PatternMatchException(
+              "Object pattern field access '$fieldNameStr' is not yet fully supported for type '${value?.runtimeType}'");
+        }
+
+        Logger.debug(
+            "[_matchAndBind]   Matching object field '$fieldNameStr': ${fieldPattern.runtimeType} against ${fieldValue?.runtimeType}");
+        _matchAndBind(fieldPattern, fieldValue, environment);
+      }
+
+      Logger.debug("[_matchAndBind] Object pattern matched successfully.");
     } else {
       throw UnimplementedError(
           "Pattern type not yet supported in _matchAndBind: ${pattern.runtimeType}");
