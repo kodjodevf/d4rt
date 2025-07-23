@@ -2035,19 +2035,136 @@ class InterpretedFunction implements Callable {
       awaitContextNode =
           nodeThatCausedSuspension; // The DoStatement is the context
       awaitExpression = nodeThatCausedSuspension.condition as AwaitExpression;
-    } else {
-      // We don't know how to extract the await, use the node directly
-      // (may lead to errors if the logic below does not handle this node)
+    } else if (nodeThatCausedSuspension is MethodInvocation) {
+      // Special case: the await was in the arguments of a method invocation
       awaitContextNode = nodeThatCausedSuspension;
-      awaitExpression = null; // We don't know where the await was exactly
-      Logger.warn(
-          "[_determineNextNodeAfterAwait] Could not determine exact await context for node type ${nodeThatCausedSuspension.runtimeType}. Using node as context.");
+      awaitExpression = null; // The await is nested in arguments
+      Logger.debug(
+          "[_determineNextNodeAfterAwait] Await context is MethodInvocation with arguments containing await.");
+    } else if (nodeThatCausedSuspension is FunctionExpressionInvocation) {
+      // Special case: the await was in the arguments of a function expression invocation
+      awaitContextNode = nodeThatCausedSuspension;
+      awaitExpression = null; // The await is nested in arguments
+      Logger.debug(
+          "[_determineNextNodeAfterAwait] Await context is FunctionExpressionInvocation with arguments containing await.");
+    } else if (nodeThatCausedSuspension is InstanceCreationExpression) {
+      // Special case: the await was in the arguments of a constructor call
+      awaitContextNode = nodeThatCausedSuspension;
+      awaitExpression = null; // The await is nested in arguments
+      Logger.debug(
+          "[_determineNextNodeAfterAwait] Await context is InstanceCreationExpression with arguments containing await.");
+    } else {
+      // Try to find await context by analyzing the node structure
+      AstNode? foundInvocation =
+          _findInvocationWithAwaitInArguments(nodeThatCausedSuspension);
+      if (foundInvocation != null) {
+        Logger.debug(
+            "[_determineNextNodeAfterAwait] Found invocation with await in arguments: ${foundInvocation.runtimeType}");
+        awaitContextNode = foundInvocation;
+        awaitExpression = null; // The await is nested in arguments
+      } else {
+        // We don't know how to extract the await, use the node directly
+        // (may lead to errors if the logic below does not handle this node)
+        awaitContextNode = nodeThatCausedSuspension;
+        awaitExpression = null; // We don't know where the await was exactly
+        Logger.warn(
+            "[_determineNextNodeAfterAwait] Could not determine exact await context for node type ${nodeThatCausedSuspension.runtimeType}. Using node as context.");
+      }
     }
 
     Logger.debug(
         "[_determineNextNodeAfterAwait] Determined await context: ${awaitContextNode.runtimeType}");
 
     // Logic based on the type of node that contained the await (awaitContextNode)
+
+    // Case: Method/Function/Constructor invocation with await in arguments
+    if (awaitContextNode is MethodInvocation ||
+        awaitContextNode is FunctionExpressionInvocation ||
+        awaitContextNode is InstanceCreationExpression) {
+      Logger.debug(
+          "[_determineNextNodeAfterAwait] Handling ${awaitContextNode.runtimeType} with await in arguments. Re-executing the invocation...");
+
+      // Re-execute the invocation with the resolved await value
+      try {
+        // Temporarily restore the async state to enable await processing
+        final previousAsyncState = visitor.currentAsyncState;
+        visitor.currentAsyncState = state;
+
+        // Enable invocation resumption mode so await expressions return the resolved value
+        final previousResumptionMode = state.isInvocationResumptionMode;
+        state.isInvocationResumptionMode = true;
+
+        final result = awaitContextNode.accept<Object?>(visitor);
+
+        // Restore the previous modes
+        state.isInvocationResumptionMode = previousResumptionMode;
+        visitor.currentAsyncState = previousAsyncState;
+
+        if (result is AsyncSuspensionRequest) {
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Another await encountered during invocation continuation.");
+          return awaitContextNode; // Stay on the same node to handle the next await
+        }
+
+        // The call completed successfully
+        Logger.debug(
+            "[_determineNextNodeAfterAwait] Invocation completed successfully with result: $result");
+
+        // CRITICAL FIX: Store the invocation result so it can be used as the final completion value
+        // This ensures that when the state machine finishes, it uses the correct result
+        // instead of falling back to lastAwaitResult
+        state.lastAwaitResult = result;
+
+        // Now we need to handle the result based on the parent context
+        AstNode? parentStatement = awaitContextNode;
+        while (parentStatement != null && parentStatement is! Statement) {
+          parentStatement = parentStatement.parent;
+        }
+
+        if (parentStatement is VariableDeclarationStatement) {
+          // This is a variable declaration with the invocation as initializer
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Completing variable declaration with invocation result: $result");
+
+          // Find the variable declaration and assign the result
+          final varList = parentStatement.variables;
+          if (varList.variables.isNotEmpty) {
+            final varDecl = varList.variables.first;
+            final varName = varDecl.name.lexeme;
+
+            // Set the variable in the current environment
+            final currentEnv = state.loopEnvironmentStack.isNotEmpty
+                ? state.loopEnvironmentStack.last
+                : currentExecutionEnvironment;
+            currentEnv.define(varName, result);
+            Logger.debug(
+                "[_determineNextNodeAfterAwait] Assigned invocation result to variable '$varName' = $result");
+          }
+
+          // Find the next statement after the variable declaration
+          return _findNextSequentialNode(visitor, parentStatement);
+        } else if (parentStatement is ExpressionStatement) {
+          // This is a standalone expression statement
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Completed expression statement with invocation result: $result");
+
+          // Find the next statement after the expression statement
+          return _findNextSequentialNode(visitor, parentStatement);
+        } else {
+          // For other cases, continue with finding the next node
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Invocation in other context. Finding next node.");
+          return _findNextSequentialNode(visitor, awaitContextNode);
+        }
+      } catch (e, s) {
+        Logger.error(
+            "[_determineNextNodeAfterAwait] Error during invocation continuation: $e\n$s");
+        if (!state.completer.isCompleted) {
+          state.completer.completeError(e, s);
+        }
+        return null; // Stop execution
+      }
+    }
 
     // Case 1: Variable declaration (var x = await f();)
     if (awaitContextNode is VariableDeclarationStatement) {
@@ -3010,6 +3127,70 @@ class InterpretedFunction implements Callable {
   @override
   String toString() => '<fn ${_name ?? '<anonymous>'}>';
 
+  // Helper to recursively search for invocations with await in arguments
+  static AstNode? _findInvocationWithAwaitInArguments(AstNode node) {
+    // Check if this node is an invocation with await in arguments
+    if (node is MethodInvocation ||
+        node is FunctionExpressionInvocation ||
+        node is InstanceCreationExpression) {
+      if (_hasAwaitInArguments(node)) {
+        return node;
+      }
+    }
+
+    // Recursively search in child nodes
+    for (final child in node.childEntities) {
+      if (child is AstNode) {
+        final found = _findInvocationWithAwaitInArguments(child);
+        if (found != null) {
+          return found;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Helper to check if an invocation has await in its arguments
+  static bool _hasAwaitInArguments(AstNode invocation) {
+    ArgumentList? argumentList;
+
+    if (invocation is MethodInvocation) {
+      argumentList = invocation.argumentList;
+    } else if (invocation is FunctionExpressionInvocation) {
+      argumentList = invocation.argumentList;
+    } else if (invocation is InstanceCreationExpression) {
+      argumentList = invocation.argumentList;
+    }
+
+    if (argumentList == null) return false;
+
+    // Check each argument for await expressions
+    for (final arg in argumentList.arguments) {
+      if (_containsAwait(arg)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Helper to recursively check if a node contains await
+  static bool _containsAwait(AstNode node) {
+    if (node is AwaitExpression) {
+      return true;
+    }
+
+    // Recursively check child nodes
+    for (final child in node.childEntities) {
+      if (child is AstNode && _containsAwait(child)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // Helper to evaluate arguments for constructor/super/this invocations
   (List<Object?>, Map<String, Object?>) _evaluateArgumentsForInvocation(
       InterpreterVisitor visitor,
@@ -3021,11 +3202,11 @@ class InterpretedFunction implements Callable {
     bool namedArgsEncountered = false;
 
     for (final arg in argumentList.arguments) {
-      // Evaluate argument, disallow await
+      // Evaluate argument, disallow await for now in constructor contexts
       final argValue = arg.accept<Object?>(visitor);
       if (argValue is AsyncSuspensionRequest) {
         throw UnimplementedError(
-            "'await' is not supported within $invocationType call arguments.");
+            "'await' is not yet supported within $invocationType call arguments.");
       }
 
       if (arg is NamedExpression) {
@@ -3037,7 +3218,7 @@ class InterpretedFunction implements Callable {
             " [_evalArgs] Evaluated NAMED arg expression '$name' = $value (${value?.runtimeType})");
         if (value is AsyncSuspensionRequest) {
           throw UnimplementedError(
-              "'await' is not supported within $invocationType call arguments.");
+              "'await' is not yet supported within $invocationType call arguments.");
         }
         if (namedArgs.containsKey(name)) {
           throw RuntimeError(
@@ -3052,10 +3233,6 @@ class InterpretedFunction implements Callable {
         positionalArgs.add(argValue);
         Logger.debug(
             " [_evalArgs] Evaluated POSITIONAL arg = $argValue (${argValue?.runtimeType})");
-        if (argValue is AsyncSuspensionRequest) {
-          throw UnimplementedError(
-              "'await' is not supported within $invocationType call arguments.");
-        }
       }
     }
     return (positionalArgs, namedArgs);

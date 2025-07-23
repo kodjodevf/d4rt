@@ -73,6 +73,10 @@ class AsyncExecutionState {
   /// Store the original exception wrapped for potential rethrow.
   InternalInterpreterException? originalErrorForRethrow;
 
+  /// Flag to indicate if we are resuming an invocation with await in arguments
+  /// When true, await expressions should return the last resolved value instead of suspending
+  bool isInvocationResumptionMode = false;
+
   AsyncExecutionState({
     required this.environment,
     required this.completer,

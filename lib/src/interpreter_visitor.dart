@@ -2006,8 +2006,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                     "[MethodInvocation] Found extension method '$methodName'. Evaluating args and calling...");
 
                 // Evaluate arguments (must be done here as direct call failed)
+                final evaluationResult =
+                    _evaluateArgumentsAsync(node.argumentList);
+                if (evaluationResult is AsyncSuspensionRequest) {
+                  return evaluationResult; // Propagate suspension
+                }
                 final (positionalArgs, namedArgs) =
-                    _evaluateArguments(node.argumentList);
+                    evaluationResult as (List<Object?>, Map<String, Object?>);
                 List<RuntimeType>? evaluatedTypeArguments;
                 final typeArgsNode = node.typeArguments;
                 if (typeArgsNode != null) {
@@ -2075,8 +2080,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                   !extensionCallable.isSetter) {
                 Logger.debug(
                     "[MethodInvocation] Found extension method '$methodName' for enum value. Evaluating args and calling...");
+                final evaluationResult =
+                    _evaluateArgumentsAsync(node.argumentList);
+                if (evaluationResult is AsyncSuspensionRequest) {
+                  return evaluationResult; // Propagate suspension
+                }
                 final (positionalArgs, namedArgs) =
-                    _evaluateArguments(node.argumentList);
+                    evaluationResult as (List<Object?>, Map<String, Object?>);
                 List<RuntimeType>?
                     evaluatedTypeArguments; // Handle type args if needed
 
@@ -2126,8 +2136,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         final adapter = bridgedClass.instanceMethodAdapters[methodName];
 
         if (adapter != null) {
+          final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+          if (evaluationResult is AsyncSuspensionRequest) {
+            return evaluationResult; // Propagate suspension
+          }
           final (positionalArgs, namedArgs) =
-              _evaluateArguments(node.argumentList);
+              evaluationResult as (List<Object?>, Map<String, Object?>);
 
           try {
             // Call the adapter with the native object
@@ -2153,8 +2167,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             if (extensionMethod is InterpretedExtensionMethod) {
               Logger.debug(
                   "[visitMethodInvocation] Found extension method '$methodName' for ${bridgedClass.name}. Calling...");
+              final evaluationResult =
+                  _evaluateArgumentsAsync(node.argumentList);
+              if (evaluationResult is AsyncSuspensionRequest) {
+                return evaluationResult; // Propagate suspension
+              }
               final (positionalArgs, namedArgs) =
-                  _evaluateArguments(node.argumentList);
+                  evaluationResult as (List<Object?>, Map<String, Object?>);
 
               final extensionArgs = <Object?>[targetValue];
               extensionArgs.addAll(positionalArgs);
@@ -2181,8 +2200,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                 "Cannot instantiate abstract class '${targetValue.name}'.");
           }
 
+          final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+          if (evaluationResult is AsyncSuspensionRequest) {
+            return evaluationResult; // Propagate suspension
+          }
           final (positionalArgs, namedArgs) =
-              _evaluateArguments(node.argumentList);
+              evaluationResult as (List<Object?>, Map<String, Object?>);
 
           try {
             // 1. Create and initialize instance fields (using the class's public helper)
@@ -2226,8 +2249,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       } else if (targetValue is BridgedEnumValue) {
         // This is a method call on a bridged enum value.
         // It must use the invoke() method of BridgedEnumValue.
+        final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+        if (evaluationResult is AsyncSuspensionRequest) {
+          return evaluationResult; // Propagate suspension
+        }
         final (positionalArgs, namedArgs) =
-            _evaluateArguments(node.argumentList);
+            evaluationResult as (List<Object?>, Map<String, Object?>);
         try {
           return targetValue.invoke(
               this, methodName, positionalArgs, namedArgs);
@@ -2255,8 +2282,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (constructorAdapter != null) {
           Logger.debug(
               "[visitMethodInvocation] Found Bridged CONSTRUCTOR adapter for '$methodName'");
+          final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+          if (evaluationResult is AsyncSuspensionRequest) {
+            return evaluationResult; // Propagate suspension
+          }
           final (positionalArgs, namedArgs) =
-              _evaluateArguments(node.argumentList);
+              evaluationResult as (List<Object?>, Map<String, Object?>);
 
           try {
             final nativeObject =
@@ -2288,8 +2319,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           if (staticMethodAdapter != null) {
             Logger.debug(
                 "[visitMethodInvocation] Found Bridged STATIC METHOD adapter for '$methodName'");
+            final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+            if (evaluationResult is AsyncSuspensionRequest) {
+              return evaluationResult; // Propagate suspension
+            }
             final (positionalArgs, namedArgs) =
-                _evaluateArguments(node.argumentList);
+                evaluationResult as (List<Object?>, Map<String, Object?>);
 
             try {
               final result =
@@ -2351,8 +2386,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
         if (methodAdapter != null) {
           // Evaluate the arguments
+          final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+          if (evaluationResult is AsyncSuspensionRequest) {
+            return evaluationResult; // Propagate suspension
+          }
           final (positionalArgs, namedArgs) =
-              _evaluateArguments(node.argumentList);
+              evaluationResult as (List<Object?>, Map<String, Object?>);
 
           // Call the adapter with the native object as target
           try {
@@ -2373,8 +2412,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
       //
       else {
+        final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+        if (evaluationResult is AsyncSuspensionRequest) {
+          return evaluationResult; // Propagate suspension
+        }
         final (positionalArgs, namedArgs) =
-            _evaluateArguments(node.argumentList);
+            evaluationResult as (List<Object?>, Map<String, Object?>);
         List<RuntimeType>? evaluatedTypeArguments;
         final typeArgsNode = node.typeArguments;
         if (typeArgsNode != null) {
@@ -2413,7 +2456,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     // Check if the resolved value is callable
     if (calleeValue is Callable) {
-      final (positionalArgs, namedArgs) = _evaluateArguments(node.argumentList);
+      final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+      if (evaluationResult is AsyncSuspensionRequest) {
+        return evaluationResult; // Propagate suspension
+      }
+      final (positionalArgs, namedArgs) =
+          evaluationResult as (List<Object?>, Map<String, Object?>);
 
       // Evaluate Type Arguments for Method Invocation
       List<RuntimeType>? evaluatedTypeArguments;
@@ -2447,8 +2495,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         Logger.debug(
             "[visitMethodInvocation] Calling default bridged constructor for '${bridgedClass.name}'");
 
+        final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+        if (evaluationResult is AsyncSuspensionRequest) {
+          return evaluationResult; // Propagate suspension
+        }
         final (positionalArgs, namedArgs) =
-            _evaluateArguments(node.argumentList);
+            evaluationResult as (List<Object?>, Map<String, Object?>);
 
         try {
           final nativeObject =
@@ -6327,7 +6379,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
 
       // Evaluate the arguments
-      final (positionalArgs, namedArgs) = _evaluateArguments(node.argumentList);
+      final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+      if (evaluationResult is AsyncSuspensionRequest) {
+        return evaluationResult; // Propagate suspension
+      }
+      final (positionalArgs, namedArgs) =
+          evaluationResult as (List<Object?>, Map<String, Object?>);
 
       // Find and call the constructor (interpreted)
       final constructorLookupName =
@@ -6478,6 +6535,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         namedArgsEncountered = true;
         final name = arg.name.label.name;
         final value = arg.expression.accept<Object?>(this);
+
+        // Check for async suspension in named arguments
+        if (value is AsyncSuspensionRequest) {
+          return value as dynamic; // Propagate suspension request
+        }
+
         if (namedArgs.containsKey(name)) {
           throw RuntimeError("Named argument '$name' provided more than once.");
         }
@@ -6490,6 +6553,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "Positional arguments cannot follow named arguments.");
         }
         final a = arg.accept<Object?>(this);
+
+        // Check for async suspension in positional arguments
+        if (a is AsyncSuspensionRequest) {
+          return a as dynamic; // Propagate suspension request
+        }
+
         final bridgedInstance = toBridgedInstance(a);
         positionalArgs.add(_bridgeInterpreterValueToNative(
             bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : a));
@@ -6509,6 +6578,57 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     }
 
     return interpreterValue;
+  }
+
+  /// Evaluates arguments for async function calls, handling await expressions.
+  /// Returns either (List&lt;Object?&gt;, Map&lt;String, Object?&gt;) or AsyncSuspensionRequest.
+  Object? _evaluateArgumentsAsync(ArgumentList argumentList) {
+    List<Object?> positionalArgs = [];
+    Map<String, Object?> namedArgs = {};
+    bool namedArgsEncountered = false;
+
+    for (final arg in argumentList.arguments) {
+      if (arg is NamedExpression) {
+        namedArgsEncountered = true;
+        final name = arg.name.label.name;
+        final value = arg.expression.accept<Object?>(this);
+
+        // Check for async suspension in named arguments
+        if (value is AsyncSuspensionRequest) {
+          Logger.debug(
+              "[_evaluateArgumentsAsync] Async suspension in named argument '$name'");
+          return value; // Propagate suspension request
+        }
+
+        if (namedArgs.containsKey(name)) {
+          throw RuntimeError("Named argument '$name' provided more than once.");
+        }
+        final bridgedInstance = toBridgedInstance(value);
+        namedArgs[name] = _bridgeInterpreterValueToNative(
+            bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : value);
+      } else {
+        if (namedArgsEncountered) {
+          throw RuntimeError(
+              "Positional arguments cannot follow named arguments.");
+        }
+        final a = arg.accept<Object?>(this);
+
+        // Check for async suspension in positional arguments
+        if (a is AsyncSuspensionRequest) {
+          Logger.debug(
+              "[_evaluateArgumentsAsync] Async suspension in positional argument");
+          return a; // Propagate suspension request
+        }
+
+        final bridgedInstance = toBridgedInstance(a);
+        positionalArgs.add(_bridgeInterpreterValueToNative(
+            bridgedInstance.$2 ? bridgedInstance.$1!.nativeObject : a));
+      }
+    }
+
+    Logger.debug(
+        "[_evaluateArgumentsAsync] All arguments evaluated successfully: ${positionalArgs.length} positional, ${namedArgs.length} named");
+    return (positionalArgs, namedArgs);
   }
 
   // Add FunctionExpressionInvocation handler
@@ -6748,6 +6868,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     // Initial check: Are we in an async function?
     if (!currentAsyncState!.function.isAsync) {
       throw RuntimeError("'await' can only be used inside an async function.");
+    }
+
+    // Check if we are in invocation resumption mode
+    if (currentAsyncState!.isInvocationResumptionMode) {
+      Logger.debug(
+          "[AwaitExpression] In invocation resumption mode, returning last await result: ${currentAsyncState!.lastAwaitResult}");
+      return currentAsyncState!.lastAwaitResult;
     }
 
     Logger.debug("[AwaitExpression] Evaluating expression for await...");
