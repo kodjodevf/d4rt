@@ -3,6 +3,30 @@ import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:d4rt/d4rt.dart';
 
+/// Represents a yield operation in a generator function
+class YieldValue {
+  final Object? value;
+  final bool isYieldStar;
+
+  YieldValue(this.value, {this.isYieldStar = false});
+}
+
+/// State for tracking generator execution
+class GeneratorExecutionState {
+  final Environment environment;
+  final InterpretedFunction function;
+  AstNode? nextStateIdentifier;
+  bool isCompleted = false;
+  Object? yieldedValue;
+  bool isWaitingForYield = false;
+
+  GeneratorExecutionState({
+    required this.environment,
+    required this.function,
+    this.nextStateIdentifier,
+  });
+}
+
 /// Unwraps a BridgedInstance to get the native object if it's an exception
 Object _unwrapExceptionForPropagation(Object? thrownValue) {
   if (thrownValue is BridgedInstance) {
@@ -47,6 +71,9 @@ class InterpretedFunction implements Callable {
   final bool isAbstract;
   // Async flag for methods/functions
   final bool isAsync;
+  // Generator flags
+  final bool isGenerator;
+  final bool isAsyncGenerator;
   // Factory flag for constructors
   final bool isFactory;
 
@@ -146,6 +173,8 @@ class InterpretedFunction implements Callable {
     this.ownerType,
     this.isAbstract = false,
     this.isAsync = false,
+    this.isGenerator = false,
+    this.isAsyncGenerator = false,
     this.isFactory = false,
     this.declaredReturnType,
     this.isNullable = false,
@@ -167,6 +196,12 @@ class InterpretedFunction implements Callable {
           isAbstract: false, // Non-method functions cannot be abstract
           isAsync: declaration
               .functionExpression.body.isAsynchronous, // Pass async flag
+          isGenerator: declaration
+              .functionExpression.body.isGenerator, // Pass generator flag
+          isAsyncGenerator:
+              declaration.functionExpression.body.isAsynchronous &&
+                  declaration.functionExpression.body
+                      .isGenerator, // Pass async generator flag
           declaredReturnType: declaredReturnType,
           isNullable: isNullable,
           typeParameterNames: _extractTypeParameterNames(
@@ -183,6 +218,9 @@ class InterpretedFunction implements Callable {
           ownerType: null, // Not defined within a class/enum
           isAbstract: false, // Anonymous functions cannot be abstract
           isAsync: expression.body.isAsynchronous, // Pass async flag
+          isGenerator: expression.body.isGenerator, // Pass generator flag
+          isAsyncGenerator: expression.body.isAsynchronous &&
+              expression.body.isGenerator, // Pass async generator flag
           typeParameterNames:
               _extractTypeParameterNames(expression.typeParameters),
           typeParameterBounds:
@@ -202,6 +240,9 @@ class InterpretedFunction implements Callable {
           ownerType: owner, // Pass the owner type (class or enum)
           isAbstract: declaration.isAbstract, // Set the abstract flag
           isAsync: declaration.body.isAsynchronous, // Pass async flag
+          isGenerator: declaration.body.isGenerator, // Pass generator flag
+          isAsyncGenerator: declaration.body.isAsynchronous &&
+              declaration.body.isGenerator, // Pass async generator flag
           typeParameterNames:
               _extractTypeParameterNames(declaration.typeParameters),
           typeParameterBounds:
@@ -286,6 +327,8 @@ class InterpretedFunction implements Callable {
       ownerType: ownerType, // Pass ownerType
       isAbstract: isAbstract,
       isAsync: isAsync,
+      isGenerator: isGenerator,
+      isAsyncGenerator: isAsyncGenerator,
       isFactory: isFactory, // Copy the factory flag
       declaredReturnType: declaredReturnType,
       typeParameterNames: typeParameterNames, // Copy type parameter names
@@ -530,11 +573,12 @@ class InterpretedFunction implements Callable {
               final fieldName = initializer.fieldName.name;
               final value = initializer.expression.accept<Object?>(visitor);
               if (value is AsyncSuspensionRequest) {
-                // Propagate suspension state. Cannot continue synchronously.
-                // This is a complex case - how does the continuation work?
-                // For now, throw an error indicating this isn't fully supported.
-                throw UnimplementedError(
-                    "'await' is not supported within constructor field initializers.");
+                // Await in constructor field initializers is not allowed in Dart
+                // The parser would normally catch this, but if it gets here we should provide guidance
+                throw RuntimeError(
+                    "Dart language does not allow 'await' expressions in constructor field initializers. "
+                    "Consider using a static async factory method instead: "
+                    "static Future<${ownerType?.name ?? 'YourClass'}> create() async { /* await initialization */ }");
               }
               thisValue.set(
                   fieldName, value); // No visitor needed for direct field init
@@ -652,8 +696,10 @@ class InterpretedFunction implements Callable {
               for (final arg in initializer.argumentList.arguments) {
                 final argValue = arg.accept<Object?>(visitor);
                 if (argValue is AsyncSuspensionRequest) {
-                  throw UnimplementedError(
-                      "'await' is not supported within redirecting constructor call arguments.");
+                  throw RuntimeError(
+                      "Dart language does not allow 'await' expressions in redirecting constructor call arguments. "
+                      "Consider using a static async factory method instead: "
+                      "static Future<${ownerType?.name ?? 'YourClass'}> create() async { /* await initialization */ }");
                 }
 
                 if (arg is NamedExpression) {
@@ -914,7 +960,15 @@ class InterpretedFunction implements Callable {
           visitor.currentAsyncState; // Save current async state
 
       try {
-        if (isAsync) {
+        if (isAsyncGenerator) {
+          // Handle async* functions - return a Stream
+          return _createAsyncGeneratorStream(
+              visitor, executionEnvironment, redirected);
+        } else if (isGenerator) {
+          // Handle sync* functions - return an Iterable
+          return _createSyncGeneratorIterable(
+              visitor, executionEnvironment, redirected);
+        } else if (isAsync) {
           final completer = Completer<Object?>();
 
           // Determine the first state (AST node)
@@ -1166,107 +1220,243 @@ class InterpretedFunction implements Callable {
           final forNode = currentNode;
           final parts = forNode.forLoopParts as ForEachParts;
 
-          Iterator<Object?>? iterator = currentState.currentForInIterator;
-
-          // First time or resumed after the body?
-          if (iterator == null) {
-            // First time: evaluate the iterable and create the iterator
+          // Check if this is an await for loop
+          if (forNode.awaitKeyword != null) {
+            // This is an await for loop - handle it natively in the state machine
             Logger.debug(
-                " [StateMachine] Handling ForIn: Evaluating iterable.");
-            final iterableResult = parts.iterable.accept<Object?>(visitor);
+                "[StateMachine] Detected await for loop, handling natively.");
 
-            // Handle if the iterable evaluation is suspended
-            if (iterableResult is AsyncSuspensionRequest) {
+            // Check if we have already converted the stream to a list
+            if (currentState.currentForInIterator == null &&
+                currentState.currentAwaitForList == null) {
+              // First time: evaluate the stream and convert to list
+              Logger.debug("[StateMachine] AwaitForIn: Evaluating stream.");
+              final streamResult = parts.iterable.accept<Object?>(visitor);
+
+              if (streamResult is AsyncSuspensionRequest) {
+                Logger.debug(
+                    "[StateMachine] AwaitForIn stream evaluation suspended. Waiting...");
+                lastResult = streamResult;
+                // The suspension logic below will handle it.
+              } else {
+                // We have a stream, convert it to a list asynchronously
+                Object? streamValue;
+                if (visitor.toBridgedInstance(streamResult).$2) {
+                  final bridgedInstance =
+                      visitor.toBridgedInstance(streamResult).$1!;
+                  if (bridgedInstance.nativeObject is Stream) {
+                    streamValue = bridgedInstance.nativeObject;
+                  } else {
+                    throw RuntimeError(
+                        'Value used in await for-in loop must be a Stream, but got BridgedInstance containing ${bridgedInstance.nativeObject.runtimeType}');
+                  }
+                } else if (streamResult is Stream) {
+                  streamValue = streamResult;
+                } else {
+                  throw RuntimeError(
+                      'Value used in await for-in loop must be a Stream, but got ${streamResult?.runtimeType}');
+                }
+
+                if (streamValue is Stream) {
+                  // Create a suspension request to convert stream to list
+                  lastResult = AsyncSuspensionRequest(
+                    streamValue.toList(),
+                    currentState,
+                  );
+                  // Mark that we're waiting for stream conversion
+                  currentState.awaitingStreamConversion = true;
+                }
+              }
+            } else if (currentState.awaitingStreamConversion == true) {
+              // We just finished converting the stream to a list
+              currentState.awaitingStreamConversion = false;
+              final List<Object?> items =
+                  currentState.lastAwaitResult as List<Object?>;
+              currentState.currentAwaitForList = items;
+              currentState.currentAwaitForIndex = 0;
               Logger.debug(
-                  "[StateMachine] ForIn iterable suspended. Waiting...");
-              lastResult = iterableResult;
-              // The suspension logic below will handle it.
-            } else if (iterableResult is Iterable) {
-              iterator = iterableResult.iterator;
-              currentState.currentForInIterator = iterator; // Save the iterator
-              Logger.debug("[StateMachine] ForIn: Iterator created.");
-            } else {
-              throw RuntimeError(
-                  "The value iterate over in a for-in loop must be an Iterable, but got ${iterableResult?.runtimeType}.");
-            }
-          }
+                  "[StateMachine] AwaitForIn: Stream converted to list with ${items.length} items.");
 
-          // If we have an iterator (either created or resumed), we continue the loop
-          if (iterator != null && lastResult is! AsyncSuspensionRequest) {
-            bool hasNext;
-            try {
-              hasNext = iterator.moveNext();
-            } catch (e, s) {
-              Logger.warn(
-                  "[StateMachine] Error during iterator.moveNext(): $e\n$s");
-              throw RuntimeError("Error during iteration: $e");
-            }
-
-            if (hasNext) {
-              // Next item available
-              final currentItem = iterator.current;
-              Logger.debug("[StateMachine] ForIn: Got next item: $currentItem");
-
+              // Set up the loop variable environment
               if (parts is ForEachPartsWithDeclaration) {
                 final loopVariable = parts.loopVariable;
-                // Create a dedicated environment for the loop if it hasn't been done yet
-                if (currentState.loopEnvironmentStack.isEmpty) {
-                  final newLoopEnvironment =
-                      Environment(enclosing: currentState.environment);
-                  currentState.forLoopEnvironment = newLoopEnvironment;
-                  currentState.loopEnvironmentStack.add(newLoopEnvironment);
-                  currentState.loopNodeStack
-                      .add(forNode); // Track ForStatement for for-in loops too
-                }
-                visitor.environment = currentState.loopEnvironmentStack.last;
-                // Define the loop variable in this environment
-                currentState.loopEnvironmentStack.last
-                    .define(loopVariable.name.lexeme, currentItem);
-              } else if (parts is ForEachPartsWithIdentifier) {
-                // No declaration, assign in the current environment
-                currentState.environment
-                    .assign(parts.identifier.name, currentItem);
-                // Ensure we don't use a residual loop environment
-                currentState.forLoopEnvironment = null;
-                visitor.environment = currentState.environment;
-              } else {
-                throw StateError(
-                    "Unknown ForEachParts type: \\${parts.runtimeType}");
+                visitor.environment.define(loopVariable.name.lexeme, null);
               }
 
-              // The next state is the body of the loop
-              Logger.debug(
-                  "[StateMachine] ForIn: Next node is body: \\${forNode.body.runtimeType}");
-              if (forNode.body is Block) {
-                currentNode = (forNode.body as Block).statements.firstOrNull;
-              } else {
-                currentNode = forNode.body;
-              }
-              currentState.nextStateIdentifier = currentNode;
-              continue; // Restart the state machine loop with the beginning of the body
-            } else {
-              // End of iteration
-              Logger.debug(
-                  "[StateMachine] ForIn: Iteration finished. Finding node after loop. (forNode: \\${forNode.runtimeType}, parent: \\${forNode.parent?.runtimeType}, env: \\${visitor.environment.hashCode})");
-              currentState.currentForInIterator = null; // Clean the iterator
-              // Clean the loop environment if it existed
-              currentState.forLoopEnvironment = null;
-              if (currentState.loopEnvironmentStack.isNotEmpty) {
-                currentState.loopEnvironmentStack.removeLast();
-              }
-              if (currentState.loopNodeStack.isNotEmpty) {
-                currentState.loopNodeStack.removeLast();
-              }
-              visitor.environment = currentState.environment;
-              currentNode = _findNextSequentialNode(visitor, forNode);
-              Logger.debug(
-                  "[StateMachine] ForIn: After _findNextSequentialNode, currentNode: \\${currentNode?.runtimeType}, parent: \\${currentNode?.parent?.runtimeType}");
-              currentState.nextStateIdentifier = currentNode;
-              continue; // Restart the state machine loop
+              // Continue to process the first item
             }
-          }
-          // If the iterable evaluation was suspended, lastResult contains
-          // AsyncSuspensionRequest and will be handled by the logic below.
+
+            // Process the current item if we have the list
+            if (currentState.currentAwaitForList != null) {
+              final items = currentState.currentAwaitForList!;
+              final currentIndex = currentState.currentAwaitForIndex ?? 0;
+
+              if (currentIndex < items.length) {
+                // Process current item
+                final currentItem = items[currentIndex];
+                Logger.debug(
+                    "[StateMachine] AwaitForIn: Processing item $currentIndex: $currentItem");
+
+                if (parts is ForEachPartsWithDeclaration) {
+                  visitor.environment
+                      .assign(parts.loopVariable.name.lexeme, currentItem);
+                } else if (parts is ForEachPartsWithIdentifier) {
+                  visitor.environment
+                      .assign(parts.identifier.name, currentItem);
+                }
+
+                // Execute the body synchronously for this item
+                Logger.debug(
+                    "[StateMachine] AwaitForIn: Executing body for item $currentIndex");
+                try {
+                  if (forNode.body is Block) {
+                    for (final stmt in (forNode.body as Block).statements) {
+                      final result = stmt.accept<Object?>(visitor);
+                      if (result is AsyncSuspensionRequest) {
+                        // If the body has an async operation, we need to suspend
+                        Logger.debug(
+                            "[StateMachine] AwaitForIn: Body suspended during item $currentIndex");
+                        lastResult = result;
+                        break; // Exit and let the suspension logic handle this
+                      }
+                    }
+                  } else {
+                    final result = forNode.body.accept<Object?>(visitor);
+                    if (result is AsyncSuspensionRequest) {
+                      Logger.debug(
+                          "[StateMachine] AwaitForIn: Body suspended during item $currentIndex");
+                      lastResult = result;
+                    }
+                  }
+
+                  // If no suspension occurred, move to next item
+                  if (lastResult is! AsyncSuspensionRequest) {
+                    currentState.currentAwaitForIndex = currentIndex + 1;
+                    // Continue with the next item (loop back to the start of this if block)
+                    continue;
+                  }
+                } catch (e) {
+                  // Clean up and rethrow
+                  currentState.currentAwaitForList = null;
+                  currentState.currentAwaitForIndex = null;
+                  rethrow;
+                }
+              } else {
+                // End of iteration
+                Logger.debug("[StateMachine] AwaitForIn: Iteration finished.");
+                currentState.currentAwaitForList = null;
+                currentState.currentAwaitForIndex = null;
+                currentNode = _findNextSequentialNode(visitor, forNode);
+                currentState.nextStateIdentifier = currentNode;
+                continue; // Restart the state machine loop
+              }
+            }
+          } else {
+            // Regular for-in loop handling
+            Iterator<Object?>? iterator = currentState.currentForInIterator;
+
+            // First time or resumed after the body?
+            if (iterator == null) {
+              // First time: evaluate the iterable and create the iterator
+              Logger.debug(
+                  " [StateMachine] Handling ForIn: Evaluating iterable.");
+              final iterableResult = parts.iterable.accept<Object?>(visitor);
+
+              // Handle if the iterable evaluation is suspended
+              if (iterableResult is AsyncSuspensionRequest) {
+                Logger.debug(
+                    "[StateMachine] ForIn iterable suspended. Waiting...");
+                lastResult = iterableResult;
+                // The suspension logic below will handle it.
+              } else if (iterableResult is Iterable) {
+                iterator = iterableResult.iterator;
+                currentState.currentForInIterator =
+                    iterator; // Save the iterator
+                Logger.debug("[StateMachine] ForIn: Iterator created.");
+              } else {
+                throw RuntimeError(
+                    "The value iterate over in a for-in loop must be an Iterable, but got ${iterableResult?.runtimeType}.");
+              }
+            }
+
+            // If we have an iterator (either created or resumed), we continue the loop
+            if (iterator != null && lastResult is! AsyncSuspensionRequest) {
+              bool hasNext;
+              try {
+                hasNext = iterator.moveNext();
+              } catch (e, s) {
+                Logger.warn(
+                    "[StateMachine] Error during iterator.moveNext(): $e\n$s");
+                throw RuntimeError("Error during iteration: $e");
+              }
+
+              if (hasNext) {
+                // Next item available
+                final currentItem = iterator.current;
+                Logger.debug(
+                    "[StateMachine] ForIn: Got next item: $currentItem");
+
+                if (parts is ForEachPartsWithDeclaration) {
+                  final loopVariable = parts.loopVariable;
+                  // Create a dedicated environment for the loop if it hasn't been done yet
+                  if (currentState.loopEnvironmentStack.isEmpty) {
+                    final newLoopEnvironment =
+                        Environment(enclosing: currentState.environment);
+                    currentState.forLoopEnvironment = newLoopEnvironment;
+                    currentState.loopEnvironmentStack.add(newLoopEnvironment);
+                    currentState.loopNodeStack.add(
+                        forNode); // Track ForStatement for for-in loops too
+                  }
+                  visitor.environment = currentState.loopEnvironmentStack.last;
+                  // Define the loop variable in this environment
+                  currentState.loopEnvironmentStack.last
+                      .define(loopVariable.name.lexeme, currentItem);
+                } else if (parts is ForEachPartsWithIdentifier) {
+                  // No declaration, assign in the current environment
+                  currentState.environment
+                      .assign(parts.identifier.name, currentItem);
+                  // Ensure we don't use a residual loop environment
+                  currentState.forLoopEnvironment = null;
+                  visitor.environment = currentState.environment;
+                } else {
+                  throw StateError(
+                      "Unknown ForEachParts type: \\${parts.runtimeType}");
+                }
+
+                // The next state is the body of the loop
+                Logger.debug(
+                    "[StateMachine] ForIn: Next node is body: \\${forNode.body.runtimeType}");
+                if (forNode.body is Block) {
+                  currentNode = (forNode.body as Block).statements.firstOrNull;
+                } else {
+                  currentNode = forNode.body;
+                }
+                currentState.nextStateIdentifier = currentNode;
+                continue; // Restart the state machine loop with the beginning of the body
+              } else {
+                // End of iteration
+                Logger.debug(
+                    "[StateMachine] ForIn: Iteration finished. Finding node after loop. (forNode: \\${forNode.runtimeType}, parent: \\${forNode.parent?.runtimeType}, env: \\${visitor.environment.hashCode})");
+                currentState.currentForInIterator = null; // Clean the iterator
+                // Clean the loop environment if it existed
+                currentState.forLoopEnvironment = null;
+                if (currentState.loopEnvironmentStack.isNotEmpty) {
+                  currentState.loopEnvironmentStack.removeLast();
+                }
+                if (currentState.loopNodeStack.isNotEmpty) {
+                  currentState.loopNodeStack.removeLast();
+                }
+                visitor.environment = currentState.environment;
+                currentNode = _findNextSequentialNode(visitor, forNode);
+                Logger.debug(
+                    "[StateMachine] ForIn: After _findNextSequentialNode, currentNode: \\${currentNode?.runtimeType}, parent: \\${currentNode?.parent?.runtimeType}");
+                currentState.nextStateIdentifier = currentNode;
+                continue; // Restart the state machine loop
+              }
+            }
+            // If the iterable evaluation was suspended, lastResult contains
+            // AsyncSuspensionRequest and will be handled by the logic below.
+          } // End of else block for regular for-in loops
         } else if (currentNode is ForStatement &&
             (currentNode.forLoopParts is ForPartsWithDeclarations ||
                 currentNode.forLoopParts is ForPartsWithExpression)) {
@@ -2863,6 +3053,38 @@ class InterpretedFunction implements Callable {
       }
     }
 
+    // Handle await for loops specifically
+    if (awaitContextNode is ForStatement &&
+        awaitContextNode.awaitKeyword != null) {
+      Logger.debug(
+          "[_determineNextNodeAfterAwait] Handling await for loop suspension.");
+
+      // If we just finished converting stream to list, set up the list and start iteration
+      if (state.awaitingStreamConversion == true) {
+        Logger.debug(
+            "[_determineNextNodeAfterAwait] Setting up await for list iteration.");
+        state.awaitingStreamConversion = false;
+        final List<Object?> items = futureResult as List<Object?>;
+        state.currentAwaitForList = items;
+        state.currentAwaitForIndex = 0;
+
+        final parts = awaitContextNode.forLoopParts as ForEachParts;
+        if (parts is ForEachPartsWithDeclaration) {
+          final loopVariable = parts.loopVariable;
+          visitor.environment.define(loopVariable.name.lexeme, null);
+        }
+
+        // Return the ForStatement itself to continue processing
+        return awaitContextNode;
+      } else {
+        // If we're in the middle of await for iteration but got suspended (e.g., body had async operation)
+        // Just continue back to the ForStatement to process next item
+        Logger.debug(
+            "[_determineNextNodeAfterAwait] Continuing await for iteration after body suspension.");
+        return awaitContextNode;
+      }
+    }
+
     Logger.warn(
         "_determineNextNodeAfterAwait - Unhandled await context: ${awaitContextNode.runtimeType} (suspension from: ${nodeThatCausedSuspension.runtimeType}). Stopping state machine.");
     return null; // Default stop state machine
@@ -3236,6 +3458,233 @@ class InterpretedFunction implements Callable {
       }
     }
     return (positionalArgs, namedArgs);
+  }
+
+  // Create a Stream for async* generator functions
+  Stream<Object?> _createAsyncGeneratorStream(InterpreterVisitor visitor,
+      Environment executionEnvironment, bool redirected) {
+    late StreamController<Object?> controller;
+
+    controller = StreamController<Object?>(onListen: () async {
+      try {
+        final previousVisitorEnv = visitor.environment;
+        final previousCurrentFunction = visitor.currentFunction;
+
+        try {
+          visitor.environment = executionEnvironment;
+          visitor.currentFunction = this;
+
+          if (isAbstract) {
+            controller.addError(RuntimeError(
+                "Cannot call abstract method '${_name ?? '<abstract>'}'."));
+            return;
+          }
+
+          final bodyToExecute = _body;
+          if (!redirected) {
+            if (bodyToExecute is BlockFunctionBody) {
+              // Simple implementation: execute the block and collect yields
+              await _executeGeneratorBlock(
+                  visitor, bodyToExecute.block.statements, controller);
+            } else if (bodyToExecute is ExpressionFunctionBody) {
+              final result = bodyToExecute.expression.accept<Object?>(visitor);
+              if (result is YieldValue) {
+                if (result.isYieldStar) {
+                  await _handleYieldStar(result.value, controller);
+                } else {
+                  controller.add(result.value);
+                }
+              }
+            } else if (bodyToExecute is EmptyFunctionBody) {
+              // Empty generator - no yields
+            }
+          }
+        } on ReturnException catch (_) {
+          // Generator completed with return
+        } finally {
+          visitor.environment = previousVisitorEnv;
+          visitor.currentFunction = previousCurrentFunction;
+        }
+      } catch (e, stackTrace) {
+        controller.addError(e, stackTrace);
+      } finally {
+        if (!controller.isClosed) controller.close();
+      }
+    });
+
+    return controller.stream;
+  }
+
+  // Create an Iterable for sync* generator functions
+  Iterable<Object?> _createSyncGeneratorIterable(InterpreterVisitor visitor,
+      Environment executionEnvironment, bool redirected) {
+    return _SyncGeneratorIterable(
+        this, visitor, executionEnvironment, redirected);
+  }
+
+  // Execute generator block and handle yields
+  Future<void> _executeGeneratorBlock(InterpreterVisitor visitor,
+      List<Statement> statements, StreamController<Object?> controller) async {
+    for (final statement in statements) {
+      try {
+        final result = statement.accept<Object?>(visitor);
+        if (result is YieldValue) {
+          if (result.isYieldStar) {
+            await _handleYieldStar(result.value, controller);
+          } else {
+            controller.add(result.value);
+          }
+        }
+      } on ReturnException catch (_) {
+        break; // Exit generator
+      } on BreakException catch (_) {
+        break; // Exit generator
+      } on ContinueException catch (_) {
+        continue; // Continue to next iteration
+      }
+    }
+  }
+
+  // Handle yield* expressions
+  Future<void> _handleYieldStar(
+      Object? value, StreamController<Object?> controller) async {
+    if (value is Stream) {
+      await for (final item in value) {
+        controller.add(item);
+      }
+    } else if (value is Iterable) {
+      for (final item in value) {
+        controller.add(item);
+      }
+    } else {
+      throw RuntimeError(
+          "yield* expression must be a Stream or Iterable, got ${value.runtimeType}");
+    }
+  }
+}
+
+// Iterable implementation for sync* generators
+class _SyncGeneratorIterable extends Iterable<Object?> {
+  final InterpretedFunction function;
+  final InterpreterVisitor visitor;
+  final Environment executionEnvironment;
+  final bool redirected;
+
+  _SyncGeneratorIterable(
+      this.function, this.visitor, this.executionEnvironment, this.redirected);
+
+  @override
+  Iterator<Object?> get iterator => _SyncGeneratorIterator(
+      function, visitor, executionEnvironment, redirected);
+}
+
+// Iterator implementation for sync* generators
+class _SyncGeneratorIterator implements Iterator<Object?> {
+  final InterpretedFunction function;
+  final InterpreterVisitor visitor;
+  final Environment executionEnvironment;
+  final bool redirected;
+
+  List<Object?>? _values;
+  int _currentIndex = -1;
+  bool _initialized = false;
+
+  _SyncGeneratorIterator(
+      this.function, this.visitor, this.executionEnvironment, this.redirected);
+
+  @override
+  Object? get current =>
+      (_currentIndex >= 0 && _values != null && _currentIndex < _values!.length)
+          ? _values![_currentIndex]
+          : null;
+
+  @override
+  bool moveNext() {
+    if (!_initialized) {
+      _initialized = true;
+      _values = _collectAllValues();
+    }
+
+    if (_values == null || _values!.isEmpty) {
+      return false;
+    }
+
+    _currentIndex++;
+    return _currentIndex < _values!.length;
+  }
+
+  List<Object?> _collectAllValues() {
+    final values = <Object?>[];
+    final previousVisitorEnv = visitor.environment;
+    final previousCurrentFunction = visitor.currentFunction;
+
+    try {
+      visitor.environment = executionEnvironment;
+      visitor.currentFunction = function;
+
+      if (function.isAbstract) {
+        throw RuntimeError(
+            "Cannot call abstract method '${function._name ?? '<abstract>'}'.");
+      }
+
+      final bodyToExecute = function._body;
+      if (!redirected) {
+        if (bodyToExecute is BlockFunctionBody) {
+          _executeGeneratorBlockSync(bodyToExecute.block.statements, values);
+        } else if (bodyToExecute is ExpressionFunctionBody) {
+          final result = bodyToExecute.expression.accept<Object?>(visitor);
+          if (result is YieldValue) {
+            if (result.isYieldStar) {
+              _handleYieldStarSync(result.value, values);
+            } else {
+              values.add(result.value);
+            }
+          }
+        } else if (bodyToExecute is EmptyFunctionBody) {
+          // Empty generator - no yields
+        }
+      }
+    } on ReturnException catch (_) {
+      // Generator completed with return
+    } finally {
+      visitor.environment = previousVisitorEnv;
+      visitor.currentFunction = previousCurrentFunction;
+    }
+
+    return values;
+  }
+
+  void _executeGeneratorBlockSync(
+      List<Statement> statements, List<Object?> values) {
+    for (final statement in statements) {
+      try {
+        final result = statement.accept<Object?>(visitor);
+        if (result is YieldValue) {
+          if (result.isYieldStar) {
+            _handleYieldStarSync(result.value, values);
+          } else {
+            values.add(result.value);
+          }
+        }
+      } on ReturnException catch (_) {
+        break; // Exit generator
+      } on BreakException catch (_) {
+        break; // Exit generator
+      } on ContinueException catch (_) {
+        continue; // Continue to next iteration
+      }
+    }
+  }
+
+  void _handleYieldStarSync(Object? value, List<Object?> values) {
+    if (value is Iterable) {
+      values.addAll(value);
+    } else if (value is Stream) {
+      throw RuntimeError("Cannot yield* a Stream in a sync* generator");
+    } else {
+      throw RuntimeError(
+          "yield* expression must be an Iterable, got ${value.runtimeType}");
+    }
   }
 }
 

@@ -167,6 +167,7 @@ class MapCore {
           'keys': (visitor, target) => (target as Map).keys,
           'values': (visitor, target) => (target as Map).values,
           'entries': (visitor, target) => (target as Map).entries,
+          'runtimeType': (visitor, target) => (target as Map).runtimeType,
         },
       );
 }

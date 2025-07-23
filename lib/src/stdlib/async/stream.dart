@@ -333,6 +333,15 @@ class StreamSubscriptionAsync {
         nativeType: StreamSubscription,
         name: 'StreamSubscription',
         typeParameterCount: 1,
+        nativeNames: [
+          '_ControllerSubscription',
+          '_BroadcastSubscription',
+          '_BufferingStreamSubscription',
+          '_StreamSubscriptionWrapper',
+          '_DoneStreamSubscription',
+          '_SingleSubscription',
+          '_EmptyStreamSubscription',
+        ],
         constructors: {},
         methods: {
           'cancel': (visitor, target, positionalArgs, namedArgs) =>

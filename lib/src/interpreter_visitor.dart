@@ -3128,11 +3128,25 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       _executeClassicFor(loopParts.initialization, loopParts.condition,
           loopParts.updaters, node.body);
     } else if (loopParts is ForEachPartsWithDeclaration) {
-      // For-in loop: for (var item in list)
-      _executeForIn(loopParts.loopVariable, loopParts.iterable, node.body);
+      // For-in loop: for (var item in list) or await for (var item in stream)
+      if (node.awaitKeyword != null) {
+        // await for loop - expect Stream
+        return _executeAwaitForIn(
+            loopParts.loopVariable, loopParts.iterable, node.body);
+      } else {
+        // Regular for-in loop - expect Iterable
+        _executeForIn(loopParts.loopVariable, loopParts.iterable, node.body);
+      }
     } else if (loopParts is ForEachPartsWithIdentifier) {
-      // For-in loop: for (item in list)
-      _executeForIn(loopParts.identifier, loopParts.iterable, node.body);
+      // For-in loop: for (item in list) or await for (item in stream)
+      if (node.awaitKeyword != null) {
+        // await for loop - expect Stream
+        return _executeAwaitForIn(
+            loopParts.identifier, loopParts.iterable, node.body);
+      } else {
+        // Regular for-in loop - expect Iterable
+        _executeForIn(loopParts.identifier, loopParts.iterable, node.body);
+      }
     } else {
       // Should not happen with valid Dart code
       throw StateError('Unknown ForLoopParts type: ${loopParts.runtimeType}');
@@ -3314,6 +3328,116 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     }
   }
 
+  // Helper method to execute the logic of an await for-in loop (for streams)
+  Object? _executeAwaitForIn(AstNode loopVariableOrIdentifier,
+      Expression iterableExpression, Statement body) {
+    final expressionValue = iterableExpression.accept<Object?>(this);
+
+    // Handle stream being BridgedInstance<Stream>
+    Object? streamValue;
+    if (toBridgedInstance(expressionValue).$2) {
+      final bridgedInstance = toBridgedInstance(expressionValue).$1!;
+      if (bridgedInstance.nativeObject is Stream) {
+        streamValue = bridgedInstance.nativeObject;
+      } else {
+        throw RuntimeError(
+            'Value used in await for-in loop must be a Stream, but got BridgedInstance containing ${bridgedInstance.nativeObject.runtimeType}');
+      }
+    } else if (expressionValue is Stream) {
+      streamValue = expressionValue;
+    } else {
+      throw RuntimeError(
+          'Value used in await for-in loop must be a Stream, but got ${expressionValue?.runtimeType}');
+    }
+
+    if (streamValue is Stream) {
+      // Create a suspension request for converting the stream to a list first
+      if (currentAsyncState == null) {
+        throw RuntimeError(
+            "await for statement can only be used inside async functions");
+      }
+
+      // Convert the stream to a list first, then process it as a regular for-in loop
+      return AsyncSuspensionRequest(
+        _convertStreamAndProcessForIn(
+            loopVariableOrIdentifier, streamValue, body),
+        currentAsyncState!,
+      );
+    } else {
+      // Should not happen after the check above
+      throw StateError(
+          'Internal error: Expected Stream but got ${streamValue.runtimeType}');
+    }
+  }
+
+  // Convert stream to list and then process as regular for-in loop
+  Future<Object?> _convertStreamAndProcessForIn(
+      AstNode loopVariableOrIdentifier,
+      Stream<Object?> stream,
+      Statement body) async {
+    // Convert stream to list
+    final List<Object?> items = await stream.toList();
+
+    // Now process as a regular for-in loop with the list
+    _executeForInWithItems(loopVariableOrIdentifier, items, body);
+
+    return null; // await for loops don't produce a value
+  }
+
+  // Execute for-in loop with a list of items (reused logic from _executeForIn)
+  void _executeForInWithItems(
+      AstNode loopVariableOrIdentifier, List<Object?> items, Statement body) {
+    // Don't create a new environment - use the current one to preserve access to local variables
+    String variableName;
+    if (loopVariableOrIdentifier is DeclaredIdentifier) {
+      variableName = loopVariableOrIdentifier.name.lexeme;
+      // Define the loop variable in the current environment
+      environment.define(variableName, null);
+    } else if (loopVariableOrIdentifier is SimpleIdentifier) {
+      variableName = loopVariableOrIdentifier.name;
+      try {
+        environment.get(variableName); // Check existence
+      } catch (e) {
+        throw RuntimeError(
+            "Variable '$variableName' for for-in loop is not defined.");
+      }
+    } else {
+      throw StateError(
+          'Unexpected for-in loop variable type: ${loopVariableOrIdentifier.runtimeType}');
+    }
+
+    // Iterate over the items
+    for (final element in items) {
+      // Assign current element to the loop variable
+      environment.assign(variableName, element);
+
+      // Execute the body
+      try {
+        body.accept<Object?>(this);
+      } on BreakException catch (e) {
+        Logger.debug(
+            "[AwaitForIn] Caught BreakException (label: ${e.label}) with current labels: $_currentStatementLabels");
+        if (e.label == null || _currentStatementLabels.contains(e.label)) {
+          Logger.debug("[AwaitForIn] Breaking loop.");
+          break; // Exit the for-in loop
+        } else {
+          Logger.debug("[AwaitForIn] Rethrowing outer break...");
+          rethrow;
+        }
+      } on ContinueException catch (e) {
+        Logger.debug(
+            "[AwaitForIn] Caught ContinueException (label: ${e.label}) with current labels: $_currentStatementLabels");
+        if (e.label == null || _currentStatementLabels.contains(e.label)) {
+          Logger.debug("[AwaitForIn] Continuing loop.");
+          continue; // Go to the next element
+        } else {
+          Logger.debug("[AwaitForIn] Rethrowing outer continue...");
+          rethrow;
+        }
+      }
+    }
+  }
+
   // Add handler for VariableDeclarationList used in ForPartsWithDeclarations
   @override
   Object? visitVariableDeclarationList(VariableDeclarationList node) {
@@ -3388,6 +3512,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     Logger.debug(
         "[ContinueStatement] Throwing ContinueException (label: $label)");
     throw ContinueException(label);
+  }
+
+  @override
+  Object? visitYieldStatement(YieldStatement node) {
+    final value = node.expression.accept<Object?>(this);
+    Logger.debug(
+        "[YieldStatement] Yielding value: $value (star: ${node.star != null})");
+    return YieldValue(value, isYieldStar: node.star != null);
   }
 
   @override
@@ -6135,6 +6267,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           break;
         case 'List':
           result = expressionValue is List;
+          break;
+        case 'Map':
+          result = expressionValue is Map;
           break;
         case 'Null':
           result = expressionValue == null;

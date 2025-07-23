@@ -14,7 +14,8 @@ class IterableCore {
           '_CompactValuesIterable',
           '_SplayTreeKeyIterable',
           '_SplayTreeValueIterable',
-          '_AllMatchesIterable'
+          '_AllMatchesIterable',
+          '_SyncGeneratorIterable',
         ],
         staticMethods: {
           'generate': (visitor, positionalArgs, namedArgs) {

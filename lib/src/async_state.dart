@@ -77,6 +77,11 @@ class AsyncExecutionState {
   /// When true, await expressions should return the last resolved value instead of suspending
   bool isInvocationResumptionMode = false;
 
+  /// Fields for await for loop processing
+  List<Object?>? currentAwaitForList;
+  int? currentAwaitForIndex;
+  bool awaitingStreamConversion = false;
+
   AsyncExecutionState({
     required this.environment,
     required this.completer,
