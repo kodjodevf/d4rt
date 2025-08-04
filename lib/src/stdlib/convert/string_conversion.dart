@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class StringConversionConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StringConversionSink,
         name: 'StringConversionSink',
         typeParameterCount: 0,

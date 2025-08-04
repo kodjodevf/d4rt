@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class ObjectCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Object,
         name: 'Object',
         typeParameterCount: 0,

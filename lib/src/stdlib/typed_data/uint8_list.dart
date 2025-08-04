@@ -14,7 +14,7 @@ T? _runAction<T>(InterpreterVisitor visitor, InterpretedFunction? function,
 }
 
 class Uint8ListTypedData {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         name: 'Uint8List',
         nativeType: Uint8List,
         nativeNames: ['_Uint8ArrayView'],

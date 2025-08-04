@@ -3190,7 +3190,7 @@ void main() {
     setUp(() {
       interpreter = D4rt();
       interpreter.registerBridgedClass(
-          BridgedClassDefinition(
+          BridgedClass(
             nativeType: DummyNative,
             name: 'Dummy',
             constructors: {'': (v, p, n) => DummyNative()},

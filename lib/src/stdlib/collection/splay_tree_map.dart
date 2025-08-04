@@ -2,7 +2,7 @@ import 'dart:collection';
 import 'package:d4rt/d4rt.dart';
 
 class SplayTreeMapCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: SplayTreeMap,
         name: 'SplayTreeMap',
         typeParameterCount: 2,

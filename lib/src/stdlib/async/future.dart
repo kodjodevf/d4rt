@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:d4rt/d4rt.dart';
 
 class FutureAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Future,
         name: 'Future',
         typeParameterCount: 1, // Future<T>

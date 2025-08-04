@@ -3,7 +3,7 @@ import 'package:d4rt/d4rt.dart';
 
 dynamic execute(String source, {Object? args}) {
   final d4rt = D4rt();
-  d4rt.setDebug(true);
+  d4rt.setDebug(false);
   return d4rt.execute(
       library: 'package:test/main.dart',
       args: args,

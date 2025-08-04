@@ -1,3 +1,6 @@
+## 0.1.1
+- BREAKING CHANGE: BridgedClassDefinition has been removed and replaced with BridgedClass
+
 ## 0.1.0
 - Added runtime checks for generic type constraints.
 - Added support for compound bitwise assignment operators (&=, |=, etc.).

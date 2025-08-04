@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:d4rt/d4rt.dart';
 
 class PointMath {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Point,
         name: 'Point',
         typeParameterCount: 1, // Point<T extends num>

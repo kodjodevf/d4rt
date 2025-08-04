@@ -199,20 +199,19 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
         } else {
           Logger.warn(
               "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeName' resolved to non-RuntimeType: $resolvedType. Using placeholder.");
-          declaredReturnType = BridgedClass(Object, name: typeName);
+          declaredReturnType = BridgedClass(nativeType: Object, name: typeName);
         }
       } on RuntimeError catch (e) {
         Logger.warn(
             "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeName' not found in environment (RuntimeError: ${e.message}). Using placeholder.");
-        declaredReturnType = BridgedClass(Object, name: typeName);
+        declaredReturnType = BridgedClass(nativeType: Object, name: typeName);
       }
     } else if (returnTypeNode == null) {
-      declaredReturnType = BridgedClass(Object,
-          name: 'dynamic'); // Default to dynamic if no type
+      declaredReturnType = BridgedClass(nativeType: Object, name: 'dynamic');
     } else {
       // For other TypeAnnotation types, use a generic placeholder
       declaredReturnType =
-          BridgedClass(Object, name: 'unknown_type_placeholder');
+          BridgedClass(nativeType: Object, name: 'unknown_type_placeholder');
     }
 
     bool isNullable = returnTypeNode?.question != null; // Check for 'A?'

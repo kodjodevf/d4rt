@@ -2,7 +2,7 @@ import 'dart:collection';
 import 'package:d4rt/d4rt.dart';
 
 class QueueCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Queue,
         name: 'Queue',
         typeParameterCount: 1,

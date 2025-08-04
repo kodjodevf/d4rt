@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class LineSplitterConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: LineSplitter,
         name: 'LineSplitter',
         typeParameterCount: 0,

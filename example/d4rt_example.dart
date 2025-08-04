@@ -19,7 +19,7 @@ class User {
   String greet({String? prefix}) => '${prefix ?? 'Hi'}, $name!';
 }
 
-final userBridge = BridgedClassDefinition(
+final userBridge = BridgedClass(
   nativeType: User,
   name: 'User',
   constructors: {

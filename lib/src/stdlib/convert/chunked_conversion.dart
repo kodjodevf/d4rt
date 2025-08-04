@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class ChunkedConversionConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: ChunkedConversionSink,
         name: 'ChunkedConversionSink',
         typeParameterCount: 1,

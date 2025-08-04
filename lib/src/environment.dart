@@ -27,8 +27,7 @@ class Environment {
     _values[name] = value;
   }
 
-  void defineBridge(BridgedClassDefinition definition) {
-    final bridgedClass = definition.buildBridgedClass();
+  void defineBridge(BridgedClass bridgedClass) {
     final name = bridgedClass.name;
 
     if (_values.containsKey(name) ||

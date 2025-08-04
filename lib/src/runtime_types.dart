@@ -362,7 +362,7 @@ class InterpretedClass implements Callable, RuntimeType {
     List<RuntimeType> effective;
     if (providedTypeArguments == null || providedTypeArguments.isEmpty) {
       effective = List.generate(typeParameterNames.length,
-          (_) => BridgedClass(Object, name: 'dynamic'));
+          (_) => BridgedClass(nativeType: Object, name: 'dynamic'));
     } else if (providedTypeArguments.length != typeParameterNames.length) {
       throw RuntimeError(
           "Class '$name' requires ${typeParameterNames.length} type argument(s), but ${providedTypeArguments.length} were provided.");
@@ -728,7 +728,7 @@ class InterpretedClass implements Callable, RuntimeType {
   /// This considers inheritance (extends), mixin application (with),
   /// and interface implementation (implements).
   @override
-  bool isSubtypeOf(RuntimeType other) {
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
     if (other is InterpretedClass) {
       // Check for identity (reflexive)
       if (this == other) return true;
@@ -1360,7 +1360,7 @@ class InterpretedEnum implements RuntimeType {
 
   // Implement isSubtypeOf
   @override
-  bool isSubtypeOf(RuntimeType other) {
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
     // An enum is a subtype of itself and Object.
     // For now, we don't handle complex type hierarchies involving enums.
     // We might need to look up 'Object' in the environment later.

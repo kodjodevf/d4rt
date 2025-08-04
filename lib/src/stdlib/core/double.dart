@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class DoubleCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: double,
         name: 'double',
         typeParameterCount: 0,

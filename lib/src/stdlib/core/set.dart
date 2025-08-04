@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class SetCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Set,
         name: 'Set',
         typeParameterCount: 1,

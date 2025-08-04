@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'package:d4rt/d4rt.dart';
 
 class HashSetCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: HashSet,
         name: 'HashSet',
         typeParameterCount: 1,

@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class NumCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: num,
         name: 'num',
         typeParameterCount: 0,

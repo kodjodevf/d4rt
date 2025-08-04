@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
 
 class DirectoryIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Directory,
         name: 'Directory',
         typeParameterCount: 0,

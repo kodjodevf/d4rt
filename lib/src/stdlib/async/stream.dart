@@ -12,7 +12,7 @@ FutureOr<T> _runAction<T>(
 }
 
 class StreamAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Stream,
         name: 'Stream',
         typeParameterCount: 1,
@@ -329,7 +329,7 @@ class StreamAsync {
 }
 
 class StreamSubscriptionAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StreamSubscription,
         name: 'StreamSubscription',
         typeParameterCount: 1,
@@ -398,7 +398,7 @@ class StreamSubscriptionAsync {
 }
 
 class StreamControllerAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StreamController,
         name: 'StreamController',
         typeParameterCount: 1,
@@ -536,7 +536,7 @@ class StreamControllerAsync {
 }
 
 class StreamSinkAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StreamSink,
         name: 'StreamSink',
         typeParameterCount: 1,
@@ -575,7 +575,7 @@ class StreamSinkAsync {
 }
 
 class StreamTransformerAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StreamTransformer,
         name: 'StreamTransformer',
         typeParameterCount: 2,

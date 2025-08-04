@@ -114,7 +114,7 @@ void main() {
       NativeCounter._staticCounter = 0;
 
       // 2. Definition of the bridged class for NativeCounter
-      final counterDefinition = BridgedClassDefinition(
+      final counterDefinition = BridgedClass(
         nativeType: NativeCounter,
         name: 'Counter', // Name in the interpreter
         constructors: {
@@ -309,7 +309,7 @@ void main() {
           counterDefinition, 'package:test/counter.dart');
 
       // 3. Definition of the bridge for AsyncProcessor
-      final asyncProcessorDefinition = BridgedClassDefinition(
+      final asyncProcessorDefinition = BridgedClass(
         nativeType: AsyncProcessor,
         name: 'AsyncProcessor', // Name in the interpreter
         constructors: {

@@ -18,10 +18,10 @@ import 'package:d4rt/src/bridge/registration.dart';
 
 class D4rt {
   final List<Map<String, BridgedEnumDefinition>> _bridgedEnumDefinitions = [];
-  final List<Map<String, BridgedClassDefinition>> _bridgedClassDefinitions = [];
+  final List<Map<String, BridgedClass>> _bridgedClases = [];
   InterpretedInstance? _interpretedInstance;
   InterpreterVisitor? _visitor;
-  final Map<Type, BridgedClassDefinition> _bridgedDefLookupByType = {};
+  final Map<Type, BridgedClass> _bridgedDefLookupByType = {};
   InterpreterVisitor? get visitor => _visitor;
   final List<NativeFunction> _nativeFunctions = [];
 
@@ -31,8 +31,8 @@ class D4rt {
     _bridgedEnumDefinitions.add({library: definition});
   }
 
-  void registerBridgedClass(BridgedClassDefinition definition, String library) {
-    _bridgedClassDefinitions.add({library: definition});
+  void registerBridgedClass(BridgedClass definition, String library) {
+    _bridgedClases.add({library: definition});
     _bridgedDefLookupByType[definition.nativeType] = definition;
   }
 
@@ -41,8 +41,8 @@ class D4rt {
   }
 
   ModuleLoader _initModule(Map<String, String>? sources) {
-    final moduleLoader = ModuleLoader(Environment(), sources ?? {},
-        _bridgedEnumDefinitions, _bridgedClassDefinitions);
+    final moduleLoader = ModuleLoader(
+        Environment(), sources ?? {}, _bridgedEnumDefinitions, _bridgedClases);
     _visitor = InterpreterVisitor(
         globalEnvironment: moduleLoader.globalEnvironment,
         moduleLoader: moduleLoader);

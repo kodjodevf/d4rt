@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/bridge/registration.dart';
+import 'package:d4rt/d4rt.dart';
 
 class JsonCodecConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: JsonCodec,
         name: 'JsonCodec',
         typeParameterCount: 0,
@@ -60,7 +58,7 @@ class JsonCodecConvert {
 }
 
 class JsonEncoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: JsonEncoder,
         name: 'JsonEncoder',
         typeParameterCount: 0,
@@ -116,7 +114,7 @@ class JsonEncoderConvert {
 }
 
 class JsonDecoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: JsonDecoder,
         name: 'JsonDecoder',
         typeParameterCount: 0,

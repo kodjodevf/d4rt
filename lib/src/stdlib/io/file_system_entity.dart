@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:d4rt/d4rt.dart';
 
 class FileSystemEntityIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: FileSystemEntity,
         name: 'FileSystemEntity',
         typeParameterCount: 0,
@@ -155,7 +155,7 @@ class FileSystemEntityIo {
 }
 
 class FileStatIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: FileStat,
         name: 'FileStat',
         typeParameterCount: 0,
@@ -179,7 +179,7 @@ class FileStatIo {
 }
 
 class FileSystemEntityTypeIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: FileSystemEntityType,
         name: 'FileSystemEntityType',
         typeParameterCount: 0,
@@ -195,7 +195,7 @@ class FileSystemEntityTypeIo {
 }
 
 class FileSystemEventIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: FileSystemEvent,
         name: 'FileSystemEvent',
         typeParameterCount: 0,

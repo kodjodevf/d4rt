@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
 
 class ByteDataTypedData {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         name: 'ByteData',
         nativeType: ByteData,
         typeParameterCount: 0,

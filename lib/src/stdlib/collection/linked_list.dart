@@ -2,7 +2,7 @@ import 'dart:collection';
 import 'package:d4rt/d4rt.dart';
 
 class LinkedListCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: LinkedList,
         name: 'LinkedList',
         typeParameterCount: 0,
@@ -117,7 +117,7 @@ final class BridgedLinkedListEntry
 }
 
 class LinkedListEntryCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: BridgedLinkedListEntry,
         name: 'LinkedListEntry',
         typeParameterCount: 0,

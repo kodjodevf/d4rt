@@ -74,7 +74,7 @@ class MyClass {
   int doubleValue() => value * 2;
 }
 
-final myClassBridge = BridgedClassDefinition(
+final myClassBridge = BridgedClass(
   nativeType: MyClass,
   name: 'MyClass',
   constructors: {

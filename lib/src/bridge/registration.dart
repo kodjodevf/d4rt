@@ -1,4 +1,3 @@
-import 'bridged_types.dart';
 import '../interpreter_visitor.dart'; // Import InterpreterVisitor for adapters
 import 'bridged_enum.dart';
 
@@ -58,83 +57,6 @@ typedef BridgedInstanceGetterAdapter = Object? Function(
 typedef BridgedInstanceSetterAdapter = void Function(
     InterpreterVisitor? visitor, Object target, Object? value);
 
-class BridgedClassDefinition {
-  final Type nativeType;
-  final String name;
-
-  /// Additional native class names that should map to this bridged class.
-  /// This is essential for mapping Dart's internal implementation classes to their public interfaces.
-  ///
-  /// For example, Stream has many internal implementations like '_MultiStream', '_ControllerStream',
-  /// '_BroadcastStream', etc. When the interpreter encounters these native objects at runtime,
-  /// it needs to know they should be treated as 'Stream' instances.
-  ///
-  /// Without nativeNames:
-  /// - runtime error: "No registered bridged class found for native type _MultiStream"
-  ///
-  /// With nativeNames: ['_MultiStream', '_ControllerStream', ...]:
-  /// - The environment can map these internal types to the Stream bridge
-  /// - Methods like toList(), listen(), etc. become available on these objects
-  ///
-  /// Used by Environment.toBridgedClass() to perform fallback lookups when
-  /// the exact nativeType doesn't match any registered bridge.
-  final List<String>? nativeNames;
-  // Number of expected type parameters
-  final int typeParameterCount;
-
-  // Support for mixin usage
-  final bool canBeUsedAsMixin;
-
-  // Adapters for constructors (key: constructor name, '' for default)
-  final Map<String, BridgedConstructorCallable> constructors;
-
-  // Adapters for static methods
-  final Map<String, BridgedStaticMethodAdapter> staticMethods;
-  // Adapters for static getters/setters
-  final Map<String, BridgedStaticGetterAdapter> staticGetters;
-  final Map<String, BridgedStaticSetterAdapter> staticSetters;
-
-  // Adapters for instance methods
-  final Map<String, BridgedMethodAdapter> methods;
-  // Instance getters
-  final Map<String, BridgedInstanceGetterAdapter> getters;
-  // Instance setters
-  final Map<String, BridgedInstanceSetterAdapter> setters;
-
-  BridgedClassDefinition({
-    required this.nativeType,
-    required this.name,
-    this.nativeNames,
-    this.typeParameterCount = 0,
-    this.canBeUsedAsMixin = false,
-    this.constructors = const {},
-    this.staticMethods = const {},
-    this.staticGetters = const {},
-    this.staticSetters = const {},
-    this.methods = const {},
-    this.getters = const {},
-    this.setters = const {},
-  });
-
-  // Method to create the actual BridgedClass object from this definition
-  BridgedClass buildBridgedClass() {
-    final bridgedClass = BridgedClass(nativeType,
-        name: name,
-        nativeNames: nativeNames,
-        typeParameterCount: typeParameterCount,
-        canBeUsedAsMixin: canBeUsedAsMixin);
-    // Copy ALL adapters
-    bridgedClass.constructorAdapters = constructors;
-    bridgedClass.instanceMethodAdapters = methods;
-    bridgedClass.staticMethodAdapters = staticMethods;
-    bridgedClass.staticGetterAdapters = staticGetters;
-    bridgedClass.staticSetterAdapters = staticSetters;
-    bridgedClass.instanceGetterAdapters = getters;
-    bridgedClass.instanceSetterAdapters = setters;
-    return bridgedClass;
-  }
-}
-
 class BridgedEnumDefinition<T extends Enum> {
   /// The name under which the enum will be known in the interpreter.
   final String name;
@@ -171,8 +93,8 @@ class BridgedEnumDefinition<T extends Enum> {
     final bridgedValues = <String, BridgedEnumValue>{};
 
     // Share instance adapters with all created values
-    placeholderEnum.instanceGetterAdapters = getters;
-    placeholderEnum.instanceMethodAdapters = methods;
+    placeholderEnum.getters = getters;
+    placeholderEnum.methods = methods;
 
     for (final nativeValue in values) {
       final valueName = nativeValue.name; // Use the .name getter of Dart enums
@@ -196,8 +118,8 @@ class BridgedEnumDefinition<T extends Enum> {
     final bridgedEnum = BridgedEnum(name, bridgedValues);
 
     // Copy adapters into the final instance as well
-    bridgedEnum.instanceGetterAdapters = getters;
-    bridgedEnum.instanceMethodAdapters = methods;
+    bridgedEnum.getters = getters;
+    bridgedEnum.methods = methods;
 
     final finalBridgedValues = <String, BridgedEnumValue>{};
     for (final nativeValue in values) {

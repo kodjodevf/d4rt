@@ -27,12 +27,12 @@ class ModuleLoader {
   final Map<String, String> sources;
   final Map<Uri, LoadedModule> _moduleCache = {};
   final List<Map<String, BridgedEnumDefinition>> bridgedEnumDefinitions;
-  final List<Map<String, BridgedClassDefinition>> bridgedClassDefinitions;
+  final List<Map<String, BridgedClass>> bridgedClases;
   Uri?
       currentlibrary; // Keep for the initial relative URI resolution in _fetchModuleSource and for relative imports
 
   ModuleLoader(this.globalEnvironment, this.sources,
-      this.bridgedEnumDefinitions, this.bridgedClassDefinitions) {
+      this.bridgedEnumDefinitions, this.bridgedClases) {
     Logger.debug(
         "[ModuleLoader] Initialized with ${sources.length} preloaded sources.");
   }
@@ -238,8 +238,7 @@ class ModuleLoader {
             "Dart library '${uri.toString()}' not supported.");
       }
     }
-    if (bridgedClassDefinitions.isNotEmpty ||
-        bridgedEnumDefinitions.isNotEmpty) {
+    if (bridgedClases.isNotEmpty || bridgedEnumDefinitions.isNotEmpty) {
       for (var bridgedEnumDefinition in bridgedEnumDefinitions) {
         if (bridgedEnumDefinition.containsKey(uriString)) {
           final definition = bridgedEnumDefinition[uriString]!;
@@ -256,9 +255,9 @@ class ModuleLoader {
         }
       }
 
-      for (var bridgedClassDefinition in bridgedClassDefinitions) {
-        if (bridgedClassDefinition.containsKey(uriString)) {
-          final definition = bridgedClassDefinition[uriString]!;
+      for (var bridgedClass in bridgedClases) {
+        if (bridgedClass.containsKey(uriString)) {
+          final definition = bridgedClass[uriString]!;
           try {
             globalEnvironment.defineBridge(definition);
             Logger.debug(

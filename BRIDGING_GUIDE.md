@@ -9,7 +9,7 @@ This guide provides a comprehensive overview of how to bridge your native Dart c
   - [Basic Enum Bridging](#basic-enum-bridging)
   - [Advanced Enum Bridging (with Getters and Methods)](#advanced-enum-bridging)
 - [Bridging Classes](#bridging-classes)
-  - [Core Concepts: `BridgedClassDefinition`](#core-concepts-bridgedclassdefinition)
+  - [Core Concepts: `BridgedClass`](#core-concepts-BridgedClass)
   - [Registering Bridged Classes](#registering-bridged-classes)
   - [Bridging Constructors](#bridging-constructors)
     - [Default Constructor](#default-constructor)
@@ -189,11 +189,11 @@ main() {
 
 Bridging classes allows your interpreted scripts to instantiate and interact with your native Dart objects.
 
-### Core Concepts: `BridgedClassDefinition`
+### Core Concepts: `BridgedClass`
 
-The `BridgedClassDefinition` is the cornerstone for bridging classes. It describes how a native Dart class should be exposed to the interpreter, including its constructors, static members, and instance members.
+The `BridgedClass` is the cornerstone for bridging classes. It describes how a native Dart class should be exposed to the interpreter, including its constructors, static members, and instance members.
 
-Key properties of `BridgedClassDefinition`:
+Key properties of `BridgedClass`:
 -   `nativeType`: The `Type` object of the native Dart class (e.g., `MyNativeClass`).
 -   `name`: The name by which the class will be known in the d4rt script (e.g., `'MyBridgedClass'`).
 -   `constructors`: A map of constructor adapters.
@@ -207,7 +207,7 @@ Similar to enums, bridged classes are registered with an interpreter instance, t
 ```dart
 // Bridge setup code
 // Assume NativeCounter class is defined
-final counterDefinition = BridgedClassDefinition(
+final counterDefinition = BridgedClass(
   nativeType: NativeCounter,
   name: 'Counter',
   // ... constructor and member definitions ...
@@ -244,7 +244,7 @@ class NativeLogger {
 }
 
 // Bridge Definition
-final loggerDefinition = BridgedClassDefinition(
+final loggerDefinition = BridgedClass(
   nativeType: NativeLogger,
   name: 'Logger',
   constructors: {
@@ -277,7 +277,7 @@ class User {
 }
 
 // Bridge Definition
-final userDefinition = BridgedClassDefinition(
+final userDefinition = BridgedClass(
   nativeType: User,
   name: 'User',
   constructors: {
@@ -461,7 +461,7 @@ class AsyncService {
 }
 
 // Bridge Definition (partial)
-final asyncServiceDefinition = BridgedClassDefinition(
+final asyncServiceDefinition = BridgedClass(
   nativeType: AsyncService,
   name: 'AsyncService',
   constructors: { /* ... */ },
@@ -712,12 +712,12 @@ When your d4rt script creates a Stream using native methods, the actual object r
 
 ### The Solution: `nativeNames`
 
-The `nativeNames` parameter in `BridgedClassDefinition` solves this by providing a list of alternative class names that should be mapped to the same bridge:
+The `nativeNames` parameter in `BridgedClass` solves this by providing a list of alternative class names that should be mapped to the same bridge:
 
 ```dart
 // Example from Stream bridging
 class StreamAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
     nativeType: Stream,
     name: 'Stream',
     // Map all these internal Stream implementations to the same Stream bridge
@@ -774,7 +774,7 @@ You should consider using `nativeNames` when:
 // RuntimeError: No registered bridged class found for native type _MultiStream
 
 // With nativeNames:
-static BridgedClassDefinition get definition => BridgedClassDefinition(
+static BridgedClass get definition => BridgedClass(
   nativeType: Stream,
   name: 'Stream',
   nativeNames: ['_MultiStream', '_ControllerStream', /* ... */],
@@ -796,7 +796,7 @@ static BridgedClassDefinition get definition => BridgedClassDefinition(
 
 ```dart
 // Good example with documentation
-static BridgedClassDefinition get definition => BridgedClassDefinition(
+static BridgedClass get definition => BridgedClass(
   nativeType: Stream,
   name: 'Stream',
   // Internal Stream implementations discovered through testing:

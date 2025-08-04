@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
 
 class Float32ListTypedData {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         name: 'Float32List',
         nativeType: Float32List,
         typeParameterCount: 0,

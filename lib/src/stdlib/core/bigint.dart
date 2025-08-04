@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class BigIntCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: BigInt,
         name: 'BigInt',
         typeParameterCount: 0,

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class EncodingConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Encoding,
         name: 'Encoding',
         typeParameterCount: 0,

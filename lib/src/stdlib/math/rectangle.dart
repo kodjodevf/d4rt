@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:d4rt/d4rt.dart';
 
 class RectangleMath {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Rectangle,
         name: 'Rectangle',
         typeParameterCount: 1, // Rectangle<T extends num>

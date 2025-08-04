@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class AsciiCodecConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: AsciiCodec,
         name: 'AsciiCodec',
         typeParameterCount: 0,
@@ -52,7 +52,7 @@ class AsciiCodecConvert {
 }
 
 class AsciiEncoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: AsciiEncoder,
         name: 'AsciiEncoder',
         typeParameterCount: 0,
@@ -114,7 +114,7 @@ class AsciiEncoderConvert {
 }
 
 class AsciiDecoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: AsciiDecoder,
         name: 'AsciiDecoder',
         typeParameterCount: 0,

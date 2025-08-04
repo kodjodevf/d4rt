@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
 
 class Int16ListTypedData {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         name: 'Int16List',
         nativeType: Int16List,
         typeParameterCount: 0,

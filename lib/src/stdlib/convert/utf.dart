@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/bridge/registration.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
+import 'package:d4rt/d4rt.dart';
 
 class Utf8CodecConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Utf8Codec,
         name: 'Utf8Codec',
         typeParameterCount: 0,
@@ -50,7 +48,7 @@ class Utf8CodecConvert {
 }
 
 class Utf8EncoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Utf8Encoder,
         name: 'Utf8Encoder',
         typeParameterCount: 0,
@@ -106,7 +104,7 @@ class Utf8EncoderConvert {
 }
 
 class Utf8DecoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Utf8Decoder,
         name: 'Utf8Decoder',
         typeParameterCount: 0,

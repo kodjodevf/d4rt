@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class PatternCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Pattern,
         name: 'Pattern',
         typeParameterCount: 0,
@@ -28,7 +28,7 @@ class PatternCore {
 }
 
 class MatchCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Match,
         name: 'Match',
         typeParameterCount: 0,

@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class UnmodifiableListViewCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: UnmodifiableListView,
         name: 'UnmodifiableListView',
         typeParameterCount: 1,

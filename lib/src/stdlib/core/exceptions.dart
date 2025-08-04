@@ -1,7 +1,7 @@
-import 'package:d4rt/src/bridge/registration.dart';
+import 'package:d4rt/d4rt.dart';
 
 class ExceptionCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Exception,
         name: 'Exception',
         typeParameterCount: 0,
@@ -25,7 +25,7 @@ class ExceptionCore {
 }
 
 class FormatExceptionCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: FormatException,
         name: 'FormatException',
         typeParameterCount: 0,

@@ -12,10 +12,10 @@ class BridgedEnum implements RuntimeType {
   final Map<String, BridgedEnumValue> values;
 
   /// Instance getter adapters (shared by all values).
-  Map<String, BridgedInstanceGetterAdapter> instanceGetterAdapters = {};
+  Map<String, BridgedInstanceGetterAdapter> getters = {};
 
   /// Instance method adapters (shared by all values).
-  Map<String, BridgedMethodAdapter> instanceMethodAdapters = {};
+  Map<String, BridgedMethodAdapter> methods = {};
 
   /// Creates a definition for a bridged enum.
   BridgedEnum(this.name, this.values);
@@ -24,7 +24,7 @@ class BridgedEnum implements RuntimeType {
   String toString() => 'BridgedEnum($name)';
 
   @override
-  bool isSubtypeOf(RuntimeType other) {
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
     return other.name == 'Object' || other == this;
   }
 
@@ -54,17 +54,17 @@ class BridgedEnumValue implements RuntimeValue {
 
   /// Instance getter adapters (potentially specific to this value if needed in the future,
   /// but currently shared via BridgedEnum).
-  final Map<String, BridgedInstanceGetterAdapter> _instanceGetterAdapters;
+  final Map<String, BridgedInstanceGetterAdapter> _getters;
 
   /// Instance method adapters.
-  final Map<String, BridgedMethodAdapter> _instanceMethodAdapters;
+  final Map<String, BridgedMethodAdapter> _methods;
 
   BridgedEnumValue(this.enumType, this.name, this.index, this.nativeValue,
       {Map<String, BridgedInstanceGetterAdapter>?
           getters, // Rendre optionnels ici
       Map<String, BridgedMethodAdapter>? methods})
-      : _instanceGetterAdapters = getters ?? {},
-        _instanceMethodAdapters = methods ?? {};
+      : _getters = getters ?? {},
+        _methods = methods ?? {};
 
   // Implement the required getter from RuntimeValue
   @override
@@ -81,8 +81,8 @@ class BridgedEnumValue implements RuntimeValue {
       // 'toString' is handled below via adapters or the invoke method
       default:
         // 1. Check for custom instance getters
-        final getterAdapter = _instanceGetterAdapters[identifier] ??
-            enumType.instanceGetterAdapters[identifier];
+        final getterAdapter =
+            _getters[identifier] ?? enumType.getters[identifier];
         if (getterAdapter != null) {
           try {
             // Note: The visitor is null here because get() has no visitor context.
@@ -96,8 +96,8 @@ class BridgedEnumValue implements RuntimeValue {
 
         // 2. Check for instance methods (for cases like .toString() called as a getter)
         // Or to return a callable function representing the method.
-        final methodAdapter = _instanceMethodAdapters[identifier] ??
-            enumType.instanceMethodAdapters[identifier];
+        final methodAdapter =
+            _methods[identifier] ?? enumType.methods[identifier];
         if (methodAdapter != null) {
           // Return a function that wraps the bridged method call
           // (or handle directly if it's a getter disguised as a method, like toString)
@@ -139,8 +139,7 @@ class BridgedEnumValue implements RuntimeValue {
 
   Object? invoke(InterpreterVisitor visitor, String method, List<Object?> args,
       Map<String, Object?> namedArgs) {
-    final methodAdapter = _instanceMethodAdapters[method] ??
-        enumType.instanceMethodAdapters[method];
+    final methodAdapter = _methods[method] ?? enumType.methods[method];
     if (methodAdapter == null) {
       // Special case: if calling .toString() and there is no specific adapter,
       // return the standard representation.
@@ -168,8 +167,8 @@ class BridgedEnumValue implements RuntimeValue {
   @override
   String toString() {
     // Try to call the toString() adapter if it exists
-    final toStringAdapter = _instanceMethodAdapters['toString'] ??
-        enumType.instanceMethodAdapters['toString'];
+    final toStringAdapter =
+        _methods['toString'] ?? enumType.methods['toString'];
     if (toStringAdapter != null) {
       try {
         // Call without specific visitor or argument here, as it's just for representation

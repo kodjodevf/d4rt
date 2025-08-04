@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:d4rt/src/exceptions.dart';
-import 'package:d4rt/src/bridge/registration.dart';
-import 'package:d4rt/src/utils/extensions/list.dart';
+import 'package:d4rt/d4rt.dart';
 
 class Base64CodecConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Base64Codec,
         name: 'Base64Codec',
         typeParameterCount: 0,
@@ -71,7 +69,7 @@ class Base64CodecConvert {
 }
 
 class Base64EncoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Base64Encoder,
         name: 'Base64Encoder',
         typeParameterCount: 0,
@@ -140,7 +138,7 @@ class Base64EncoderConvert {
 }
 
 class Base64DecoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Base64Decoder,
         name: 'Base64Decoder',
         typeParameterCount: 0,

@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class NullCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Null,
         name: 'Null',
         typeParameterCount: 0,

@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class HttpClientIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: HttpClient,
         name: 'HttpClient',
         typeParameterCount: 0,
@@ -171,7 +171,7 @@ class HttpClientIo {
 }
 
 class HttpServerIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: HttpServer,
         name: 'HttpServer',
         typeParameterCount: 0,
@@ -263,7 +263,7 @@ class HttpServerIo {
 }
 
 class HttpClientRequestIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: HttpClientRequest,
         name: 'HttpClientRequest',
         typeParameterCount: 0,
@@ -373,7 +373,7 @@ class HttpClientRequestIo {
 }
 
 class HttpClientResponseIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: HttpClientResponse,
         name: 'HttpClientResponse',
         typeParameterCount: 0,

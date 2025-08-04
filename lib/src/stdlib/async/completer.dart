@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:d4rt/d4rt.dart';
 
 class CompleterAsync {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Completer,
         name: 'Completer',
         typeParameterCount: 1, // Completer<T>

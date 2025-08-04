@@ -1,7 +1,7 @@
-import 'package:d4rt/src/bridge/registration.dart';
+import 'package:d4rt/d4rt.dart';
 
 class StringBufferCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StringBuffer,
         name: 'StringBuffer',
         typeParameterCount: 0,

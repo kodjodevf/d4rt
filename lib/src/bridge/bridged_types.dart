@@ -34,24 +34,32 @@ class BridgedClass implements RuntimeType {
   final bool canBeUsedAsMixin;
 
   // Adapters for constructors
-  Map<String, BridgedConstructorCallable> constructorAdapters = {};
+  Map<String, BridgedConstructorCallable> constructors = {};
   // Adapters for instance methods
-  Map<String, BridgedMethodAdapter> instanceMethodAdapters = {};
+  Map<String, BridgedMethodAdapter> methods = {};
   // Adapters for static members and getters/setters
-  Map<String, BridgedStaticMethodAdapter> staticMethodAdapters = {};
-  Map<String, BridgedStaticGetterAdapter> staticGetterAdapters = {};
-  Map<String, BridgedStaticSetterAdapter> staticSetterAdapters = {};
-  Map<String, BridgedInstanceGetterAdapter> instanceGetterAdapters = {};
-  Map<String, BridgedInstanceSetterAdapter> instanceSetterAdapters = {};
+  Map<String, BridgedStaticMethodAdapter> staticMethods = {};
+  Map<String, BridgedStaticGetterAdapter> staticGetters = {};
+  Map<String, BridgedStaticSetterAdapter> staticSetters = {};
+  Map<String, BridgedInstanceGetterAdapter> getters = {};
+  Map<String, BridgedInstanceSetterAdapter> setters = {};
 
-  BridgedClass(this.nativeType,
-      {required this.name,
+  BridgedClass(
+      {required this.nativeType,
+      required this.name,
       this.nativeNames,
       this.typeParameterCount = 0,
-      this.canBeUsedAsMixin = false});
+      this.canBeUsedAsMixin = false,
+      this.constructors = const {},
+      this.staticMethods = const {},
+      this.staticGetters = const {},
+      this.staticSetters = const {},
+      this.methods = const {},
+      this.getters = const {},
+      this.setters = const {}});
 
   @override
-  bool isSubtypeOf(RuntimeType other) {
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
     if (other is BridgedClass) {
       if (name == 'num') {
         final isSubtype = switch (other.name) {
@@ -71,33 +79,33 @@ class BridgedClass implements RuntimeType {
 
   // Method to find a constructor adapter
   BridgedConstructorCallable? findConstructorAdapter(String name) {
-    return constructorAdapters[name];
+    return constructors[name];
   }
 
   // Method to find an instance method adapter
   BridgedMethodAdapter? findInstanceMethodAdapter(String name) {
-    return instanceMethodAdapters[name];
+    return methods[name];
   }
 
   // Finders for other adapters
   BridgedStaticMethodAdapter? findStaticMethodAdapter(String name) {
-    return staticMethodAdapters[name];
+    return staticMethods[name];
   }
 
   BridgedStaticGetterAdapter? findStaticGetterAdapter(String name) {
-    return staticGetterAdapters[name];
+    return staticGetters[name];
   }
 
   BridgedStaticSetterAdapter? findStaticSetterAdapter(String name) {
-    return staticSetterAdapters[name];
+    return staticSetters[name];
   }
 
   BridgedInstanceGetterAdapter? findInstanceGetterAdapter(String name) {
-    return instanceGetterAdapters[name];
+    return getters[name];
   }
 
   BridgedInstanceSetterAdapter? findInstanceSetterAdapter(String name) {
-    return instanceSetterAdapters[name];
+    return setters[name];
   }
 }
 
@@ -162,7 +170,7 @@ class TypeParameter implements RuntimeType {
   TypeParameter(this.name, {this.bound});
 
   @override
-  bool isSubtypeOf(RuntimeType other) {
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
     // For now, type parameters accept any type as a subtype
     // This is because we don't have full generic type inference yet
     // In a real type system, this would be more sophisticated

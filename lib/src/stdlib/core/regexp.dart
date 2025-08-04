@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class RegExpCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: RegExp,
         name: 'RegExp',
         typeParameterCount: 0,
@@ -71,7 +71,7 @@ class RegExpCore {
 }
 
 class RegExpMatchCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: RegExpMatch,
         name: 'RegExpMatch',
         typeParameterCount: 0,

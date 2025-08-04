@@ -4,7 +4,7 @@ abstract class RuntimeType {
   String get name;
 
   /// Checks if this type is a subtype of [other].
-  bool isSubtypeOf(RuntimeType other);
+  bool isSubtypeOf(RuntimeType other, {Object? value});
 }
 
 /// Common interface for values defined at runtime (interpreted or bridged instances).

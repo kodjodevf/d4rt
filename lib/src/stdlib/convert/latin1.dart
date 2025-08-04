@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class Latin1CodecConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Latin1Codec,
         name: 'Latin1Codec',
         typeParameterCount: 0,
@@ -42,7 +42,7 @@ class Latin1CodecConvert {
 }
 
 class Latin1EncoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Latin1Encoder,
         name: 'Latin1Encoder',
         typeParameterCount: 0,
@@ -96,7 +96,7 @@ class Latin1EncoderConvert {
 }
 
 class Latin1DecoderConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Latin1Decoder,
         name: 'Latin1Decoder',
         typeParameterCount: 0,

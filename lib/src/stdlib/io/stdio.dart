@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class StdinIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Stdin,
         name: 'Stdin',
         typeParameterCount: 0,
@@ -49,7 +49,7 @@ class StdinIo {
 }
 
 class StdoutIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Stdout,
         name: 'Stdout',
         typeParameterCount: 0,
@@ -140,7 +140,7 @@ class StdoutIo {
 }
 
 class StdioTypeIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: StdioType,
         name: 'StdioType',
         typeParameterCount: 0,

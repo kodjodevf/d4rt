@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class ListCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: List,
         name: 'List',
         typeParameterCount: 1,

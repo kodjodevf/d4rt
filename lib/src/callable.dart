@@ -3716,7 +3716,7 @@ class NativeFunction implements Callable, RuntimeType {
   String toString() => '<native fn $_name>';
 
   @override
-  bool isSubtypeOf(RuntimeType other) {
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
     final f1 = _function;
     if (other is NativeFunction) {
       final f2 = other._function;

@@ -2,7 +2,7 @@ import 'dart:collection';
 import 'package:d4rt/d4rt.dart';
 
 class LinkedHashMapCollection {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: LinkedHashMap,
         name: 'LinkedHashMap',
         typeParameterCount: 2,

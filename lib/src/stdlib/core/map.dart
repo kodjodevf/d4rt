@@ -1,7 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 
 class MapCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: Map,
         name: 'Map',
         typeParameterCount: 2,
@@ -173,7 +173,7 @@ class MapCore {
 }
 
 class MapEntryCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: MapEntry,
         name: 'MapEntry',
         typeParameterCount: 2,

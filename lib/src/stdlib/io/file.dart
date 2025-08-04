@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
 
 class FileIo {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: File,
         name: 'File',
         typeParameterCount: 0,

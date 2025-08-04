@@ -1,7 +1,7 @@
-import 'package:d4rt/src/bridge/registration.dart';
+import 'package:d4rt/d4rt.dart';
 
 class DateTimeCore {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: DateTime,
         name: 'DateTime',
         typeParameterCount: 0,

@@ -21,7 +21,7 @@ void main() {
 
       // Register TestMixin as a bridged class that can be used as a mixin
       d4rt.registerBridgedClass(
-        BridgedClassDefinition(
+        BridgedClass(
           nativeType: TestMixin,
           name: 'TestMixin',
           canBeUsedAsMixin: true,
@@ -157,7 +157,7 @@ void main() {
     test('throws error when bridged class not marked as mixin', () async {
       // Register a class without canBeUsedAsMixin=true
       d4rt.registerBridgedClass(
-        BridgedClassDefinition(
+        BridgedClass(
           nativeType: String,
           name: 'NotAMixin',
           canBeUsedAsMixin: false, // Explicitly set to false

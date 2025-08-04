@@ -2132,8 +2132,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             return targetValue.toString();
           default:
         }
-        // Use directly instanceMethodAdapters because we need the BridgedMethodCallable
-        final adapter = bridgedClass.instanceMethodAdapters[methodName];
+        // Use directly methods because we need the BridgedMethodCallable
+        final adapter = bridgedClass.methods[methodName];
 
         if (adapter != null) {
           final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
@@ -4177,7 +4177,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (valueRuntimeType != null) {
           if (declaredType != null) {
             if (declaredType.name != "dynamic" &&
-                !declaredType.isSubtypeOf(valueRuntimeType)) {
+                !declaredType.isSubtypeOf(valueRuntimeType,
+                    value: returnValue)) {
               bool showError = true;
               if (isNullable && returnValue == null) {
                 showError = false;
@@ -6438,7 +6439,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       TypeAnnotation? typeNode, Environment env,
       {bool isAsync = false}) {
     if (typeNode == null) {
-      return BridgedClass(dynamic, name: 'dynamic');
+      return BridgedClass(nativeType: dynamic, name: 'dynamic');
     }
     if (typeNode is NamedType) {
       final typeName = isAsync
@@ -6449,7 +6450,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               .substringBeforeLast('>')
           : typeNode.name2.lexeme;
       if (typeName == "void") {
-        return BridgedClass(VoidType, name: 'void');
+        return BridgedClass(nativeType: VoidType, name: 'void');
       }
       Logger.debug("[ResolveType] Resolving NamedType: $typeName");
       try {
@@ -6468,7 +6469,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           Logger.debug("[ResolveType]   Resolved to dynamic (special case)");
           // Need a representation for dynamic. Using a placeholder for now.
           // Ideally, have a predefined DynamicRuntimeType() instance.
-          return BridgedClass(Object, name: 'dynamic'); // Corrected placeholder
+          return BridgedClass(
+              nativeType: Object, name: 'dynamic'); // Corrected placeholder
         }
         throw RuntimeError("Type '$typeName' not found.");
       }

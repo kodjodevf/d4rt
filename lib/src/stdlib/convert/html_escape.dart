@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
 class HtmlEscapeConvert {
-  static BridgedClassDefinition get definition => BridgedClassDefinition(
+  static BridgedClass get definition => BridgedClass(
         nativeType: HtmlEscape,
         name: 'HtmlEscape',
         typeParameterCount: 0,
@@ -60,7 +60,7 @@ class HtmlEscapeConvert {
         },
       );
 
-  static BridgedClassDefinition get modeDefinition => BridgedClassDefinition(
+  static BridgedClass get modeDefinition => BridgedClass(
         nativeType: HtmlEscapeMode,
         name: 'HtmlEscapeMode',
         typeParameterCount: 0,

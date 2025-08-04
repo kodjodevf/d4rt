@@ -355,7 +355,7 @@ void _registerAllMixins(D4rt d4rt) {
 
   // Register EventMixin
   d4rt.registerBridgedClass(
-    BridgedClassDefinition(
+    BridgedClass(
       nativeType: Object, // Placeholder type
       name: 'EventMixin',
       canBeUsedAsMixin: true,
@@ -407,7 +407,7 @@ void _registerAllMixins(D4rt d4rt) {
 
   // Register ValidationMixin
   d4rt.registerBridgedClass(
-    BridgedClassDefinition(
+    BridgedClass(
       nativeType: Object,
       name: 'ValidationMixin',
       canBeUsedAsMixin: true,
@@ -489,7 +489,7 @@ void _registerAllMixins(D4rt d4rt) {
 
   // Register CacheMixin
   d4rt.registerBridgedClass(
-    BridgedClassDefinition(
+    BridgedClass(
       nativeType: Object,
       name: 'CacheMixin',
       canBeUsedAsMixin: true,
@@ -558,7 +558,7 @@ void _registerAllMixins(D4rt d4rt) {
 
   // Register MathMixin
   d4rt.registerBridgedClass(
-    BridgedClassDefinition(
+    BridgedClass(
       nativeType: Object,
       name: 'MathMixin',
       canBeUsedAsMixin: true,
