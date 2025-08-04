@@ -1,4 +1,7 @@
 ## 0.1.1
+- Implement await for-in loop support for streams in interpreter
+- Enhance pattern matching with support for rest elements in lists and maps
+- Add support for await expressions in function and constructor arguments
 - BREAKING CHANGE: BridgedClassDefinition has been removed and replaced with BridgedClass
 
 ## 0.1.0
