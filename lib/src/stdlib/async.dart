@@ -3,6 +3,7 @@ import 'package:d4rt/src/stdlib/async/completer.dart';
 import 'package:d4rt/src/stdlib/async/future.dart';
 import 'package:d4rt/src/stdlib/async/stream.dart';
 import 'package:d4rt/d4rt.dart';
+import 'package:d4rt/src/stdlib/async/timer.dart';
 
 export 'package:d4rt/src/stdlib/async/completer.dart';
 export 'package:d4rt/src/environment.dart';
@@ -14,5 +15,6 @@ class AsyncStdlib {
     CompleterStdlib.register(environment);
     FutureStdlib.register(environment);
     AsyncStreamStdlib.register(environment);
+    TimerStdlib.register(environment);
   }
 }

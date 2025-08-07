@@ -11,7 +11,7 @@ class ChunkedConversionConvert {
             if (positionalArgs.length != 1 ||
                 positionalArgs[0] is! InterpretedFunction) {
               throw RuntimeError(
-                  'ChunkedConversionSink.withCallback requires an InterpretedFunction callback.');
+                  'ChunkedConversionSink.withCallback requires an Function callback.');
             }
             final callback = positionalArgs[0] as InterpretedFunction;
             return ChunkedConversionSink<dynamic>.withCallback(

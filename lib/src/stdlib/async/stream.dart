@@ -131,7 +131,7 @@ class StreamAsync {
             final mapper = positionalArgs[0];
             if (mapper is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.map requires an InterpretedFunction mapper argument.');
+                  'Stream.map requires an Function mapper argument.');
             }
             return (target as Stream)
                 .map((event) => _runAction<dynamic>(visitor, mapper, [event]));
@@ -140,7 +140,7 @@ class StreamAsync {
             final predicate = positionalArgs[0];
             if (predicate is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.where requires an InterpretedFunction predicate argument.');
+                  'Stream.where requires an Function predicate argument.');
             }
             return (target as Stream).where((event) {
               final result = _runAction<dynamic>(visitor, predicate, [event]);
@@ -151,7 +151,7 @@ class StreamAsync {
             final converter = positionalArgs[0];
             if (converter is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.expand requires an InterpretedFunction converter argument.');
+                  'Stream.expand requires an Function converter argument.');
             }
             return (target as Stream).expand((event) {
               final result = _runAction<dynamic>(visitor, converter, [event]);
@@ -186,7 +186,7 @@ class StreamAsync {
             final predicate = positionalArgs[0];
             if (predicate is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.takeWhile requires an InterpretedFunction predicate argument.');
+                  'Stream.takeWhile requires an Function predicate argument.');
             }
             return (target as Stream).takeWhile((event) {
               final result = _runAction<dynamic>(visitor, predicate, [event]);
@@ -197,7 +197,7 @@ class StreamAsync {
             final predicate = positionalArgs[0];
             if (predicate is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.skipWhile requires an InterpretedFunction predicate argument.');
+                  'Stream.skipWhile requires an Function predicate argument.');
             }
             return (target as Stream).skipWhile((event) {
               final result = _runAction<dynamic>(visitor, predicate, [event]);
@@ -239,7 +239,7 @@ class StreamAsync {
             final predicate = positionalArgs[0];
             if (predicate is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.any requires an InterpretedFunction predicate argument.');
+                  'Stream.any requires an Function predicate argument.');
             }
             return (target as Stream).any((event) {
               final result = _runAction<dynamic>(visitor, predicate, [event]);
@@ -257,7 +257,7 @@ class StreamAsync {
             final predicate = positionalArgs[0];
             if (predicate is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.every requires an InterpretedFunction predicate argument.');
+                  'Stream.every requires an Function predicate argument.');
             }
             return (target as Stream).every((event) {
               final result = _runAction<dynamic>(visitor, predicate, [event]);
@@ -282,7 +282,7 @@ class StreamAsync {
             final combine = positionalArgs[0];
             if (combine is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.reduce requires an InterpretedFunction combine argument.');
+                  'Stream.reduce requires an Function combine argument.');
             }
             return (target as Stream).reduce(
               (previous, element) =>
@@ -293,7 +293,7 @@ class StreamAsync {
             final action = positionalArgs[0];
             if (action is! InterpretedFunction) {
               throw RuntimeError(
-                  'Stream.forEach requires an InterpretedFunction action argument.');
+                  'Stream.forEach requires an Function action argument.');
             }
             return (target as Stream).forEach(
               (element) => _runAction<void>(visitor, action, [element]),

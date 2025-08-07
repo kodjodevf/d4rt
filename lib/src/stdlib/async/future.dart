@@ -40,16 +40,14 @@ class FutureAsync {
           'microtask': (visitor, positionalArgs, namedArgs) {
             final computation = positionalArgs[0];
             if (computation is! InterpretedFunction) {
-              throw RuntimeError(
-                  'Future.microtask requires an InterpretedFunction.');
+              throw RuntimeError('Future.microtask requires an Function.');
             }
             return Future.microtask(() => computation.call(visitor, []));
           },
           'sync': (visitor, positionalArgs, namedArgs) {
             final computation = positionalArgs[0];
             if (computation is! InterpretedFunction) {
-              throw RuntimeError(
-                  'Future.sync requires an InterpretedFunction.');
+              throw RuntimeError('Future.sync requires an Function.');
             }
             return Future.sync(() => computation.call(visitor, []));
           },
@@ -78,7 +76,7 @@ class FutureAsync {
             final action = positionalArgs[1];
             if (action is! InterpretedFunction) {
               throw RuntimeError(
-                  'Future.forEach requires an InterpretedFunction for action.');
+                  'Future.forEach requires an Function for action.');
             }
             return Future.forEach(elements,
                 (element) => action.call(visitor, [element]) as FutureOr<void>);
@@ -87,7 +85,7 @@ class FutureAsync {
             final action = positionalArgs[0];
             if (action is! InterpretedFunction) {
               throw RuntimeError(
-                  'Future.doWhile requires an InterpretedFunction for action.');
+                  'Future.doWhile requires an Function for action.');
             }
             return Future.doWhile(
                 () => action.call(visitor, []) as FutureOr<bool>);
@@ -99,7 +97,7 @@ class FutureAsync {
             final onError = namedArgs.get<InterpretedFunction?>('onError');
             if (onValue is! InterpretedFunction) {
               throw RuntimeError(
-                  'Future.then requires an InterpretedFunction for onValue.');
+                  'Future.then requires an Function for onValue.');
             }
             return (target as Future).then(
                 (value) => onValue.call(visitor, [value]),
@@ -113,7 +111,7 @@ class FutureAsync {
             final test = namedArgs.get<InterpretedFunction?>('test');
             if (onError is! InterpretedFunction) {
               throw RuntimeError(
-                  'Future.catchError requires an InterpretedFunction for onError.');
+                  'Future.catchError requires an Function for onError.');
             }
             return (target as Future).catchError(
                 (error, stackTrace) =>
@@ -126,7 +124,7 @@ class FutureAsync {
             final action = positionalArgs[0];
             if (action is! InterpretedFunction) {
               throw RuntimeError(
-                  'Future.whenComplete requires an InterpretedFunction for action.');
+                  'Future.whenComplete requires an Function for action.');
             }
             return (target as Future)
                 .whenComplete(() => action.call(visitor, []));
