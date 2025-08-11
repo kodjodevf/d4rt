@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
@@ -228,6 +229,133 @@ class SocketIo {
             return (target as Socket).where((element) =>
                 _runAction<bool>(visitor, test, [element]) == true);
           },
+          'listen': (visitor, target, positionalArgs, namedArgs) {
+            final onData = positionalArgs[0] as InterpretedFunction?;
+            final onError = namedArgs['onError'] as InterpretedFunction?;
+            final onDone = namedArgs['onDone'] as InterpretedFunction?;
+            final cancelOnError = namedArgs['cancelOnError'] as bool?;
+
+            void onDataWrapper(dynamic data) =>
+                _runAction<void>(visitor, onData!, [data]);
+            Function? onErrorWrapper = onError == null
+                ? null
+                : (Object error, [StackTrace? stackTrace]) =>
+                    _runAction<void>(visitor, onError, [error, stackTrace]);
+            void Function()? onDoneWrapper = onDone == null
+                ? null
+                : () => _runAction<void>(visitor, onDone, []);
+
+            return (target as Socket).listen(
+              onData != null ? onDataWrapper : null,
+              onError: onErrorWrapper,
+              onDone: onDoneWrapper,
+              cancelOnError: cancelOnError,
+            );
+          },
+          'asyncMap': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty ||
+                positionalArgs[0] is! InterpretedFunction) {
+              throw RuntimeError(
+                  'Socket.asyncMap requires a convert function.');
+            }
+            final convert = positionalArgs[0] as InterpretedFunction;
+            return (target as Socket).asyncMap(
+              (event) => _runAction(visitor, convert, [event]),
+            );
+          },
+          'asyncExpand': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty ||
+                positionalArgs[0] is! InterpretedFunction) {
+              throw RuntimeError(
+                  'Socket.asyncExpand requires a convert function.');
+            }
+            final convert = positionalArgs[0] as InterpretedFunction;
+            return (target as Socket).asyncExpand<dynamic>(
+              (event) {
+                final result = _runAction(visitor, convert, [event]);
+                return result is Stream ? result : Stream.empty();
+              },
+            );
+          },
+          'handleError': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty ||
+                positionalArgs[0] is! InterpretedFunction) {
+              throw RuntimeError(
+                  'Socket.handleError requires an onError function.');
+            }
+            final onError = positionalArgs[0] as InterpretedFunction;
+            final test = namedArgs['test'] as InterpretedFunction?;
+            return (target as Socket).handleError(
+              (error, stackTrace) =>
+                  _runAction<void>(visitor, onError, [error, stackTrace]),
+              test: test == null
+                  ? null
+                  : (error) => _runAction<bool>(visitor, test, [error]) == true,
+            );
+          },
+          'timeout': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! Duration) {
+              throw RuntimeError('Socket.timeout requires a Duration.');
+            }
+            final timeLimit = positionalArgs[0] as Duration;
+            final onTimeout = namedArgs['onTimeout'] as InterpretedFunction?;
+            return (target as Socket).timeout(
+              timeLimit,
+              onTimeout: onTimeout == null
+                  ? null
+                  : (sink) => _runAction<void>(visitor, onTimeout, [sink]),
+            );
+          },
+          'asBroadcastStream': (visitor, target, positionalArgs, namedArgs) {
+            final onListen = namedArgs['onListen'] as InterpretedFunction?;
+            final onCancel = namedArgs['onCancel'] as InterpretedFunction?;
+            return (target as Socket).asBroadcastStream(
+              onListen: onListen == null
+                  ? null
+                  : (subscription) =>
+                      _runAction<void>(visitor, onListen, [subscription]),
+              onCancel: onCancel == null
+                  ? null
+                  : (subscription) =>
+                      _runAction<void>(visitor, onCancel, [subscription]),
+            );
+          },
+          'distinct': (visitor, target, positionalArgs, namedArgs) {
+            final equals = positionalArgs.isNotEmpty
+                ? positionalArgs[0] as InterpretedFunction?
+                : null;
+            if (equals == null) {
+              return (target as Socket).distinct();
+            } else {
+              return (target as Socket).distinct((p, n) {
+                final result = _runAction<dynamic>(visitor, equals, [p, n]);
+                return result is bool && result;
+              });
+            }
+          },
+          'reduce': (visitor, target, positionalArgs, namedArgs) {
+            final combine = positionalArgs[0] as InterpretedFunction;
+            return (target as Socket).reduce(
+              (previous, element) =>
+                  _runAction<dynamic>(visitor, combine, [previous, element]),
+            );
+          },
+          'pipe': (visitor, target, positionalArgs, namedArgs) {
+            final streamConsumer = positionalArgs[0];
+            if (streamConsumer is! StreamConsumer) {
+              throw RuntimeError(
+                  'Socket.pipe requires a StreamConsumer argument.');
+            }
+            return (target as Socket)
+                .pipe(streamConsumer as StreamConsumer<Uint8List>);
+          },
+          'cast': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Socket).cast(),
+          'drain': (visitor, target, positionalArgs, namedArgs) {
+            final futureValue =
+                positionalArgs.isNotEmpty ? positionalArgs[0] : null;
+            return (target as Socket).drain(futureValue);
+          },
           '==': (visitor, target, positionalArgs, namedArgs) {
             return (target as Socket) == positionalArgs[0];
           },
@@ -239,6 +367,21 @@ class SocketIo {
           'remoteAddress': (visitor, target) =>
               (target as Socket).remoteAddress,
           'done': (visitor, target) => (target as Socket).done,
+          'isBroadcast': (visitor, target) => (target as Socket).isBroadcast,
+          'first': (visitor, target) => (target as Socket).first,
+          'last': (visitor, target) => (target as Socket).last,
+          'single': (visitor, target) => (target as Socket).single,
+          'length': (visitor, target) => (target as Socket).length,
+          'isEmpty': (visitor, target) => (target as Socket).isEmpty,
+          'hashCode': (visitor, target) => (target as Socket).hashCode,
+          'runtimeType': (visitor, target) => (target as Socket).runtimeType,
+          'encoding': (visitor, target) => (target as Socket).encoding,
+        },
+        setters: {
+          'encoding': (visitor, target, value) {
+            (target as Socket).encoding = value as Encoding;
+            return;
+          },
         },
       );
 
