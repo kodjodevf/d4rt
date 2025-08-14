@@ -58,7 +58,7 @@ class FutureAsync {
             }
             final eagerError = namedArgs.get<bool?>('eagerError') ?? false;
             final cleanUp = namedArgs.get<InterpretedFunction?>('cleanUp');
-            return Future.wait(futures.cast(),
+            return Future.wait(futures.cast<Future>(),
                 eagerError: eagerError,
                 cleanUp: cleanUp == null
                     ? null
@@ -69,7 +69,7 @@ class FutureAsync {
             if (futures is! Iterable) {
               throw RuntimeError('Future.any requires an Iterable.');
             }
-            return Future.any(futures.cast());
+            return Future.any(futures.cast<Future>());
           },
           'forEach': (visitor, positionalArgs, namedArgs) {
             final elements = positionalArgs[0] as Iterable;
@@ -140,6 +140,30 @@ class FutureAsync {
           'asStream': (visitor, target, positionalArgs, namedArgs) {
             return (target as Future).asStream();
           },
+          // FutureExtensions methods
+          'onError': (visitor, target, positionalArgs, namedArgs) {
+            final handleError = positionalArgs[0];
+            final test = namedArgs.get<InterpretedFunction?>('test');
+            if (handleError is! InterpretedFunction) {
+              throw RuntimeError(
+                  'Future.onError requires a Function for handleError.');
+            }
+            return (target as Future).catchError(
+              (error, stackTrace) =>
+                  handleError.call(visitor, [error, stackTrace]),
+              test: test == null
+                  ? null
+                  : (error) => test.call(visitor, [error]) as bool,
+            );
+          },
+          'ignore': (visitor, target, positionalArgs, namedArgs) {
+            final future = target as Future;
+            future.then<void>(
+              (value) => null,
+              onError: (error, stackTrace) => null,
+            );
+            return null;
+          },
         },
         getters: {
           'hashCode': (visitor, target) => (target as Future).hashCode,
@@ -148,8 +172,55 @@ class FutureAsync {
       );
 }
 
+/// Explicitly ignores a future.
+class UnawaitedAsync {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: Function,
+        name: 'unawaited',
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            unawaited((positionalArgs[0] as Future));
+            return null;
+          },
+        },
+      );
+}
+
+/// Thrown when a scheduled timeout happens while waiting for an async result.
+class TimeoutExceptionAsync {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: TimeoutException,
+        name: 'TimeoutException',
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final message = positionalArgs.get<String?>(0);
+            final duration = positionalArgs.get<Duration?>(1);
+            return TimeoutException(message, duration);
+          },
+        },
+        getters: {
+          'message': (visitor, target) => (target as TimeoutException).message,
+          'duration': (visitor, target) =>
+              (target as TimeoutException).duration,
+          'toString': (visitor, target) =>
+              (target as TimeoutException).toString(),
+          'hashCode': (visitor, target) =>
+              (target as TimeoutException).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as TimeoutException).runtimeType,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as TimeoutException).toString();
+          },
+        },
+      );
+}
+
 class FutureStdlib {
   static void register(Environment environment) {
     environment.defineBridge(FutureAsync.definition);
+    environment.defineBridge(TimeoutExceptionAsync.definition);
+    environment.defineBridge(UnawaitedAsync.definition);
   }
 }
