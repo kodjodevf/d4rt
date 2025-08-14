@@ -482,6 +482,11 @@ class InternetAddressIo {
           'anyIPv4': (visitor) => InternetAddress.anyIPv4,
           'anyIPv6': (visitor) => InternetAddress.anyIPv6,
         },
+        methods: {
+          'reverse': (visitor, target, positionalArgs, namedArgs) {
+            return (target as InternetAddress).reverse();
+          },
+        },
         getters: {
           'host': (visitor, target) => (target as InternetAddress).host,
           'address': (visitor, target) => (target as InternetAddress).address,
@@ -494,6 +499,16 @@ class InternetAddressIo {
               (target as InternetAddress).isLinkLocal,
           'isMulticast': (visitor, target) =>
               (target as InternetAddress).isMulticast,
+        },
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw ArgumentError('InternetAddress requires address');
+            }
+            final address = positionalArgs[0] as String;
+            final type = namedArgs['type'] as InternetAddressType?;
+            return InternetAddress(address, type: type);
+          },
         },
       );
 }
@@ -681,9 +696,10 @@ class ServerSocketIo {
             final port = positionalArgs[1] as int;
             final backlog = namedArgs['backlog'] as int? ?? 0;
             final v6Only = namedArgs['v6Only'] as bool? ?? false;
+            final shared = namedArgs['shared'] as bool? ?? false;
 
             return ServerSocket.bind(host, port,
-                backlog: backlog, v6Only: v6Only);
+                backlog: backlog, v6Only: v6Only, shared: shared);
           },
         },
         getters: {
@@ -697,6 +713,424 @@ class ServerSocketIo {
           'last': (visitor, target) => (target as ServerSocket).last,
           'length': (visitor, target) => (target as ServerSocket).length,
           'single': (visitor, target) => (target as ServerSocket).single,
+        },
+      );
+}
+
+/// Raw socket for low-level socket operations
+class RawSocketIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: RawSocket,
+        name: 'RawSocket',
+        typeParameterCount: 0,
+        methods: {
+          'available': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RawSocket).available(),
+          'read': (visitor, target, positionalArgs, namedArgs) {
+            final len =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as int? : null;
+            return (target as RawSocket).read(len);
+          },
+          'write': (visitor, target, positionalArgs, namedArgs) {
+            final data = positionalArgs[0] as List<int>;
+            return (target as RawSocket).write(data);
+          },
+          'close': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RawSocket).close(),
+          'shutdown': (visitor, target, positionalArgs, namedArgs) {
+            final direction = positionalArgs[0] as SocketDirection;
+            return (target as RawSocket).shutdown(direction);
+          },
+          'listen': (visitor, target, positionalArgs, namedArgs) {
+            final onData = positionalArgs[0] as InterpretedFunction;
+            final onError = namedArgs['onError'] as InterpretedFunction?;
+            final onDone = namedArgs['onDone'] as InterpretedFunction?;
+            final cancelOnError = namedArgs['cancelOnError'] as bool? ?? false;
+
+            void onDataWrapper(RawSocketEvent event) =>
+                _runAction<void>(visitor, onData, [event]);
+            Function? onErrorWrapper = onError == null
+                ? null
+                : (Object error, [StackTrace? stackTrace]) =>
+                    _runAction<void>(visitor, onError, [error, stackTrace]);
+            void Function()? onDoneWrapper = onDone == null
+                ? null
+                : () => _runAction<void>(visitor, onDone, []);
+
+            return (target as RawSocket).listen(
+              onDataWrapper,
+              onError: onErrorWrapper,
+              onDone: onDoneWrapper,
+              cancelOnError: cancelOnError,
+            );
+          },
+          'setOption': (visitor, target, positionalArgs, namedArgs) {
+            final option = positionalArgs[0] as SocketOption;
+            final enabled = positionalArgs[1] as bool;
+            return (target as RawSocket).setOption(option, enabled);
+          },
+          'getRawOption': (visitor, target, positionalArgs, namedArgs) {
+            final option = positionalArgs[0] as RawSocketOption;
+            return (target as RawSocket).getRawOption(option);
+          },
+          'setRawOption': (visitor, target, positionalArgs, namedArgs) {
+            final option = positionalArgs[0] as RawSocketOption;
+            return (target as RawSocket).setRawOption(option);
+          },
+        },
+        staticMethods: {
+          'connect': (visitor, positionalArgs, namedArgs) async {
+            final host = positionalArgs[0];
+            final port = positionalArgs[1] as int;
+            final sourceAddress = namedArgs['sourceAddress'];
+            final timeout = namedArgs['timeout'] as Duration?;
+            return RawSocket.connect(host, port,
+                sourceAddress: sourceAddress, timeout: timeout);
+          },
+          'startConnect': (visitor, positionalArgs, namedArgs) async {
+            final host = positionalArgs[0];
+            final port = positionalArgs[1] as int;
+            final sourceAddress = namedArgs['sourceAddress'];
+            return RawSocket.startConnect(host, port,
+                sourceAddress: sourceAddress);
+          },
+        },
+        getters: {
+          'port': (visitor, target) => (target as RawSocket).port,
+          'remotePort': (visitor, target) => (target as RawSocket).remotePort,
+          'address': (visitor, target) => (target as RawSocket).address,
+          'remoteAddress': (visitor, target) =>
+              (target as RawSocket).remoteAddress,
+          'readEventsEnabled': (visitor, target) =>
+              (target as RawSocket).readEventsEnabled,
+          'writeEventsEnabled': (visitor, target) =>
+              (target as RawSocket).writeEventsEnabled,
+        },
+        setters: {
+          'readEventsEnabled': (visitor, target, value) =>
+              (target as RawSocket).readEventsEnabled = value as bool,
+          'writeEventsEnabled': (visitor, target, value) =>
+              (target as RawSocket).writeEventsEnabled = value as bool,
+        },
+      );
+}
+
+/// Raw server socket for low-level server operations
+class RawServerSocketIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: RawServerSocket,
+        name: 'RawServerSocket',
+        typeParameterCount: 0,
+        methods: {
+          'listen': (visitor, target, positionalArgs, namedArgs) {
+            final onData = positionalArgs[0] as InterpretedFunction;
+            final onError = namedArgs['onError'] as InterpretedFunction?;
+            final onDone = namedArgs['onDone'] as InterpretedFunction?;
+            final cancelOnError = namedArgs['cancelOnError'] as bool? ?? false;
+
+            void onDataWrapper(RawSocket socket) =>
+                _runAction<void>(visitor, onData, [socket]);
+            Function? onErrorWrapper = onError == null
+                ? null
+                : (Object error, [StackTrace? stackTrace]) =>
+                    _runAction<void>(visitor, onError, [error, stackTrace]);
+            void Function()? onDoneWrapper = onDone == null
+                ? null
+                : () => _runAction<void>(visitor, onDone, []);
+
+            return (target as RawServerSocket).listen(
+              onDataWrapper,
+              onError: onErrorWrapper,
+              onDone: onDoneWrapper,
+              cancelOnError: cancelOnError,
+            );
+          },
+          'close': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RawServerSocket).close(),
+        },
+        staticMethods: {
+          'bind': (visitor, positionalArgs, namedArgs) async {
+            final address = positionalArgs[0];
+            final port = positionalArgs[1] as int;
+            final backlog = namedArgs['backlog'] as int? ?? 0;
+            final v6Only = namedArgs['v6Only'] as bool? ?? false;
+            final shared = namedArgs['shared'] as bool? ?? false;
+            return RawServerSocket.bind(address, port,
+                backlog: backlog, v6Only: v6Only, shared: shared);
+          },
+        },
+        getters: {
+          'address': (visitor, target) => (target as RawServerSocket).address,
+          'port': (visitor, target) => (target as RawServerSocket).port,
+        },
+      );
+}
+
+/// Socket direction enumeration
+class SocketDirectionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: SocketDirection,
+        name: 'SocketDirection',
+        typeParameterCount: 0,
+        staticGetters: {
+          'receive': (visitor) => SocketDirection.receive,
+          'send': (visitor) => SocketDirection.send,
+          'both': (visitor) => SocketDirection.both,
+        },
+      );
+}
+
+/// Raw socket option for low-level socket configuration
+class RawSocketOptionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: RawSocketOption,
+        name: 'RawSocketOption',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final level = positionalArgs[0] as int;
+            final option = positionalArgs[1] as int;
+            final value = positionalArgs[2] as List<int>;
+            return RawSocketOption(level, option, Uint8List.fromList(value));
+          },
+          'fromInt': (visitor, positionalArgs, namedArgs) {
+            final level = positionalArgs[0] as int;
+            final option = positionalArgs[1] as int;
+            final value = positionalArgs[2] as int;
+            return RawSocketOption.fromInt(level, option, value);
+          },
+          'fromBool': (visitor, positionalArgs, namedArgs) {
+            final level = positionalArgs[0] as int;
+            final option = positionalArgs[1] as int;
+            final value = positionalArgs[2] as bool;
+            return RawSocketOption.fromBool(level, option, value);
+          },
+        },
+        staticGetters: {
+          'levelSocket': (visitor) => RawSocketOption.levelSocket,
+          'levelTcp': (visitor) => RawSocketOption.levelTcp,
+          'levelUdp': (visitor) => RawSocketOption.levelUdp,
+        },
+        getters: {
+          'level': (visitor, target) => (target as RawSocketOption).level,
+          'option': (visitor, target) => (target as RawSocketOption).option,
+          'value': (visitor, target) => (target as RawSocketOption).value,
+        },
+      );
+}
+
+/// Raw socket event enumeration
+class RawSocketEventIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: RawSocketEvent,
+        name: 'RawSocketEvent',
+        typeParameterCount: 0,
+        staticGetters: {
+          'read': (visitor) => RawSocketEvent.read,
+          'write': (visitor) => RawSocketEvent.write,
+          'readClosed': (visitor) => RawSocketEvent.readClosed,
+          'closed': (visitor) => RawSocketEvent.closed,
+        },
+      );
+}
+
+/// Socket exception for handling socket errors
+class SocketExceptionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: SocketException,
+        name: 'SocketException',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final message = positionalArgs[0] as String;
+            final osError = namedArgs['osError'] as OSError?;
+            final address = namedArgs['address'] as InternetAddress?;
+            final port = namedArgs['port'] as int?;
+            return SocketException(message,
+                osError: osError, address: address, port: port);
+          },
+          'closed': (visitor, positionalArgs, namedArgs) {
+            return SocketException.closed();
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as SocketException).toString(),
+        },
+        getters: {
+          'message': (visitor, target) => (target as SocketException).message,
+          'osError': (visitor, target) => (target as SocketException).osError,
+          'address': (visitor, target) => (target as SocketException).address,
+          'port': (visitor, target) => (target as SocketException).port,
+        },
+      );
+}
+
+/// Connection task for managing async socket connections
+class ConnectionTaskIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: ConnectionTask,
+        name: 'ConnectionTask',
+        typeParameterCount: 1,
+        methods: {
+          'cancel': (visitor, target, positionalArgs, namedArgs) =>
+              (target as ConnectionTask).cancel(),
+        },
+        getters: {
+          'socket': (visitor, target) => (target as ConnectionTask).socket,
+        },
+      );
+}
+
+/// Datagram for UDP socket communication
+class DatagramIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: Datagram,
+        name: 'Datagram',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final data = positionalArgs[0] as List<int>;
+            final address = positionalArgs[1] as InternetAddress;
+            final port = positionalArgs[2] as int;
+            return Datagram(Uint8List.fromList(data), address, port);
+          },
+        },
+        getters: {
+          'data': (visitor, target) => (target as Datagram).data,
+          'address': (visitor, target) => (target as Datagram).address,
+          'port': (visitor, target) => (target as Datagram).port,
+        },
+      );
+}
+
+/// Raw datagram socket for UDP communication
+class RawDatagramSocketIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: RawDatagramSocket,
+        name: 'RawDatagramSocket',
+        typeParameterCount: 0,
+        methods: {
+          'receive': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RawDatagramSocket).receive(),
+          'send': (visitor, target, positionalArgs, namedArgs) {
+            final data = positionalArgs[0] as List<int>;
+            final address = positionalArgs[1] as InternetAddress;
+            final port = positionalArgs[2] as int;
+            return (target as RawDatagramSocket).send(data, address, port);
+          },
+          'close': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RawDatagramSocket).close(),
+          'listen': (visitor, target, positionalArgs, namedArgs) {
+            final onData = positionalArgs[0] as InterpretedFunction;
+            final onError = namedArgs['onError'] as InterpretedFunction?;
+            final onDone = namedArgs['onDone'] as InterpretedFunction?;
+            final cancelOnError = namedArgs['cancelOnError'] as bool? ?? false;
+
+            void onDataWrapper(RawSocketEvent event) =>
+                _runAction<void>(visitor, onData, [event]);
+            Function? onErrorWrapper = onError == null
+                ? null
+                : (Object error, [StackTrace? stackTrace]) =>
+                    _runAction<void>(visitor, onError, [error, stackTrace]);
+            void Function()? onDoneWrapper = onDone == null
+                ? null
+                : () => _runAction<void>(visitor, onDone, []);
+
+            return (target as RawDatagramSocket).listen(
+              onDataWrapper,
+              onError: onErrorWrapper,
+              onDone: onDoneWrapper,
+              cancelOnError: cancelOnError,
+            );
+          },
+          'joinMulticast': (visitor, target, positionalArgs, namedArgs) {
+            final group = positionalArgs[0] as InternetAddress;
+            return (target as RawDatagramSocket).joinMulticast(group);
+          },
+          'leaveMulticast': (visitor, target, positionalArgs, namedArgs) {
+            final group = positionalArgs[0] as InternetAddress;
+            return (target as RawDatagramSocket).leaveMulticast(group);
+          },
+          'getRawOption': (visitor, target, positionalArgs, namedArgs) {
+            final option = positionalArgs[0] as RawSocketOption;
+            return (target as RawDatagramSocket).getRawOption(option);
+          },
+          'setRawOption': (visitor, target, positionalArgs, namedArgs) {
+            final option = positionalArgs[0] as RawSocketOption;
+            return (target as RawDatagramSocket).setRawOption(option);
+          },
+        },
+        staticMethods: {
+          'bind': (visitor, positionalArgs, namedArgs) async {
+            final host = positionalArgs[0];
+            final port = positionalArgs[1] as int;
+            final reuseAddress = namedArgs['reuseAddress'] as bool? ?? true;
+            final reusePort = namedArgs['reusePort'] as bool? ?? false;
+            final ttl = namedArgs['ttl'] as int? ?? 1;
+            return RawDatagramSocket.bind(host, port,
+                reuseAddress: reuseAddress, reusePort: reusePort, ttl: ttl);
+          },
+        },
+        getters: {
+          'address': (visitor, target) => (target as RawDatagramSocket).address,
+          'port': (visitor, target) => (target as RawDatagramSocket).port,
+          'readEventsEnabled': (visitor, target) =>
+              (target as RawDatagramSocket).readEventsEnabled,
+          'writeEventsEnabled': (visitor, target) =>
+              (target as RawDatagramSocket).writeEventsEnabled,
+          'multicastLoopback': (visitor, target) =>
+              (target as RawDatagramSocket).multicastLoopback,
+          'multicastHops': (visitor, target) =>
+              (target as RawDatagramSocket).multicastHops,
+          'broadcastEnabled': (visitor, target) =>
+              (target as RawDatagramSocket).broadcastEnabled,
+        },
+        setters: {
+          'readEventsEnabled': (visitor, target, value) =>
+              (target as RawDatagramSocket).readEventsEnabled = value as bool,
+          'writeEventsEnabled': (visitor, target, value) =>
+              (target as RawDatagramSocket).writeEventsEnabled = value as bool,
+          'multicastLoopback': (visitor, target, value) =>
+              (target as RawDatagramSocket).multicastLoopback = value as bool,
+          'multicastHops': (visitor, target, value) =>
+              (target as RawDatagramSocket).multicastHops = value as int,
+          'broadcastEnabled': (visitor, target, value) =>
+              (target as RawDatagramSocket).broadcastEnabled = value as bool,
+        },
+      );
+}
+
+/// Network interface information
+class NetworkInterfaceIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: NetworkInterface,
+        name: 'NetworkInterface',
+        typeParameterCount: 0,
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as NetworkInterface).toString(),
+        },
+        staticMethods: {
+          'list': (visitor, positionalArgs, namedArgs) async {
+            final includeLoopback =
+                namedArgs['includeLoopback'] as bool? ?? false;
+            final includeLinkLocal =
+                namedArgs['includeLinkLocal'] as bool? ?? false;
+            final type = namedArgs['type'] as InternetAddressType? ??
+                InternetAddressType.any;
+            return NetworkInterface.list(
+              includeLoopback: includeLoopback,
+              includeLinkLocal: includeLinkLocal,
+              type: type,
+            );
+          },
+        },
+        getters: {
+          'name': (visitor, target) => (target as NetworkInterface).name,
+          'index': (visitor, target) => (target as NetworkInterface).index,
+          'addresses': (visitor, target) =>
+              (target as NetworkInterface).addresses,
         },
       );
 }

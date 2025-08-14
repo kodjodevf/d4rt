@@ -54,5 +54,19 @@ class IoStdlib {
     environment.defineBridge(SocketOptionIo.definition);
     environment.defineBridge(InternetAddressTypeIo.definition);
     environment.defineBridge(ServerSocketIo.definition);
+
+    // Register Raw Socket classes
+    environment.defineBridge(RawSocketIo.definition);
+    environment.defineBridge(RawServerSocketIo.definition);
+    environment.defineBridge(RawSocketOptionIo.definition);
+    environment.defineBridge(RawSocketEventIo.definition);
+    environment.defineBridge(SocketDirectionIo.definition);
+
+    // Register Socket support classes
+    environment.defineBridge(SocketExceptionIo.definition);
+    environment.defineBridge(ConnectionTaskIo.definition);
+    environment.defineBridge(DatagramIo.definition);
+    environment.defineBridge(RawDatagramSocketIo.definition);
+    environment.defineBridge(NetworkInterfaceIo.definition);
   }
 }
