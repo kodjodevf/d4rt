@@ -86,6 +86,13 @@ class FileSystemEntityIo {
             return FileSystemEntity.typeSync(positionalArgs[0] as String,
                 followLinks: namedArgs['followLinks'] as bool? ?? true);
           },
+          'parentOf': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileSystemEntity.parentOf requires one String argument (path).');
+            }
+            return FileSystemEntity.parentOf(positionalArgs[0] as String);
+          },
         },
         methods: {
           'exists': (visitor, target, positionalArgs, namedArgs) {
@@ -162,18 +169,36 @@ class FileStatIo {
         constructors: {
           // FileStat is typically obtained from stat() operations
         },
+        staticMethods: {
+          'stat': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileStat.stat requires one String argument (path).');
+            }
+            return FileStat.stat(positionalArgs[0] as String);
+          },
+          'statSync': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'FileStat.statSync requires one String argument (path).');
+            }
+            return FileStat.statSync(positionalArgs[0] as String);
+          },
+        },
         methods: {
           'modeString': (visitor, target, positionalArgs, namedArgs) {
             return (target as FileStat).modeString();
           },
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as FileStat).toString(),
         },
         getters: {
-          'accessed': (visitor, target) => (target as FileStat).accessed,
           'changed': (visitor, target) => (target as FileStat).changed,
-          'mode': (visitor, target) => (target as FileStat).mode,
           'modified': (visitor, target) => (target as FileStat).modified,
-          'size': (visitor, target) => (target as FileStat).size,
+          'accessed': (visitor, target) => (target as FileStat).accessed,
           'type': (visitor, target) => (target as FileStat).type,
+          'mode': (visitor, target) => (target as FileStat).mode,
+          'size': (visitor, target) => (target as FileStat).size,
         },
       );
 }
@@ -184,13 +209,21 @@ class FileSystemEntityTypeIo {
         name: 'FileSystemEntityType',
         typeParameterCount: 0,
         constructors: {},
-        methods: {},
-        getters: {
-          'file': (visitor, target) => FileSystemEntityType.file,
-          'directory': (visitor, target) => FileSystemEntityType.directory,
-          'link': (visitor, target) => FileSystemEntityType.link,
-          'notFound': (visitor, target) => FileSystemEntityType.notFound,
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as FileSystemEntityType).toString(),
         },
+        staticGetters: {
+          'file': (visitor) => FileSystemEntityType.file,
+          'directory': (visitor) => FileSystemEntityType.directory,
+          'link': (visitor) => FileSystemEntityType.link,
+          'unixDomainSock': (visitor) => FileSystemEntityType.unixDomainSock,
+          'pipe': (visitor) => FileSystemEntityType.pipe,
+          'notFound': (visitor) => FileSystemEntityType.notFound,
+          // Deprecated but still available
+          'NOT_FOUND': (visitor) => FileSystemEntityType.NOT_FOUND,
+        },
+        getters: {},
       );
 }
 
@@ -200,8 +233,23 @@ class FileSystemEventIo {
         name: 'FileSystemEvent',
         typeParameterCount: 0,
         constructors: {},
-        methods: {},
+        staticGetters: {
+          'create': (visitor) => FileSystemEvent.create,
+          'delete': (visitor) => FileSystemEvent.delete,
+          'modify': (visitor) => FileSystemEvent.modify,
+          'move': (visitor) => FileSystemEvent.move,
+          'all': (visitor) => FileSystemEvent.all,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as FileSystemEvent).toString(),
+        },
         getters: {
+          'type': (visitor, target) => (target as FileSystemEvent).type,
+          'path': (visitor, target) => (target as FileSystemEvent).path,
+          'isDirectory': (visitor, target) =>
+              (target as FileSystemEvent).isDirectory,
+          // Convenience getters for type checking
           'isCreate': (visitor, target) =>
               (target as FileSystemEvent).type == FileSystemEvent.create,
           'isModify': (visitor, target) =>
@@ -210,8 +258,6 @@ class FileSystemEventIo {
               (target as FileSystemEvent).type == FileSystemEvent.delete,
           'isMove': (visitor, target) =>
               (target as FileSystemEvent).type == FileSystemEvent.move,
-          'path': (visitor, target) => (target as FileSystemEvent).path,
-          'type': (visitor, target) => (target as FileSystemEvent).type,
         },
       );
 }
