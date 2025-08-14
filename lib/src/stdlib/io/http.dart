@@ -66,20 +66,19 @@ class HttpClientIo {
             return (target as HttpClient).patchUrl(positionalArgs[0] as Uri);
           },
           'open': (visitor, target, positionalArgs, namedArgs) {
-            if (positionalArgs.length != 3 ||
+            if (positionalArgs.length != 4 ||
                 positionalArgs[0] is! String ||
                 positionalArgs[1] is! String ||
-                positionalArgs[2] is! String) {
+                positionalArgs[2] is! int ||
+                positionalArgs[3] is! String) {
               throw RuntimeError(
-                  'open requires method, host, and path arguments.');
+                  'open requires method, host, port, and path arguments.');
             }
-            final port =
-                namedArgs['port'] as int? ?? HttpClient.defaultHttpPort;
             return (target as HttpClient).open(
               positionalArgs[0] as String,
               positionalArgs[1] as String,
-              port,
-              positionalArgs[2] as String,
+              positionalArgs[2] as int,
+              positionalArgs[3] as String,
             );
           },
           'openUrl': (visitor, target, positionalArgs, namedArgs) {
@@ -91,6 +90,90 @@ class HttpClientIo {
             return (target as HttpClient).openUrl(
               positionalArgs[0] as String,
               positionalArgs[1] as Uri,
+            );
+          },
+          'get': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'get requires host, port, and path arguments.');
+            }
+            return (target as HttpClient).get(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
+            );
+          },
+          'post': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'post requires host, port, and path arguments.');
+            }
+            return (target as HttpClient).post(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
+            );
+          },
+          'put': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'put requires host, port, and path arguments.');
+            }
+            return (target as HttpClient).put(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
+            );
+          },
+          'delete': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'delete requires host, port, and path arguments.');
+            }
+            return (target as HttpClient).delete(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
+            );
+          },
+          'patch': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'patch requires host, port, and path arguments.');
+            }
+            return (target as HttpClient).patch(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
+            );
+          },
+          'head': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 3 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! int ||
+                positionalArgs[2] is! String) {
+              throw RuntimeError(
+                  'head requires host, port, and path arguments.');
+            }
+            return (target as HttpClient).head(
+              positionalArgs[0] as String,
+              positionalArgs[1] as int,
+              positionalArgs[2] as String,
             );
           },
           'addCredentials': (visitor, target, positionalArgs, namedArgs) {
@@ -142,8 +225,18 @@ class HttpClientIo {
           'autoUncompress': (visitor, target) =>
               (target as HttpClient).autoUncompress,
           'userAgent': (visitor, target) => (target as HttpClient).userAgent,
-          'defaultHttpPort': (visitor, target) => HttpClient.defaultHttpPort,
-          'defaultHttpsPort': (visitor, target) => HttpClient.defaultHttpsPort,
+        },
+        staticGetters: {
+          'defaultHttpPort': (visitor) => HttpClient.defaultHttpPort,
+          'defaultHttpsPort': (visitor) => HttpClient.defaultHttpsPort,
+          'enableTimelineLogging': (visitor) =>
+              HttpClient.enableTimelineLogging,
+        },
+        staticSetters: {
+          'enableTimelineLogging': (visitor, value) {
+            HttpClient.enableTimelineLogging = value as bool;
+            return;
+          },
         },
         setters: {
           'idleTimeout': (visitor, target, value) {
@@ -164,6 +257,71 @@ class HttpClientIo {
           },
           'userAgent': (visitor, target, value) {
             (target as HttpClient).userAgent = value as String?;
+            return;
+          },
+          'authenticate': (visitor, target, value) {
+            if (value != null) {
+              final callback = value as InterpretedFunction;
+              (target as HttpClient).authenticate =
+                  (Uri url, String scheme, String? realm) async {
+                if (visitor == null) {
+                  throw RuntimeError(
+                      'Visitor cannot be null for authenticate callback');
+                }
+                final result = callback.call(visitor, [url, scheme, realm]);
+                return result is Future ? await result : result as bool;
+              };
+            } else {
+              (target as HttpClient).authenticate = null;
+            }
+            return;
+          },
+          'findProxy': (visitor, target, value) {
+            if (value != null) {
+              final callback = value as InterpretedFunction;
+              (target as HttpClient).findProxy = (Uri url) {
+                if (visitor == null) {
+                  throw RuntimeError(
+                      'Visitor cannot be null for findProxy callback');
+                }
+                final result = callback.call(visitor, [url]);
+                return result as String;
+              };
+            } else {
+              (target as HttpClient).findProxy = null;
+            }
+            return;
+          },
+          'badCertificateCallback': (visitor, target, value) {
+            if (value != null) {
+              final callback = value as InterpretedFunction;
+              (target as HttpClient).badCertificateCallback =
+                  (cert, host, port) {
+                if (visitor == null) {
+                  throw RuntimeError(
+                      'Visitor cannot be null for badCertificateCallback');
+                }
+                final result = callback.call(visitor, [cert, host, port]);
+                return result as bool;
+              };
+            } else {
+              (target as HttpClient).badCertificateCallback = null;
+            }
+            return;
+          },
+          'keyLog': (visitor, target, value) {
+            if (value != null) {
+              final callback = value as InterpretedFunction;
+              (target as HttpClient).keyLog = (String line) {
+                if (visitor == null) {
+                  throw RuntimeError(
+                      'Visitor cannot be null for keyLog callback');
+                }
+                callback.call(visitor, [line]);
+              };
+            } else {
+              (target as HttpClient).keyLog = null;
+            }
             return;
           },
         },
@@ -208,6 +366,14 @@ class HttpServerIo {
               shared: namedArgs['shared'] as bool? ?? false,
             );
           },
+          'listenOn': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 ||
+                positionalArgs[0] is! ServerSocket) {
+              throw RuntimeError(
+                  'HttpServer.listenOn requires a ServerSocket argument.');
+            }
+            return HttpServer.listenOn(positionalArgs[0] as ServerSocket);
+          },
         },
         methods: {
           'listen': (visitor, target, positionalArgs, namedArgs) {
@@ -234,6 +400,8 @@ class HttpServerIo {
               (target as HttpServer).close(
                 force: namedArgs['force'] as bool? ?? false,
               ),
+          'connectionsInfo': (visitor, target, positionalArgs, namedArgs) =>
+              (target as HttpServer).connectionsInfo(),
         },
         getters: {
           'port': (visitor, target) => (target as HttpServer).port,
@@ -244,6 +412,8 @@ class HttpServerIo {
               (target as HttpServer).idleTimeout,
           'serverHeader': (visitor, target) =>
               (target as HttpServer).serverHeader,
+          'defaultResponseHeaders': (visitor, target) =>
+              (target as HttpServer).defaultResponseHeaders,
         },
         setters: {
           'autoCompress': (visitor, target, value) {
@@ -256,6 +426,10 @@ class HttpServerIo {
           },
           'serverHeader': (visitor, target, value) {
             (target as HttpServer).serverHeader = value as String?;
+            return;
+          },
+          'sessionTimeout': (visitor, target, value) {
+            (target as HttpServer).sessionTimeout = value as int;
             return;
           },
         },
@@ -323,6 +497,15 @@ class HttpClientRequestIo {
             );
             return null;
           },
+          'abort': (visitor, target, positionalArgs, namedArgs) {
+            (target as HttpClientRequest).abort(
+              positionalArgs.isNotEmpty ? positionalArgs[0] : null,
+              positionalArgs.length > 1
+                  ? positionalArgs[1] as StackTrace?
+                  : null,
+            );
+            return null;
+          },
         },
         getters: {
           'persistentConnection': (visitor, target) =>
@@ -342,6 +525,8 @@ class HttpClientRequestIo {
           'headers': (visitor, target) => (target as HttpClientRequest).headers,
           'cookies': (visitor, target) => (target as HttpClientRequest).cookies,
           'done': (visitor, target) => (target as HttpClientRequest).done,
+          'connectionInfo': (visitor, target) =>
+              (target as HttpClientRequest).connectionInfo,
         },
         setters: {
           'persistentConnection': (visitor, target, value) {
@@ -404,6 +589,17 @@ class HttpClientResponseIo {
             throw RuntimeError(
                 'transform not yet implemented in interpreted environment');
           },
+          'redirect': (visitor, target, positionalArgs, namedArgs) {
+            final method =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as String? : null;
+            final url =
+                positionalArgs.length > 1 ? positionalArgs[1] as Uri? : null;
+            final followLoops = namedArgs['followLoops'] as bool?;
+            return (target as HttpClientResponse)
+                .redirect(method, url, followLoops);
+          },
+          'detachSocket': (visitor, target, positionalArgs, namedArgs) =>
+              (target as HttpClientResponse).detachSocket(),
         },
         getters: {
           'statusCode': (visitor, target) =>
@@ -432,12 +628,349 @@ class HttpClientResponseIo {
       );
 }
 
+class HttpHeadersIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: HttpHeaders,
+        name: 'HttpHeaders',
+        typeParameterCount: 0,
+        constructors: {},
+        staticGetters: {
+          // HTTP Header constants
+          'acceptHeader': (visitor) => HttpHeaders.acceptHeader,
+          'acceptCharsetHeader': (visitor) => HttpHeaders.acceptCharsetHeader,
+          'acceptEncodingHeader': (visitor) => HttpHeaders.acceptEncodingHeader,
+          'acceptLanguageHeader': (visitor) => HttpHeaders.acceptLanguageHeader,
+          'authorizationHeader': (visitor) => HttpHeaders.authorizationHeader,
+          'cacheControlHeader': (visitor) => HttpHeaders.cacheControlHeader,
+          'connectionHeader': (visitor) => HttpHeaders.connectionHeader,
+          'contentEncodingHeader': (visitor) =>
+              HttpHeaders.contentEncodingHeader,
+          'contentLengthHeader': (visitor) => HttpHeaders.contentLengthHeader,
+          'contentTypeHeader': (visitor) => HttpHeaders.contentTypeHeader,
+          'cookieHeader': (visitor) => HttpHeaders.cookieHeader,
+          'dateHeader': (visitor) => HttpHeaders.dateHeader,
+          'hostHeader': (visitor) => HttpHeaders.hostHeader,
+          'ifModifiedSinceHeader': (visitor) =>
+              HttpHeaders.ifModifiedSinceHeader,
+          'locationHeader': (visitor) => HttpHeaders.locationHeader,
+          'setCookieHeader': (visitor) => HttpHeaders.setCookieHeader,
+          'userAgentHeader': (visitor) => HttpHeaders.userAgentHeader,
+        },
+        methods: {
+          'add': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2) {
+              throw RuntimeError('add requires name and value arguments.');
+            }
+            (target as HttpHeaders).add(
+              positionalArgs[0] as String,
+              positionalArgs[1]!,
+              preserveHeaderCase:
+                  namedArgs['preserveHeaderCase'] as bool? ?? false,
+            );
+            return null;
+          },
+          'set': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2) {
+              throw RuntimeError('set requires name and value arguments.');
+            }
+            (target as HttpHeaders).set(
+              positionalArgs[0] as String,
+              positionalArgs[1]!,
+              preserveHeaderCase:
+                  namedArgs['preserveHeaderCase'] as bool? ?? false,
+            );
+            return null;
+          },
+          'remove': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2) {
+              throw RuntimeError('remove requires name and value arguments.');
+            }
+            (target as HttpHeaders).remove(
+              positionalArgs[0] as String,
+              positionalArgs[1]!,
+            );
+            return null;
+          },
+          'removeAll': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw RuntimeError('removeAll requires name argument.');
+            }
+            (target as HttpHeaders).removeAll(positionalArgs[0] as String);
+            return null;
+          },
+          'value': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw RuntimeError('value requires name argument.');
+            }
+            return (target as HttpHeaders).value(positionalArgs[0] as String);
+          },
+          'forEach': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty ||
+                positionalArgs[0] is! InterpretedFunction) {
+              throw RuntimeError('forEach requires a function argument.');
+            }
+            final callback = positionalArgs[0] as InterpretedFunction;
+            (target as HttpHeaders).forEach((name, values) {
+              callback.call(visitor, [name, values]);
+            });
+            return null;
+          },
+          'noFolding': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw RuntimeError('noFolding requires name argument.');
+            }
+            (target as HttpHeaders).noFolding(positionalArgs[0] as String);
+            return null;
+          },
+          'clear': (visitor, target, positionalArgs, namedArgs) {
+            (target as HttpHeaders).clear();
+            return null;
+          },
+        },
+        getters: {
+          'date': (visitor, target) => (target as HttpHeaders).date,
+          'expires': (visitor, target) => (target as HttpHeaders).expires,
+          'ifModifiedSince': (visitor, target) =>
+              (target as HttpHeaders).ifModifiedSince,
+          'host': (visitor, target) => (target as HttpHeaders).host,
+          'port': (visitor, target) => (target as HttpHeaders).port,
+          'contentType': (visitor, target) =>
+              (target as HttpHeaders).contentType,
+          'contentLength': (visitor, target) =>
+              (target as HttpHeaders).contentLength,
+          'persistentConnection': (visitor, target) =>
+              (target as HttpHeaders).persistentConnection,
+          'chunkedTransferEncoding': (visitor, target) =>
+              (target as HttpHeaders).chunkedTransferEncoding,
+        },
+        setters: {
+          'date': (visitor, target, value) {
+            (target as HttpHeaders).date = value as DateTime?;
+            return;
+          },
+          'expires': (visitor, target, value) {
+            (target as HttpHeaders).expires = value as DateTime?;
+            return;
+          },
+          'ifModifiedSince': (visitor, target, value) {
+            (target as HttpHeaders).ifModifiedSince = value as DateTime?;
+            return;
+          },
+          'host': (visitor, target, value) {
+            (target as HttpHeaders).host = value as String?;
+            return;
+          },
+          'port': (visitor, target, value) {
+            (target as HttpHeaders).port = value as int?;
+            return;
+          },
+          'contentType': (visitor, target, value) {
+            (target as HttpHeaders).contentType = value as ContentType?;
+            return;
+          },
+          'contentLength': (visitor, target, value) {
+            (target as HttpHeaders).contentLength = value as int;
+            return;
+          },
+          'persistentConnection': (visitor, target, value) {
+            (target as HttpHeaders).persistentConnection = value as bool;
+            return;
+          },
+          'chunkedTransferEncoding': (visitor, target, value) {
+            (target as HttpHeaders).chunkedTransferEncoding = value as bool;
+            return;
+          },
+        },
+      );
+}
+
+class ContentTypeIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: ContentType,
+        name: 'ContentType',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! String) {
+              throw RuntimeError(
+                  'ContentType constructor requires primaryType and subType arguments.');
+            }
+            return ContentType(
+              positionalArgs[0] as String,
+              positionalArgs[1] as String,
+              charset: namedArgs['charset'] as String?,
+              parameters:
+                  namedArgs['parameters'] as Map<String, String?>? ?? const {},
+            );
+          },
+        },
+        staticMethods: {
+          'parse': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'ContentType.parse requires a String argument.');
+            }
+            return ContentType.parse(positionalArgs[0] as String);
+          },
+        },
+        staticGetters: {
+          'text': (visitor) => ContentType.text,
+          'html': (visitor) => ContentType.html,
+          'json': (visitor) => ContentType.json,
+          'binary': (visitor) => ContentType.binary,
+        },
+        getters: {
+          'mimeType': (visitor, target) => (target as ContentType).mimeType,
+          'primaryType': (visitor, target) =>
+              (target as ContentType).primaryType,
+          'subType': (visitor, target) => (target as ContentType).subType,
+          'charset': (visitor, target) => (target as ContentType).charset,
+          'value': (visitor, target) => (target as ContentType).value,
+          'parameters': (visitor, target) => (target as ContentType).parameters,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as ContentType).toString(),
+        },
+      );
+}
+
+class CookieIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: Cookie,
+        name: 'Cookie',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2 ||
+                positionalArgs[0] is! String ||
+                positionalArgs[1] is! String) {
+              throw RuntimeError(
+                  'Cookie constructor requires name and value arguments.');
+            }
+            return Cookie(
+                positionalArgs[0] as String, positionalArgs[1] as String);
+          },
+        },
+        staticMethods: {
+          'fromSetCookieValue': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'Cookie.fromSetCookieValue requires a String argument.');
+            }
+            return Cookie.fromSetCookieValue(positionalArgs[0] as String);
+          },
+        },
+        getters: {
+          'name': (visitor, target) => (target as Cookie).name,
+          'value': (visitor, target) => (target as Cookie).value,
+          'expires': (visitor, target) => (target as Cookie).expires,
+          'maxAge': (visitor, target) => (target as Cookie).maxAge,
+          'domain': (visitor, target) => (target as Cookie).domain,
+          'path': (visitor, target) => (target as Cookie).path,
+          'secure': (visitor, target) => (target as Cookie).secure,
+          'httpOnly': (visitor, target) => (target as Cookie).httpOnly,
+          'sameSite': (visitor, target) => (target as Cookie).sameSite,
+        },
+        setters: {
+          'name': (visitor, target, value) {
+            (target as Cookie).name = value as String;
+            return;
+          },
+          'value': (visitor, target, value) {
+            (target as Cookie).value = value as String;
+            return;
+          },
+          'expires': (visitor, target, value) {
+            (target as Cookie).expires = value as DateTime?;
+            return;
+          },
+          'maxAge': (visitor, target, value) {
+            (target as Cookie).maxAge = value as int?;
+            return;
+          },
+          'domain': (visitor, target, value) {
+            (target as Cookie).domain = value as String?;
+            return;
+          },
+          'path': (visitor, target, value) {
+            (target as Cookie).path = value as String?;
+            return;
+          },
+          'secure': (visitor, target, value) {
+            (target as Cookie).secure = value as bool;
+            return;
+          },
+          'httpOnly': (visitor, target, value) {
+            (target as Cookie).httpOnly = value as bool;
+            return;
+          },
+          'sameSite': (visitor, target, value) {
+            (target as Cookie).sameSite = value as SameSite?;
+            return;
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Cookie).toString(),
+        },
+      );
+}
+
+class HeaderValueIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: HeaderValue,
+        name: 'HeaderValue',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final value =
+                positionalArgs.isNotEmpty ? positionalArgs[0] as String : '';
+            final parameters = positionalArgs.length > 1
+                ? positionalArgs[1] as Map<String, String?>
+                : const <String, String?>{};
+            return HeaderValue(value, parameters);
+          },
+        },
+        staticMethods: {
+          'parse': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'HeaderValue.parse requires a String argument.');
+            }
+            return HeaderValue.parse(
+              positionalArgs[0] as String,
+              parameterSeparator:
+                  namedArgs['parameterSeparator'] as String? ?? ';',
+              valueSeparator: namedArgs['valueSeparator'] as String?,
+              preserveBackslash:
+                  namedArgs['preserveBackslash'] as bool? ?? false,
+            );
+          },
+        },
+        getters: {
+          'value': (visitor, target) => (target as HeaderValue).value,
+          'parameters': (visitor, target) => (target as HeaderValue).parameters,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as HeaderValue).toString(),
+        },
+      );
+}
+
 class IoHttpStdlib {
   static void register(Environment environment) {
     environment.defineBridge(HttpClientIo.definition);
     environment.defineBridge(HttpServerIo.definition);
     environment.defineBridge(HttpClientRequestIo.definition);
     environment.defineBridge(HttpClientResponseIo.definition);
+    environment.defineBridge(HttpHeadersIo.definition);
+    environment.defineBridge(ContentTypeIo.definition);
+    environment.defineBridge(CookieIo.definition);
+    environment.defineBridge(HeaderValueIo.definition);
 
     // Define constructor functions for credentials
     environment.define(
@@ -471,5 +1004,15 @@ class IoHttpStdlib {
           return HttpClientDigestCredentials(
               arguments[0] as String, arguments[1] as String);
         }, arity: 2, name: 'HttpClientDigestCredentials'));
+
+    environment.define(
+        'HttpClientBearerCredentials',
+        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+          if (arguments.length != 1 || arguments[0] is! String) {
+            throw RuntimeError(
+                'HttpClientBearerCredentials requires a token argument.');
+          }
+          return HttpClientBearerCredentials(arguments[0] as String);
+        }, arity: 1, name: 'HttpClientBearerCredentials'));
   }
 }

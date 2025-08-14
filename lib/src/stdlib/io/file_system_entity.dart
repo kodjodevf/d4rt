@@ -220,8 +220,6 @@ class FileSystemEntityTypeIo {
           'unixDomainSock': (visitor) => FileSystemEntityType.unixDomainSock,
           'pipe': (visitor) => FileSystemEntityType.pipe,
           'notFound': (visitor) => FileSystemEntityType.notFound,
-          // Deprecated but still available
-          'NOT_FOUND': (visitor) => FileSystemEntityType.NOT_FOUND,
         },
         getters: {},
       );

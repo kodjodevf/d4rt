@@ -111,6 +111,8 @@ class DirectoryIo {
                     ? positionalArgs[0] as String?
                     : null);
           },
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as Directory).toString(),
         },
         getters: {
           'path': (visitor, target) => (target as Directory).path,
