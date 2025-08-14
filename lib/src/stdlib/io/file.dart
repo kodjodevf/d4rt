@@ -4,6 +4,389 @@ import 'dart:typed_data';
 
 import 'package:d4rt/d4rt.dart';
 
+/// File mode for opening files
+class FileModeIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: FileMode,
+        name: 'FileMode',
+        typeParameterCount: 0,
+        staticGetters: {
+          'read': (visitor) => FileMode.read,
+          'write': (visitor) => FileMode.write,
+          'append': (visitor) => FileMode.append,
+          'writeOnly': (visitor) => FileMode.writeOnly,
+          'writeOnlyAppend': (visitor) => FileMode.writeOnlyAppend,
+        },
+      );
+}
+
+/// File lock types
+class FileLockIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: FileLock,
+        name: 'FileLock',
+        typeParameterCount: 0,
+        staticGetters: {
+          'shared': (visitor) => FileLock.shared,
+          'exclusive': (visitor) => FileLock.exclusive,
+          'blockingShared': (visitor) => FileLock.blockingShared,
+          'blockingExclusive': (visitor) => FileLock.blockingExclusive,
+        },
+      );
+}
+
+/// Random access file operations
+class RandomAccessFileIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: RandomAccessFile,
+        name: 'RandomAccessFile',
+        typeParameterCount: 0,
+        methods: {
+          'close': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).close(),
+          'closeSync': (visitor, target, positionalArgs, namedArgs) {
+            (target as RandomAccessFile).closeSync();
+            return null;
+          },
+          'readByte': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).readByte(),
+          'readByteSync': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).readByteSync(),
+          'read': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.read requires one int argument (count).');
+            }
+            return (target as RandomAccessFile).read(positionalArgs[0] as int);
+          },
+          'readSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.readSync requires one int argument (count).');
+            }
+            return (target as RandomAccessFile)
+                .readSync(positionalArgs[0] as int);
+          },
+          'readInto': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! List) {
+              throw RuntimeError(
+                  'RandomAccessFile.readInto requires a List<int> buffer.');
+            }
+            final buffer = positionalArgs[0] as List<int>;
+            final start =
+                positionalArgs.length > 1 ? positionalArgs[1] as int? ?? 0 : 0;
+            final end =
+                positionalArgs.length > 2 ? positionalArgs[2] as int? : null;
+            return (target as RandomAccessFile).readInto(buffer, start, end);
+          },
+          'readIntoSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! List) {
+              throw RuntimeError(
+                  'RandomAccessFile.readIntoSync requires a List<int> buffer.');
+            }
+            final buffer = positionalArgs[0] as List<int>;
+            final start =
+                positionalArgs.length > 1 ? positionalArgs[1] as int? ?? 0 : 0;
+            final end =
+                positionalArgs.length > 2 ? positionalArgs[2] as int? : null;
+            return (target as RandomAccessFile)
+                .readIntoSync(buffer, start, end);
+          },
+          'writeByte': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.writeByte requires one int argument (value).');
+            }
+            return (target as RandomAccessFile)
+                .writeByte(positionalArgs[0] as int);
+          },
+          'writeByteSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.writeByteSync requires one int argument (value).');
+            }
+            return (target as RandomAccessFile)
+                .writeByteSync(positionalArgs[0] as int);
+          },
+          'writeFrom': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! List) {
+              throw RuntimeError(
+                  'RandomAccessFile.writeFrom requires a List<int> buffer.');
+            }
+            final buffer = positionalArgs[0] as List<int>;
+            final start =
+                positionalArgs.length > 1 ? positionalArgs[1] as int? ?? 0 : 0;
+            final end =
+                positionalArgs.length > 2 ? positionalArgs[2] as int? : null;
+            return (target as RandomAccessFile).writeFrom(buffer, start, end);
+          },
+          'writeFromSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! List) {
+              throw RuntimeError(
+                  'RandomAccessFile.writeFromSync requires a List<int> buffer.');
+            }
+            final buffer = positionalArgs[0] as List<int>;
+            final start =
+                positionalArgs.length > 1 ? positionalArgs[1] as int? ?? 0 : 0;
+            final end =
+                positionalArgs.length > 2 ? positionalArgs[2] as int? : null;
+            (target as RandomAccessFile).writeFromSync(buffer, start, end);
+            return null;
+          },
+          'writeString': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'RandomAccessFile.writeString requires one String argument.');
+            }
+            final encoding = namedArgs['encoding'] as Encoding? ?? utf8;
+            return (target as RandomAccessFile)
+                .writeString(positionalArgs[0] as String, encoding: encoding);
+          },
+          'writeStringSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
+              throw RuntimeError(
+                  'RandomAccessFile.writeStringSync requires one String argument.');
+            }
+            final encoding = namedArgs['encoding'] as Encoding? ?? utf8;
+            (target as RandomAccessFile).writeStringSync(
+                positionalArgs[0] as String,
+                encoding: encoding);
+            return null;
+          },
+          'position': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).position(),
+          'positionSync': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).positionSync(),
+          'setPosition': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.setPosition requires one int argument (position).');
+            }
+            return (target as RandomAccessFile)
+                .setPosition(positionalArgs[0] as int);
+          },
+          'setPositionSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.setPositionSync requires one int argument (position).');
+            }
+            (target as RandomAccessFile)
+                .setPositionSync(positionalArgs[0] as int);
+            return null;
+          },
+          'truncate': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.truncate requires one int argument (length).');
+            }
+            return (target as RandomAccessFile)
+                .truncate(positionalArgs[0] as int);
+          },
+          'truncateSync': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || positionalArgs[0] is! int) {
+              throw RuntimeError(
+                  'RandomAccessFile.truncateSync requires one int argument (length).');
+            }
+            (target as RandomAccessFile).truncateSync(positionalArgs[0] as int);
+            return null;
+          },
+          'length': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).length(),
+          'lengthSync': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).lengthSync(),
+          'flush': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).flush(),
+          'flushSync': (visitor, target, positionalArgs, namedArgs) {
+            (target as RandomAccessFile).flushSync();
+            return null;
+          },
+          'lock': (visitor, target, positionalArgs, namedArgs) {
+            final mode = namedArgs['mode'] as FileLock? ?? FileLock.exclusive;
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int? ?? -1;
+            return (target as RandomAccessFile).lock(mode, start, end);
+          },
+          'lockSync': (visitor, target, positionalArgs, namedArgs) {
+            final mode = namedArgs['mode'] as FileLock? ?? FileLock.exclusive;
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int? ?? -1;
+            (target as RandomAccessFile).lockSync(mode, start, end);
+            return null;
+          },
+          'unlock': (visitor, target, positionalArgs, namedArgs) {
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int? ?? -1;
+            return (target as RandomAccessFile).unlock(start, end);
+          },
+          'unlockSync': (visitor, target, positionalArgs, namedArgs) {
+            final start = namedArgs['start'] as int? ?? 0;
+            final end = namedArgs['end'] as int? ?? -1;
+            (target as RandomAccessFile).unlockSync(start, end);
+            return null;
+          },
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as RandomAccessFile).toString(),
+        },
+        getters: {
+          'path': (visitor, target) => (target as RandomAccessFile).path,
+        },
+      );
+}
+
+/// FileSystemException base class
+class FileSystemExceptionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: FileSystemException,
+        name: 'FileSystemException',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final message = positionalArgs.isNotEmpty
+                ? positionalArgs[0] as String? ?? ""
+                : "";
+            final path = positionalArgs.length > 1
+                ? positionalArgs[1] as String? ?? ""
+                : "";
+            final osError = positionalArgs.length > 2
+                ? positionalArgs[2] as OSError?
+                : null;
+            return FileSystemException(message, path, osError);
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as FileSystemException).toString(),
+        },
+        getters: {
+          'message': (visitor, target) =>
+              (target as FileSystemException).message,
+          'path': (visitor, target) => (target as FileSystemException).path,
+          'osError': (visitor, target) =>
+              (target as FileSystemException).osError,
+        },
+      );
+}
+
+/// PathAccessException for access denied errors
+class PathAccessExceptionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: PathAccessException,
+        name: 'PathAccessException',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2) {
+              throw RuntimeError(
+                  'PathAccessException requires path and osError arguments.');
+            }
+            final path = positionalArgs[0] as String;
+            final osError = positionalArgs[1] as OSError;
+            final message = positionalArgs.length > 2
+                ? positionalArgs[2] as String? ?? ""
+                : "";
+            return PathAccessException(path, osError, message);
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as PathAccessException).toString(),
+        },
+        getters: {
+          'message': (visitor, target) =>
+              (target as PathAccessException).message,
+          'path': (visitor, target) => (target as PathAccessException).path,
+          'osError': (visitor, target) =>
+              (target as PathAccessException).osError,
+        },
+      );
+}
+
+/// PathExistsException for file exists errors
+class PathExistsExceptionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: PathExistsException,
+        name: 'PathExistsException',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2) {
+              throw RuntimeError(
+                  'PathExistsException requires path and osError arguments.');
+            }
+            final path = positionalArgs[0] as String;
+            final osError = positionalArgs[1] as OSError;
+            final message = positionalArgs.length > 2
+                ? positionalArgs[2] as String? ?? ""
+                : "";
+            return PathExistsException(path, osError, message);
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as PathExistsException).toString(),
+        },
+        getters: {
+          'message': (visitor, target) =>
+              (target as PathExistsException).message,
+          'path': (visitor, target) => (target as PathExistsException).path,
+          'osError': (visitor, target) =>
+              (target as PathExistsException).osError,
+        },
+      );
+}
+
+/// PathNotFoundException for file not found errors
+class PathNotFoundExceptionIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: PathNotFoundException,
+        name: 'PathNotFoundException',
+        typeParameterCount: 0,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length < 2) {
+              throw RuntimeError(
+                  'PathNotFoundException requires path and osError arguments.');
+            }
+            final path = positionalArgs[0] as String;
+            final osError = positionalArgs[1] as OSError;
+            final message = positionalArgs.length > 2
+                ? positionalArgs[2] as String? ?? ""
+                : "";
+            return PathNotFoundException(path, osError, message);
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as PathNotFoundException).toString(),
+        },
+        getters: {
+          'message': (visitor, target) =>
+              (target as PathNotFoundException).message,
+          'path': (visitor, target) => (target as PathNotFoundException).path,
+          'osError': (visitor, target) =>
+              (target as PathNotFoundException).osError,
+        },
+      );
+}
+
+/// Pipe for interprocess communication
+class PipeIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: Pipe,
+        name: 'Pipe',
+        typeParameterCount: 0,
+        staticMethods: {
+          'create': (visitor, positionalArgs, namedArgs) => Pipe.create(),
+          'createSync': (visitor, positionalArgs, namedArgs) =>
+              Pipe.createSync(),
+        },
+        getters: {
+          'read': (visitor, target) => (target as Pipe).read,
+          'write': (visitor, target) => (target as Pipe).write,
+        },
+      );
+}
+
 class FileIo {
   static BridgedClass get definition => BridgedClass(
         nativeType: File,
@@ -218,11 +601,13 @@ class FileIo {
               (visitor, target, positionalArgs, namedArgs) =>
                   (target as File).resolveSymbolicLinksSync(),
           'create': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File)
-                  .create(recursive: namedArgs['recursive'] as bool? ?? false),
+              (target as File).create(
+                  recursive: namedArgs['recursive'] as bool? ?? false,
+                  exclusive: namedArgs['exclusive'] as bool? ?? false),
           'createSync': (visitor, target, positionalArgs, namedArgs) {
             (target as File).createSync(
-                recursive: namedArgs['recursive'] as bool? ?? false);
+                recursive: namedArgs['recursive'] as bool? ?? false,
+                exclusive: namedArgs['exclusive'] as bool? ?? false);
             return null;
           },
           'watch': (visitor, target, positionalArgs, namedArgs) =>

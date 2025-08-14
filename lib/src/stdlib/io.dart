@@ -30,6 +30,16 @@ class IoStdlib {
     environment.defineBridge(DirectoryIo.definition);
     environment.defineBridge(FileIo.definition);
 
+    // Register File-related classes
+    environment.defineBridge(FileModeIo.definition);
+    environment.defineBridge(FileLockIo.definition);
+    environment.defineBridge(RandomAccessFileIo.definition);
+    environment.defineBridge(FileSystemExceptionIo.definition);
+    environment.defineBridge(PathAccessExceptionIo.definition);
+    environment.defineBridge(PathExistsExceptionIo.definition);
+    environment.defineBridge(PathNotFoundExceptionIo.definition);
+    environment.defineBridge(PipeIo.definition);
+
     // Register Stdio classes (converted)
     IoStdioStdlib.register(environment);
 
