@@ -17,7 +17,7 @@ class Int16ListTypedData {
           'fromList': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 && positionalArgs[0] is List) {
               final sourceList = positionalArgs[0] as List;
-              final intList = sourceList.map((e) {
+              final intList = sourceList.toNativeList().map((e) {
                 if (e is int) return e;
                 throw RuntimeError("Int16List.fromList expects a List<int>.");
               }).toList();

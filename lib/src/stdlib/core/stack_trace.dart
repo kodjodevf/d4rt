@@ -5,7 +5,9 @@ class StackTraceCore {
         nativeType: StackTrace,
         name: 'StackTrace',
         typeParameterCount: 0,
-        constructors: {},
+        nativeNames: [
+          '_StringStackTrace',
+        ],
         staticMethods: {
           'current': (visitor, positionalArgs, namedArgs) {
             return StackTrace.current;

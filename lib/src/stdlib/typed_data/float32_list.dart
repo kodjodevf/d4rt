@@ -17,7 +17,7 @@ class Float32ListTypedData {
           'fromList': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 && positionalArgs[0] is List) {
               final sourceList = positionalArgs[0] as List;
-              final doubleList = sourceList.map((e) {
+              final doubleList = sourceList.toNativeList().map((e) {
                 if (e is num) return e.toDouble();
                 throw RuntimeError("Float32List.fromList expects a List<num>.");
               }).toList();

@@ -1,3 +1,5 @@
+import 'package:d4rt/d4rt.dart';
+
 extension ListExtension<T> on List<T> {
   R? get<R>(int index) {
     try {
@@ -5,5 +7,14 @@ extension ListExtension<T> on List<T> {
     } on RangeError {
       return null;
     }
+  }
+
+  List<dynamic> toNativeList() {
+    return map((item) {
+      if (item is BridgedInstance) {
+        return item.nativeObject;
+      }
+      return item;
+    }).toList();
   }
 }
