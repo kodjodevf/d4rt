@@ -174,7 +174,7 @@ void main() {
 | Generics                       | ✅ Full support (generic classes/functions, type constraints, runtime validation) |
 | Operator overloading           | ⚠️ Partial (via extensions, not via class operator methods)                    |
 | FFI                            | 🚫 Not supported                                                               |
-| Isolates                       | 🚫 Not supported                                                               |
+| Isolates                       | ✅ Full support                                                               |
 | Reflection/Mirrors             | 🚫 Not supported                                                               |
 | Records                        | ✅ Supported (positional, named, pattern matching)                             |
 | String interpolation           | ✅ Supported                                                                   |

@@ -1,3 +1,7 @@
+## 0.1.2+1
+- update project description in pubspec.yam
+- docs: minor updates to documentation in README.md
+
 ## 0.1.2
 - Implement complete Isolate API with Capability, IsolateSpawnException, Isolate, SendPort, ReceivePort, RawReceivePort, RemoteError, and TransferableTypedData classes
 - Add comprehensive isolate communication and message passing support
