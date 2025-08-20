@@ -1,3 +1,20 @@
+## 0.1.2
+- Implement complete Isolate API with Capability, IsolateSpawnException, Isolate, SendPort, ReceivePort, RawReceivePort, RemoteError, and TransferableTypedData classes
+- Add comprehensive isolate communication and message passing support
+- Enhance async capabilities with Timer functionality and improved error handling
+- Add UnawaitedAsync and TimeoutExceptionAsync classes for better async error management
+- Implement additional HTTP methods and error handling in HttpClientIo
+- Add toString method to DirectoryIo for better debugging
+- Enhance FileSystemEntity with parentOf method and FileStat improvements
+- Add FileSystemEvent static getters and methods
+- Implement RawSocket and additional Socket classes for network programming
+- Enhance Stream and Socket classes with additional utility methods
+- Add IOSink, ProcessIo, and StringSink classes for improved I/O operations
+- Implement Comparable interface for better type comparison support
+- Add comprehensive test coverage for isolate, socket, and I/O functionality
+- Update core typed data classes (Uint8List, Int16List, Float32List) with enhanced functionality
+- Add list extension utilities for better collection manipulation
+
 ## 0.1.1
 - Implement await for-in loop support for streams in interpreter
 - Enhance pattern matching with support for rest elements in lists and maps

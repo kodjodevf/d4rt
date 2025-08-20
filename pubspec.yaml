@@ -1,6 +1,6 @@
 name: d4rt
 description: An interpreter and runtime for the Dart language. It allows you to execute Dart code dynamically, bridge native classes, and build advanced scripting or plugin systems in your Dart/Flutter applications
-version: 0.1.1
+version: 0.1.2
 repository: https://github.com/kodjodevf/d4rt
 homepage: https://github.com/kodjodevf/d4rt
 
