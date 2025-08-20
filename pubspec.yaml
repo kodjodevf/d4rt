@@ -3,6 +3,13 @@ description: An interpreter and runtime for the Dart language.
 version: 0.1.2
 repository: https://github.com/kodjodevf/d4rt
 homepage: https://github.com/kodjodevf/d4rt
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
 
 environment:
   sdk: ^3.5.0
