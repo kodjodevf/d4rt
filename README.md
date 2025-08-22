@@ -190,7 +190,7 @@ See the [documentation](#documentation) for details and limitations.
 ## Limitations
 
 - Operator overloading is partially supported (via extensions, not via class operator methods).
-- Some advanced Dart features (isolates, FFI, mirrors) are not available.
+- Some advanced Dart features (FFI, mirrors) are not available.
 - The interpreter is not a full Dart VM: some language features may behave differently.
 
 ---
