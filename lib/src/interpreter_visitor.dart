@@ -243,6 +243,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // If get() succeeds, the value is found (variable or bridge)
       Logger.debug(
           "[visitSimpleIdentifier] Found '$name' via environment.get() -> ${value?.runtimeType}");
+
+      // Handle late variables
+      if (value is LateVariable) {
+        Logger.debug("[visitSimpleIdentifier] Accessing late variable '$name'");
+        return value
+            .value; // This will trigger lazy initialization or throw if uninitialized
+      }
+
       if (name == 'initialValue') {
         Logger.debug(
             "[visitSimpleIdentifier] Returning '$name' = $value (from lexical/bridge)");
@@ -1158,17 +1166,36 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           environment.findDefiningEnvironment(variableName);
 
       if (definingEnv != null) {
-        if (operatorType == TokenType.EQ) {
-          return environment.assign(
-              variableName, rhsValue); // Use original assign for lexical
+        // Check if the variable is a LateVariable
+        final variableValue = definingEnv.get(variableName);
+        if (variableValue is LateVariable) {
+          if (operatorType == TokenType.EQ) {
+            // Simple assignment to late variable
+            variableValue.assign(rhsValue);
+            return rhsValue;
+          } else {
+            // Compound assignment to late variable
+            final currentValue =
+                variableValue.value; // May throw if not initialized
+            Object? newValue =
+                computeCompoundValue(currentValue, rhsValue, operatorType);
+            variableValue.assign(newValue);
+            return newValue;
+          }
         } else {
-          // Handle compound assignments on lexical variables
-          final currentValue =
-              environment.get(variableName); // Get from lexical scope
-          Object? newValue =
-              computeCompoundValue(currentValue, rhsValue, operatorType);
-          return environment.assign(
-              variableName, newValue); // Assign back to lexical scope
+          // Regular variable handling
+          if (operatorType == TokenType.EQ) {
+            return environment.assign(
+                variableName, rhsValue); // Use original assign for lexical
+          } else {
+            // Handle compound assignments on lexical variables
+            final currentValue =
+                environment.get(variableName); // Get from lexical scope
+            Object? newValue =
+                computeCompoundValue(currentValue, rhsValue, operatorType);
+            return environment.assign(
+                variableName, newValue); // Assign back to lexical scope
+          }
         }
       } else {
         try {
@@ -3449,49 +3476,67 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // Evaluate initializer for potential side effects, but don't define
         variable.initializer?.accept<Object?>(this);
       } else {
-        // Explicitly evaluate the initializer if present
-        // Object? value;
-        // if (variable.initializer != null) {
-        //   value = variable.initializer!.accept<Object?>(this);
-        // }
-        // // Explicitly define the variable in the current environment
-        // environment.define(variable.name.lexeme, value);
+        // Check if this is a late variable
+        final isLate = node.lateKeyword != null;
+        final isFinal = node.keyword?.lexeme == 'final';
+        final variableName = variable.name.lexeme;
 
-        Object? initValue;
-        Object? result; // Value returned by accept() (could be suspension)
-
-        if (variable.initializer != null) {
-          result = variable.initializer!.accept<Object?>(this);
-          if (result is AsyncSuspensionRequest) {
-            // Async initializer: Define as null for now, result holds suspension
+        if (isLate) {
+          // Handle late variable
+          if (variable.initializer != null) {
+            // Late variable with lazy initializer
+            final lateVar = LateVariable(variableName, () {
+              // Create a closure that will evaluate the initializer when accessed
+              return variable.initializer!.accept<Object?>(this);
+            }, isFinal: isFinal);
+            environment.define(variableName, lateVar);
             Logger.debug(
-                "[VariableDeclList] Async init for '${variable.name.lexeme}'. Defined as null.");
-            environment.define(variable.name.lexeme, null);
-            // Propagate the suspension request.
-            // If there are multiple async inits, the LAST suspension request wins.
+                "[VariableDeclList] Defined late variable '$variableName' with lazy initializer.");
           } else {
-            // Sync initializer: Use the computed value
-            initValue = result;
+            // Late variable without initializer
+            final lateVar = LateVariable(variableName, null, isFinal: isFinal);
+            environment.define(variableName, lateVar);
             Logger.debug(
-                "[VariableDeclList] Sync init for '${variable.name.lexeme}'. Defined as $initValue.");
-            environment.define(variable.name.lexeme, initValue);
+                "[VariableDeclList] Defined late variable '$variableName' without initializer.");
           }
         } else {
-          // No initializer: Define as null
-          Logger.debug(
-              "[VariableDeclList] No init for '${variable.name.lexeme}'. Defined as null.");
-          environment.define(variable.name.lexeme, null);
-          result = null; // No suspension
-        }
+          // Regular (non-late) variable handling
+          Object? initValue;
+          Object? result; // Value returned by accept() (could be suspension)
 
-        // If the result of the variable's init was a suspension, we need to return it
-        // to signal the state machine.
-        if (result is AsyncSuspensionRequest) {
-          // If any variable initialization caused suspension, return that suspension immediately.
-          // The state machine needs to handle this before processing subsequent variables.
-          Logger.debug(
-              "[VariableDeclList] Propagating suspension from initializer of '${variable.name.lexeme}'.");
-          return result;
+          if (variable.initializer != null) {
+            result = variable.initializer!.accept<Object?>(this);
+            if (result is AsyncSuspensionRequest) {
+              // Async initializer: Define as null for now, result holds suspension
+              Logger.debug(
+                  "[VariableDeclList] Async init for '$variableName'. Defined as null.");
+              environment.define(variableName, null);
+              // Propagate the suspension request.
+              // If there are multiple async inits, the LAST suspension request wins.
+            } else {
+              // Sync initializer: Use the computed value
+              initValue = result;
+              Logger.debug(
+                  "[VariableDeclList] Sync init for '$variableName'. Defined as $initValue.");
+              environment.define(variableName, initValue);
+            }
+          } else {
+            // No initializer: Define as null
+            Logger.debug(
+                "[VariableDeclList] No init for '$variableName'. Defined as null.");
+            environment.define(variableName, null);
+            result = null; // No suspension
+          }
+
+          // If the result of the variable's init was a suspension, we need to return it
+          // to signal the state machine.
+          if (result is AsyncSuspensionRequest) {
+            // If any variable initialization caused suspension, return that suspension immediately.
+            // The state machine needs to handle this before processing subsequent variables.
+            Logger.debug(
+                "[VariableDeclList] Propagating suspension from initializer of '$variableName'.");
+            return result;
+          }
         }
       }
     }
@@ -5320,11 +5365,42 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             environment = staticInitEnv;
             for (final variable in member.fields.variables) {
               final fieldName = variable.name.lexeme;
-              Object? value;
-              if (variable.initializer != null) {
-                value = variable.initializer!.accept<Object?>(this);
+              final isLate = member.fields.lateKeyword != null;
+              final isFinal = member.fields.keyword?.lexeme == 'final';
+
+              if (isLate) {
+                // Handle late static field
+                if (variable.initializer != null) {
+                  // Late static field with lazy initializer
+                  final lateVar = LateVariable(fieldName, () {
+                    // Create a closure that will evaluate the initializer when accessed
+                    final savedEnv = environment;
+                    try {
+                      environment = staticInitEnv;
+                      return variable.initializer!.accept<Object?>(this);
+                    } finally {
+                      environment = savedEnv;
+                    }
+                  }, isFinal: isFinal);
+                  klass.staticFields[fieldName] = lateVar;
+                  Logger.debug(
+                      "[ClassDecl] Defined late static field '$fieldName' with lazy initializer for class '${klass.name}'.");
+                } else {
+                  // Late static field without initializer
+                  final lateVar =
+                      LateVariable(fieldName, null, isFinal: isFinal);
+                  klass.staticFields[fieldName] = lateVar;
+                  Logger.debug(
+                      "[ClassDecl] Defined late static field '$fieldName' without initializer for class '${klass.name}'.");
+                }
+              } else {
+                // Regular static field handling
+                Object? value;
+                if (variable.initializer != null) {
+                  value = variable.initializer!.accept<Object?>(this);
+                }
+                klass.staticFields[fieldName] = value;
               }
-              klass.staticFields[fieldName] = value;
             }
           } finally {
             environment = originalVisitorEnv;

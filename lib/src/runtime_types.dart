@@ -283,12 +283,25 @@ class InterpretedClass implements Callable, RuntimeType {
   // Get/Set static field values (no change needed here)
   Object? getStaticField(String name) {
     if (staticFields.containsKey(name)) {
-      return staticFields[name];
+      final fieldValue = staticFields[name];
+      if (fieldValue is LateVariable) {
+        // Return the value of the late variable (will initialize if needed)
+        return fieldValue.value;
+      }
+      return fieldValue;
     }
-    throw RuntimeError("Undefined static field '$name' on class '$name'.");
+    throw RuntimeError("Undefined static field '$name' on class '$this.name'.");
   }
 
   void setStaticField(String name, Object? value) {
+    if (staticFields.containsKey(name)) {
+      final fieldValue = staticFields[name];
+      if (fieldValue is LateVariable) {
+        // Assign to the late variable
+        fieldValue.assign(value);
+        return;
+      }
+    }
     // Check if field exists? Dart allows adding fields implicitly usually,
     // but for static maybe we should be stricter? For now, allow setting.
     staticFields[name] = value;
@@ -429,11 +442,45 @@ class InterpretedClass implements Callable, RuntimeType {
         for (final fieldDecl in klassInHierarchy.fieldDeclarations) {
           if (!fieldDecl.isStatic) {
             for (final variable in fieldDecl.fields.variables) {
-              if (variable.initializer != null) {
-                final fieldName = variable.name.lexeme;
-                final value = variable.initializer!.accept<Object?>(visitor);
-                // Directly set the field on the instance map
-                instance._fields[fieldName] = value;
+              final fieldName = variable.name.lexeme;
+              final isLate = fieldDecl.fields.lateKeyword != null;
+              final isFinal = fieldDecl.fields.keyword?.lexeme == 'final';
+
+              if (isLate) {
+                // Handle late instance field
+                if (variable.initializer != null) {
+                  // Late instance field with lazy initializer
+                  final lateVar = LateVariable(fieldName, () {
+                    // Create a closure that will evaluate the initializer when accessed
+                    final savedEnv = visitor.environment;
+                    try {
+                      visitor.environment = fieldInitEnv;
+                      return variable.initializer!.accept<Object?>(visitor);
+                    } finally {
+                      visitor.environment = savedEnv;
+                    }
+                  }, isFinal: isFinal);
+                  instance._fields[fieldName] = lateVar;
+                  Logger.debug(
+                      "[Instance Init] Defined late instance field '$fieldName' with lazy initializer.");
+                } else {
+                  // Late instance field without initializer
+                  final lateVar =
+                      LateVariable(fieldName, null, isFinal: isFinal);
+                  instance._fields[fieldName] = lateVar;
+                  Logger.debug(
+                      "[Instance Init] Defined late instance field '$fieldName' without initializer.");
+                }
+              } else {
+                // Regular field handling
+                if (variable.initializer != null) {
+                  final value = variable.initializer!.accept<Object?>(visitor);
+                  // Directly set the field on the instance map
+                  instance._fields[fieldName] = value;
+                } else {
+                  // Ensure field exists even without initializer (Dart default is null)
+                  instance._fields.putIfAbsent(fieldName, () => null);
+                }
               }
             }
           }
@@ -984,9 +1031,16 @@ class InterpretedInstance implements RuntimeValue {
 
     // Check fields in the current instance first
     if (_fields.containsKey(name)) {
+      final fieldValue = _fields[name];
+      if (fieldValue is LateVariable) {
+        // Return the value of the late variable (will initialize if needed)
+        Logger.debug(
+            "[Instance.get] Found late field '$name', accessing value...");
+        return fieldValue.value;
+      }
       Logger.debug(
-          "[Instance.get] Found field '$name' with value: ${_fields[name]}");
-      return _fields[name];
+          "[Instance.get] Found field '$name' with value: $fieldValue");
+      return fieldValue;
     }
 
     Logger.debug(
@@ -1193,6 +1247,18 @@ class InterpretedInstance implements RuntimeValue {
     // No setter found in the hierarchy or bridge, assign directly to the field
     Logger.debug(
         "[Instance.set] No setter found for '$name'. Setting field directly. Instance $hashCode");
+
+    // Check if it's a late variable
+    if (_fields.containsKey(name)) {
+      final fieldValue = _fields[name];
+      if (fieldValue is LateVariable) {
+        // Assign to the late variable
+        fieldValue.assign(value);
+        Logger.debug(
+            "[Instance.set] Assigned to late field '$name'. Fields now: ${_fields.keys}");
+        return;
+      }
+    }
 
     // Perform generic type validation if this instance has type arguments
     _validateFieldAssignmentGeneric(name, value);
