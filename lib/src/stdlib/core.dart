@@ -1,4 +1,5 @@
 import 'package:d4rt/d4rt.dart';
+import 'package:d4rt/src/stdlib/core/comparable.dart';
 import 'package:d4rt/src/stdlib/core/double.dart';
 import 'package:d4rt/src/stdlib/core/exceptions.dart';
 import 'package:d4rt/src/stdlib/core/int.dart';
@@ -83,6 +84,7 @@ class CoreStdlib {
     environment.defineBridge(ObjectCore.definition);
     environment.defineBridge(TypeCore.definition);
     environment.defineBridge(NullCore.definition);
+    environment.defineBridge(ComparableCore.definition);
     environment.define(
         'dynamic',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {

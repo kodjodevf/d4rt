@@ -172,7 +172,7 @@ void main() {
 | Try/catch/finally              | ✅ Supported (multiple catch, on/type, rethrow, stacktrace)                    |
 | Imports                        | ✅ Supported (URIs, show/hide clauses for libraries defined in `sources`)      |
 | Generics                       | ✅ Full support (generic classes/functions, type constraints, runtime validation) |
-| Operator overloading           | ⚠️ Partial (via extensions, not via class operator methods)                    |
+| Operator overloading           | ✅ Full support                    |
 | FFI                            | 🚫 Not supported                                                               |
 | Isolates                       | ✅ Full support                                                               |
 | Reflection/Mirrors             | 🚫 Not supported                                                               |
