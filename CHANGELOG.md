@@ -1,3 +1,12 @@
+## 0.1.3
+- Implement complete `late` variable support with lazy initialization and proper error handling
+- Add comprehensive late variable test coverage (33 test cases) including static fields, instance fields, final constraints, and error conditions
+- Add LateVariable class with proper uninitialized access detection and assignment validation
+- Enhance interpreter visitor to handle late variables in all contexts (local, static, instance)
+- Fix nullable variable handling in interpreted class instances
+- Add ComparableCore bridge to core standard library for better type comparison support
+- Update documentation and project description for better clarity
+
 ## 0.1.2+1
 - update project description in pubspec.yam
 - docs: minor updates to documentation in README.md

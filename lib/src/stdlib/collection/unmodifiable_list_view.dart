@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'package:d4rt/d4rt.dart';
 
 class UnmodifiableListViewCollection {
