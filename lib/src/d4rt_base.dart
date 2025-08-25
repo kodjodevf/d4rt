@@ -16,26 +16,66 @@ import 'package:d4rt/src/declaration_visitor.dart';
 import 'package:d4rt/src/stdlib/stdlib.dart';
 import 'package:d4rt/src/bridge/registration.dart';
 
+/// The main D4rt interpreter class.
+///
+/// This class provides the primary interface for executing Dart code at runtime.
+/// It manages the interpretation environment, handles bridged types, and provides
+/// methods for code execution with proper error handling and debugging support.
+///
+/// ## Example:
+/// ```dart
+/// final interpreter = D4rt();
+///
+/// // Register a bridged class to make native types available in interpreted code
+/// interpreter.registerBridgedClass(myBridgedClass, 'my_library');
+///
+/// // Execute Dart code
+/// final result = await interpreter.execute(source: '''
+///   void main() {
+///     print("Hello from D4rt!");
+///   }
+/// ''');
+/// ```
 class D4rt {
   final List<Map<String, BridgedEnumDefinition>> _bridgedEnumDefinitions = [];
   final List<Map<String, BridgedClass>> _bridgedClases = [];
   InterpretedInstance? _interpretedInstance;
   InterpreterVisitor? _visitor;
   final Map<Type, BridgedClass> _bridgedDefLookupByType = {};
+
+  /// Gets the current interpreter visitor instance.
+  ///
+  /// Returns null if no execution is currently in progress.
   InterpreterVisitor? get visitor => _visitor;
   final List<NativeFunction> _nativeFunctions = [];
 
   late ModuleLoader _moduleLoader;
 
+  /// Registers a bridged enum definition for use in interpreted code.
+  ///
+  /// [definition] The enum definition containing the native enum type and its values.
+  /// [library] The library identifier where this enum should be available.
   void registerBridgedEnum(BridgedEnumDefinition definition, String library) {
     _bridgedEnumDefinitions.add({library: definition});
   }
 
+  /// Registers a bridged class definition for use in interpreted code.
+  ///
+  /// This allows native Dart classes to be accessible and instantiable
+  /// from within interpreted code, enabling seamless integration between
+  /// native and interpreted environments.
+  ///
+  /// [definition] The class definition containing constructors, methods, and properties.
+  /// [library] The library identifier where this class should be available.
   void registerBridgedClass(BridgedClass definition, String library) {
     _bridgedClases.add({library: definition});
     _bridgedDefLookupByType[definition.nativeType] = definition;
   }
 
+  /// Registers a top-level native function for use in interpreted code.
+  ///
+  /// [name] The name by which the function will be accessible in interpreted code.
+  /// [function] The native function implementation to be called.
   void registertopLevelFunction(String? name, NativeFunctionImpl function) {
     _nativeFunctions.add(NativeFunction(function, name: name, arity: 0));
   }
@@ -50,6 +90,12 @@ class D4rt {
     return moduleLoader;
   }
 
+  /// Enables or disables debug logging for the interpreter.
+  ///
+  /// When enabled, the interpreter will output detailed information about
+  /// execution flow, variable lookups, method calls, and other internal operations.
+  ///
+  /// [enabled] Whether to enable debug logging.
   void setDebug(bool enabled) => Logger.setDebug(enabled);
 
   /// Execute the given source code.

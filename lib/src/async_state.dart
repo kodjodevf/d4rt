@@ -79,9 +79,21 @@ class AsyncExecutionState {
 
   /// Fields for await for loop processing
   List<Object?>? currentAwaitForList;
+
+  /// Current index when processing await for loops with stream conversion.
+  /// Used to track position in the converted list from a stream.
   int? currentAwaitForIndex;
+
+  /// Flag indicating if the interpreter is currently waiting for stream conversion.
+  /// When true, indicates that a stream is being converted to a list for await-for processing.
   bool awaitingStreamConversion = false;
 
+  /// Creates a new async execution state.
+  ///
+  /// [environment] The execution environment for the async function.
+  /// [completer] The completer that will complete when the function finishes.
+  /// [nextStateIdentifier] The AST node representing the next state to execute.
+  /// [function] The interpreted function being executed asynchronously.
   AsyncExecutionState({
     required this.environment,
     required this.completer,
@@ -113,5 +125,9 @@ class AsyncSuspensionRequest {
   /// This is needed by the scheduler to know which execution to resume later.
   final AsyncExecutionState asyncState;
 
+  /// Creates a new async suspension request.
+  ///
+  /// [future] The Future that the interpreter should wait for.
+  /// [asyncState] The current execution state that will be resumed after the Future completes.
   AsyncSuspensionRequest(this.future, this.asyncState);
 }

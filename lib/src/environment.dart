@@ -2,6 +2,30 @@ import 'package:d4rt/d4rt.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/extensions/string.dart';
 
+/// Represents the execution environment for interpreted code.
+///
+/// The Environment class manages variable bindings, function definitions,
+/// class definitions, and bridged types for a specific scope. Environments
+/// form a chain through their enclosing relationship, enabling lexical scoping.
+///
+/// ## Features:
+/// - Variable and function storage
+/// - Bridged class and enum registration
+/// - Extension method management
+/// - Prefixed imports support
+/// - Scope chain traversal for name resolution
+///
+/// ## Example:
+/// ```dart
+/// final globalEnv = Environment();
+/// final functionEnv = Environment(enclosing: globalEnv);
+///
+/// globalEnv.define('globalVar', 42);
+/// functionEnv.define('localVar', 'hello');
+///
+/// // Will find 'globalVar' by traversing up the scope chain
+/// final value = functionEnv.get('globalVar');
+/// ```
 class Environment {
   final Environment? _enclosing;
   final Map<String, Object?> _values = {};
@@ -12,11 +36,24 @@ class Environment {
       []; // Store unnamed extensions
   final Map<String, Environment> _prefixedImports = {}; // For prefixed imports
 
+  /// Creates a new environment, optionally with an enclosing (parent) environment.
+  ///
+  /// [enclosing] The parent environment for lexical scoping. If null, this becomes a root environment.
   Environment({Environment? enclosing}) : _enclosing = enclosing;
 
+  /// Gets the enclosing (parent) environment, if any.
   Environment? get enclosing => _enclosing;
+
+  /// Gets the map of variable bindings in this environment.
   Map<String, Object?> get values => _values;
 
+  /// Defines a new variable or function in this environment.
+  ///
+  /// [name] The name of the variable or function.
+  /// [value] The value to bind to the name.
+  ///
+  /// If a name is already defined or conflicts with a bridged type,
+  /// a warning will be logged.
   void define(String name, Object? value) {
     if (_values.containsKey(name) ||
         _bridgedClasses.containsKey(name) ||
@@ -27,6 +64,18 @@ class Environment {
     _values[name] = value;
   }
 
+  /// Registers a bridged class in this environment.
+  ///
+  /// [bridgedClass] The bridged class definition to register.
+  ///
+  /// This makes the native class available for use in interpreted code
+  /// under the name specified by the bridged class definition.
+  /// Registers a bridged class in this environment.
+  ///
+  /// [bridgedClass] The bridged class definition to register.
+  ///
+  /// This makes the native class available for use in interpreted code
+  /// under the name specified by the bridged class definition.
   void defineBridge(BridgedClass bridgedClass) {
     final name = bridgedClass.name;
 
@@ -42,6 +91,12 @@ class Environment {
     Logger.debug("[Environment] Defined bridge for class: $name");
   }
 
+  /// Converts a native object to a bridged instance if a bridge exists.
+  ///
+  /// [nativeObject] The native object to convert.
+  ///
+  /// Returns a [BridgedInstance] if a bridge is found for the object's type,
+  /// otherwise returns null.
   BridgedInstance? toBridgedInstance(Object? nativeObject) {
     if (nativeObject == null) {
       return null;

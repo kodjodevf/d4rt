@@ -4,10 +4,32 @@ import '../interpreter_visitor.dart';
 import 'registration.dart' hide BridgedMethodCallable;
 import '../callable.dart';
 
-/// Represents a natively defined class but accessible to the interpreter.
+/// Represents a natively defined class that is accessible to the interpreter.
+///
+/// BridgedClass allows native Dart classes to be used within interpreted code
+/// by providing metadata and adapters for constructors, methods, getters, and setters.
+/// This enables seamless integration between native and interpreted environments.
+///
+/// ## Example:
+/// ```dart
+/// final bridgedString = BridgedClass(
+///   String,
+///   name: 'String',
+///   constructors: {
+///     '': StringConstructor(),
+///   },
+///   methods: {
+///     'toLowerCase': StringToLowerCaseMethod(),
+///   },
+/// );
+/// ```
 class BridgedClass implements RuntimeType {
+  /// The native Dart type this bridge represents.
   final Type nativeType; // Keep nativeType for bridge logic
+
   @override
+
+  /// The name of this class as it appears in interpreted code.
   final String name;
 
   /// Additional native class names that should map to this bridged class.
