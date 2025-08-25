@@ -5,7 +5,7 @@ class TimerAsync {
   static BridgedClass get definition => BridgedClass(
         nativeType: Timer,
         name: 'Timer',
-        typeParameterCount: 2,
+        nativeNames: ['TimerImpl'],
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 2 || namedArgs.isNotEmpty) {

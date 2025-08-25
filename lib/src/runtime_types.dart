@@ -1154,7 +1154,18 @@ class InterpretedInstance implements RuntimeValue {
           // Adapter needs visitor (null ok?), target object, name
           // Assuming getter adapter doesn't need visitor?
           // Adapters MUST handle potential exceptions from native code.
-          return getterAdapter(null, nativeTarget);
+          final result = getterAdapter(null, nativeTarget);
+
+          // Check if result is a native enum that has been bridged
+          if (result != null && visitor != null) {
+            final bridgedEnumValue =
+                visitor.environment.getBridgedEnumValue(result);
+            if (bridgedEnumValue != null) {
+              return bridgedEnumValue;
+            }
+          }
+
+          return result;
         } catch (e, s) {
           Logger.error(
               "Native exception during bridged superclass getter '$name': $e\n$s");

@@ -791,6 +791,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final operator = node.operator.type;
     final leftOperandValue = node.leftOperand.accept<Object?>(this);
     final rightOperandValue = node.rightOperand.accept<Object?>(this);
+
+    Logger.debug("[BinaryExpression DEBUG] Operator: ${operator.lexeme}");
+    Logger.debug("  Left operand type: ${leftOperandValue?.runtimeType}");
+    Logger.debug("  Left operand value: $leftOperandValue");
+    Logger.debug("  Right operand type: ${rightOperandValue?.runtimeType}");
+    Logger.debug("  Right operand value: $rightOperandValue");
+
     if (leftOperandValue is AsyncSuspensionRequest) {
       return leftOperandValue;
     }
@@ -971,6 +978,30 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       case '%':
         if (left is BigInt && right is BigInt) return left % right;
       case '==':
+        // Special handling for BridgedEnumValue comparison
+        if (leftOperandValue is BridgedEnumValue &&
+            rightOperandValue is BridgedEnumValue) {
+          final result = leftOperandValue == rightOperandValue;
+          return result;
+        }
+
+        // Special handling for mixed native enum and BridgedEnumValue comparison
+        if ((leftOperandValue is BridgedEnumValue &&
+                rightOperandValue is Enum) ||
+            (leftOperandValue is Enum &&
+                rightOperandValue is BridgedEnumValue)) {
+          // Convert both to their native enum values for comparison
+          final leftNative = leftOperandValue is BridgedEnumValue
+              ? leftOperandValue.nativeValue
+              : leftOperandValue;
+          final rightNative = rightOperandValue is BridgedEnumValue
+              ? rightOperandValue.nativeValue
+              : rightOperandValue;
+
+          final result = leftNative == rightNative;
+          return result;
+        }
+
         return left == right;
       case '!=':
         return left != right;
@@ -1044,8 +1075,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     }
 
     throw RuntimeError(
-      'Opérateur non supporté ($operator) pour les types ${leftOperandValue?.runtimeType} et ${rightOperandValue?.runtimeType}',
-    );
+        'Unsupported operator ($operator) for types ${leftOperandValue?.runtimeType} and ${rightOperandValue?.runtimeType}');
   }
 
   @override
@@ -2647,7 +2677,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     if (target is InterpretedInstance) {
       // Standard Instance Access: Try direct first, then extension
       try {
-        final member = target.get(propertyName); // .get() handles inheritance
+        final member = target.get(propertyName,
+            visitor: this); // .get() handles inheritance
         if (member is InterpretedFunction && member.isGetter) {
           return member
               .call(this, [], {}); // .get already returned bound getter
@@ -2963,6 +2994,19 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       throw RuntimeError(
           "Undefined property or method '$propertyName' accessed via 'super' on bridged superclass '${bridgedSuper.name}'.");
     } else {
+      // Check if target is a native enum that has been bridged
+      final bridgedEnumValue = environment.getBridgedEnumValue(target);
+      if (bridgedEnumValue != null) {
+        Logger.debug(
+            "[PropertyAccess] Found bridged enum value for native enum ${target.runtimeType}");
+        try {
+          return bridgedEnumValue.get(propertyName);
+        } catch (e) {
+          throw RuntimeError(
+              "Undefined property '$propertyName' on bridged enum value '${bridgedEnumValue.name}'.");
+        }
+      }
+
       Logger.debug(
           "[PropertyAccess] Looking for extension getter '$propertyName' for target type ${target.runtimeType}.");
       final extensionCallable =

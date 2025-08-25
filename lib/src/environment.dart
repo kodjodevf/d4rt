@@ -101,6 +101,30 @@ class Environment {
     Logger.debug("[Environment] Defined bridge for enum: $name");
   }
 
+  /// Checks if the given object is a bridged enum value
+  BridgedEnum? findBridgedEnumForValue(Object value) {
+    for (final bridgedEnum in _bridgedEnums.values) {
+      for (final enumValue in bridgedEnum.values.values) {
+        if (enumValue.nativeValue == value) {
+          return bridgedEnum;
+        }
+      }
+    }
+    return _enclosing?.findBridgedEnumForValue(value);
+  }
+
+  /// Gets the BridgedEnumValue for a native enum value
+  BridgedEnumValue? getBridgedEnumValue(Object value) {
+    for (final bridgedEnum in _bridgedEnums.values) {
+      for (final enumValue in bridgedEnum.values.values) {
+        if (enumValue.nativeValue == value) {
+          return enumValue;
+        }
+      }
+    }
+    return _enclosing?.getBridgedEnumValue(value);
+  }
+
   /// Retrieves the value associated with [name].
   /// Searches the current environment, then recursively searches parent environments.
   /// Returns `null` if the name is not found in the entire chain.
