@@ -1,3 +1,6 @@
+## 0.1.4
+- feat: add methods to find and retrieve bridged enum values in Environment and InterpreterVisitor; enhance handling of bridged enums in property access and binary expressions
+- feat: enhance documentation across multiple files; add examples and clarify class functionalities in D4rt interpreter
 ## 0.1.3
 - Implement complete `late` variable support with lazy initialization and proper error handling
 - Add comprehensive late variable test coverage (33 test cases) including static fields, instance fields, final constraints, and error conditions
@@ -8,7 +11,7 @@
 - Update documentation and project description for better clarity
 
 ## 0.1.2+1
-- update project description in pubspec.yam
+- update project description in pubspec.yaml
 - docs: minor updates to documentation in README.md
 
 ## 0.1.2
