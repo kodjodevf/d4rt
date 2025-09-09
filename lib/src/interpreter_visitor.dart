@@ -2265,16 +2265,28 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               evaluationResult as (List<Object?>, Map<String, Object?>);
 
           try {
-            // 1. Create and initialize instance fields (using the class's public helper)
-            // Pass null for type arguments as they aren't applicable to named constructor resolution here
-            final instance =
-                targetValue.createAndInitializeInstance(this, null);
-            // 2. Bind 'this' and call the named constructor logic
-            final boundConstructor = namedConstructor.bind(instance);
-            boundConstructor.call(
-                this, positionalArgs, namedArgs); // Pass evaluated args
-            // Constructor call implicitly returns the bound instance.
-            return instance; // Return the created and potentially modified instance
+            // Handle factory constructors differently from regular constructors
+            if (namedConstructor.isFactory) {
+              // Factory constructors should create and return their own instance
+              // Do NOT create an instance beforehand
+              Logger.debug(
+                  "[MethodInvocation] Calling factory constructor '$methodName' directly");
+              final result =
+                  namedConstructor.call(this, positionalArgs, namedArgs);
+              return result;
+            } else {
+              // Regular constructor: create instance first, then call constructor
+              // 1. Create and initialize instance fields (using the class's public helper)
+              // Pass null for type arguments as they aren't applicable to named constructor resolution here
+              final instance =
+                  targetValue.createAndInitializeInstance(this, null);
+              // 2. Bind 'this' and call the named constructor logic
+              final boundConstructor = namedConstructor.bind(instance);
+              boundConstructor.call(
+                  this, positionalArgs, namedArgs); // Pass evaluated args
+              // Constructor call implicitly returns the bound instance.
+              return instance; // Return the created and potentially modified instance
+            }
           } on ReturnException catch (e) {
             return e.value;
           } on RuntimeError catch (e) {
