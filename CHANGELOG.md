@@ -1,3 +1,8 @@
+## 0.1.5
+- feat: implement handling of factory constructors in InterpreterVisitor; add comprehensive tests for factory constructor behavior
+- feat: enhance async execution state and interpreter visitor to support break/continue handling; add comprehensive tests for nested async loops
+- feat: enhance async execution state and interpreter visitor to support async* generators; add comprehensive tests for generator behavior and control flow
+
 ## 0.1.4
 - feat: add methods to find and retrieve bridged enum values in Environment and InterpreterVisitor; enhance handling of bridged enums in property access and binary expressions
 - feat: enhance documentation across multiple files; add examples and clarify class functionalities in D4rt interpreter
