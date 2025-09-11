@@ -94,6 +94,12 @@ class AsyncExecutionState {
   /// When true, indicates that a stream is being converted to a list for await-for processing.
   bool awaitingStreamConversion = false;
 
+  /// For async* generators: the stream controller to send yields to
+  StreamController<Object?>? generatorStreamController;
+
+  /// For async* generators: flag indicating this is a generator execution
+  bool get isGenerator => generatorStreamController != null;
+
   /// Creates a new async execution state.
   ///
   /// [environment] The execution environment for the async function.
@@ -119,6 +125,7 @@ class AsyncExecutionState {
     this.isHandlingErrorForRethrow = false,
     this.originalErrorForRethrow,
     this.isHandlingContinue = false,
+    this.generatorStreamController,
   });
 }
 
@@ -132,9 +139,14 @@ class AsyncSuspensionRequest {
   /// This is needed by the scheduler to know which execution to resume later.
   final AsyncExecutionState asyncState;
 
+  /// Flag indicating if this suspension is from a yield statement
+  final bool isYieldSuspension;
+
   /// Creates a new async suspension request.
   ///
   /// [future] The Future that the interpreter should wait for.
   /// [asyncState] The current execution state that will be resumed after the Future completes.
-  AsyncSuspensionRequest(this.future, this.asyncState);
+  /// [isYieldSuspension] Whether this suspension is from a yield statement.
+  AsyncSuspensionRequest(this.future, this.asyncState,
+      {this.isYieldSuspension = false});
 }

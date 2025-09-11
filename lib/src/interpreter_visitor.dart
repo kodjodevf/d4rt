@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -3623,7 +3624,45 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final value = node.expression.accept<Object?>(this);
     Logger.debug(
         "[YieldStatement] Yielding value: $value (star: ${node.star != null})");
+
+    // If we're in an async* generator (with real async state), create a suspension
+    if (currentAsyncState?.isGenerator == true) {
+      final controller = currentAsyncState!.generatorStreamController!;
+
+      if (node.star != null) {
+        // yield* - handle asynchronously
+        return AsyncSuspensionRequest(
+            _handleYieldStarAsync(value, controller), currentAsyncState!,
+            isYieldSuspension: true);
+      } else {
+        // regular yield - send to stream and create minimal suspension
+        controller.add(value);
+        // Create a completed future suspension to continue execution
+        return AsyncSuspensionRequest(Future.value(null), currentAsyncState!,
+            isYieldSuspension: true);
+      }
+    }
+
+    // Fallback for sync* generators or other contexts
     return YieldValue(value, isYieldStar: node.star != null);
+  }
+
+  // Handle yield* in async generator context asynchronously
+  Future<Object?> _handleYieldStarAsync(
+      Object? value, StreamController<Object?> controller) async {
+    if (value is Stream) {
+      await for (final item in value) {
+        controller.add(item);
+      }
+    } else if (value is Iterable) {
+      for (final item in value) {
+        controller.add(item);
+      }
+    } else {
+      controller.addError(RuntimeError(
+          "yield* expression must be a Stream or Iterable, got ${value.runtimeType}"));
+    }
+    return null;
   }
 
   @override
@@ -4240,6 +4279,11 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (currentCallable is InterpretedFunction) {
           declaredType = currentCallable.declaredReturnType;
           isNullable = currentCallable.isNullable;
+
+          // Special handling for async* generators: return without value should be allowed
+          if (currentCallable.isAsyncGenerator && returnValue == null) {
+            throw ReturnException(returnValue); // Exit generator cleanly
+          }
         }
         valueRuntimeType = environment.getRuntimeType(returnValue);
 

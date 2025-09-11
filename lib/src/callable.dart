@@ -11,22 +11,6 @@ class YieldValue {
   YieldValue(this.value, {this.isYieldStar = false});
 }
 
-/// State for tracking generator execution
-class GeneratorExecutionState {
-  final Environment environment;
-  final InterpretedFunction function;
-  AstNode? nextStateIdentifier;
-  bool isCompleted = false;
-  Object? yieldedValue;
-  bool isWaitingForYield = false;
-
-  GeneratorExecutionState({
-    required this.environment,
-    required this.function,
-    this.nextStateIdentifier,
-  });
-}
-
 /// Unwraps a BridgedInstance to get the native object if it's an exception
 Object _unwrapExceptionForPropagation(Object? thrownValue) {
   if (thrownValue is BridgedInstance) {
@@ -1902,10 +1886,22 @@ class InterpretedFunction implements Callable {
             }
 
             // Determine the next state based on the AST context
-            AstNode? nextNodeAfterAwait = _determineNextNodeAfterAwait(
-                visitor,
-                currentState,
-                currentNode!); // The node that caused the suspension
+            AstNode? nextNodeAfterAwait;
+
+            if (suspension.isYieldSuspension) {
+              // For yield suspensions, simply continue with the next sequential node
+              nextNodeAfterAwait = _findNextSequentialNode(visitor,
+                  currentNode!); // The YieldStatement that caused the suspension
+              Logger.debug(
+                  "[StateMachine] Yield suspension completed. Next node: ${nextNodeAfterAwait?.runtimeType}");
+            } else {
+              // For await suspensions, use the complex await logic
+              nextNodeAfterAwait = _determineNextNodeAfterAwait(
+                  visitor,
+                  currentState,
+                  currentNode!); // The node that caused the suspension
+            }
+
             currentState.nextStateIdentifier = nextNodeAfterAwait;
 
             // Reschedule the state machine execution
@@ -3510,7 +3506,7 @@ class InterpretedFunction implements Callable {
     return (positionalArgs, namedArgs);
   }
 
-  // Create a Stream for async* generator functions
+  // Create a Stream for async* generator functions using real async state machine
   Stream<Object?> _createAsyncGeneratorStream(InterpreterVisitor visitor,
       Environment executionEnvironment, bool redirected) {
     late StreamController<Object?> controller;
@@ -3519,6 +3515,7 @@ class InterpretedFunction implements Callable {
       try {
         final previousVisitorEnv = visitor.environment;
         final previousCurrentFunction = visitor.currentFunction;
+        final previousAsyncState = visitor.currentAsyncState;
 
         try {
           visitor.environment = executionEnvironment;
@@ -3531,22 +3528,18 @@ class InterpretedFunction implements Callable {
           }
 
           final bodyToExecute = _body;
-          if (!redirected) {
-            if (bodyToExecute is BlockFunctionBody) {
-              // Simple implementation: execute the block and collect yields
-              await _executeGeneratorBlock(
-                  visitor, bodyToExecute.block.statements, controller);
-            } else if (bodyToExecute is ExpressionFunctionBody) {
-              final result = bodyToExecute.expression.accept<Object?>(visitor);
-              if (result is YieldValue) {
-                if (result.isYieldStar) {
-                  await _handleYieldStar(result.value, controller);
-                } else {
-                  controller.add(result.value);
-                }
+          if (!redirected && bodyToExecute is BlockFunctionBody) {
+            // Use the real async state machine for generators
+            await _runAsyncGenerator(
+                visitor, bodyToExecute, controller, executionEnvironment);
+          } else if (bodyToExecute is ExpressionFunctionBody) {
+            final result = bodyToExecute.expression.accept<Object?>(visitor);
+            if (result is YieldValue) {
+              if (result.isYieldStar) {
+                await _handleYieldStar(result.value, controller);
+              } else {
+                controller.add(result.value);
               }
-            } else if (bodyToExecute is EmptyFunctionBody) {
-              // Empty generator - no yields
             }
           }
         } on ReturnException catch (_) {
@@ -3554,6 +3547,7 @@ class InterpretedFunction implements Callable {
         } finally {
           visitor.environment = previousVisitorEnv;
           visitor.currentFunction = previousCurrentFunction;
+          visitor.currentAsyncState = previousAsyncState;
         }
       } catch (e, stackTrace) {
         controller.addError(e, stackTrace);
@@ -3565,34 +3559,46 @@ class InterpretedFunction implements Callable {
     return controller.stream;
   }
 
+  // Run async* generator using the real async state machine
+  Future<void> _runAsyncGenerator(
+      InterpreterVisitor visitor,
+      BlockFunctionBody body,
+      StreamController<Object?> controller,
+      Environment executionEnvironment) async {
+    final completer = Completer<Object?>();
+
+    // Determine the first state (AST node)
+    AstNode? initialStateIdentifier = body.block.statements.firstOrNull;
+
+    // Create the async state with generator support
+    final asyncState = AsyncExecutionState(
+      environment: executionEnvironment,
+      completer: completer,
+      nextStateIdentifier: initialStateIdentifier,
+      function: this,
+      generatorStreamController: controller, // Enable generator mode
+    );
+
+    // Set the async state in visitor
+    final previousAsyncState = visitor.currentAsyncState;
+    visitor.currentAsyncState = asyncState;
+
+    try {
+      // Schedule the real state machine to run
+      _scheduleStateMachineRun(visitor, asyncState);
+
+      // Wait for the generator to complete
+      await completer.future;
+    } finally {
+      visitor.currentAsyncState = previousAsyncState;
+    }
+  }
+
   // Create an Iterable for sync* generator functions
   Iterable<Object?> _createSyncGeneratorIterable(InterpreterVisitor visitor,
       Environment executionEnvironment, bool redirected) {
     return _SyncGeneratorIterable(
         this, visitor, executionEnvironment, redirected);
-  }
-
-  // Execute generator block and handle yields
-  Future<void> _executeGeneratorBlock(InterpreterVisitor visitor,
-      List<Statement> statements, StreamController<Object?> controller) async {
-    for (final statement in statements) {
-      try {
-        final result = statement.accept<Object?>(visitor);
-        if (result is YieldValue) {
-          if (result.isYieldStar) {
-            await _handleYieldStar(result.value, controller);
-          } else {
-            controller.add(result.value);
-          }
-        }
-      } on ReturnException catch (_) {
-        break; // Exit generator
-      } on BreakException catch (_) {
-        break; // Exit generator
-      } on ContinueException catch (_) {
-        continue; // Continue to next iteration
-      }
-    }
   }
 
   // Handle yield* expressions
