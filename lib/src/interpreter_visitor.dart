@@ -3603,7 +3603,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   @override
   Object? visitBreakStatement(BreakStatement node) {
     final label = node.label?.name;
-    Logger.debug("[BreakStatement] Throwing BreakException (label: $label)");
+    Logger.debug(
+        "[BreakStatement] BREAKING: About to throw BreakException (label: $label). Current async state: ${currentAsyncState?.hashCode}");
+    Logger.debug(
+        "[BreakStatement] Stack trace for break: ${StackTrace.current}");
     throw BreakException(label);
   }
 
@@ -6574,13 +6577,16 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       return BridgedClass(nativeType: dynamic, name: 'dynamic');
     }
     if (typeNode is NamedType) {
-      final typeName = isAsync
+      String typeName = isAsync
           ? typeNode
               .toSource()
               .replaceAll('?', '')
               .substringAfter('<')
               .substringBeforeLast('>')
           : typeNode.name2.lexeme;
+      if (typeName.contains('<') && typeName.contains('>')) {
+        typeName = typeName.substring(0, typeName.indexOf('<'));
+      }
       if (typeName == "void") {
         return BridgedClass(nativeType: VoidType, name: 'void');
       }

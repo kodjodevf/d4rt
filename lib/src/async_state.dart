@@ -46,6 +46,12 @@ class AsyncExecutionState {
   /// Stack of ForStatement nodes corresponding to the environments
   final List<ForStatement> loopNodeStack = [];
 
+  /// Stack of loop nodes (ForStatement, WhileStatement, etc.) for break/continue.
+  final List<AstNode> loopStack = [];
+
+  /// Flag to indicate that a `continue` is being handled for a `for` loop.
+  bool isHandlingContinue = false;
+
   /// Optional: A reference back to the function definition might be useful.
   final InterpretedFunction function;
 
@@ -112,6 +118,7 @@ class AsyncExecutionState {
     this.returnAfterFinally,
     this.isHandlingErrorForRethrow = false,
     this.originalErrorForRethrow,
+    this.isHandlingContinue = false,
   });
 }
 
