@@ -1337,7 +1337,17 @@ class InterpretedFunction implements Callable {
             }
           } else {
             // Regular for-in loop handling
-            Iterator<Object?>? iterator = currentState.currentForInIterator;
+            // Check if this loop already has an iterator on the stack
+            final loopIndex = currentState.loopNodeStack.indexOf(forNode);
+            Iterator<Object?>? iterator;
+
+            if (loopIndex >= 0 &&
+                loopIndex < currentState.forInIteratorStack.length) {
+              // This loop is already initialized, retrieve its iterator
+              iterator = currentState.forInIteratorStack[loopIndex];
+              Logger.debug(
+                  "[StateMachine] ForIn: Resumed existing loop at index $loopIndex");
+            }
 
             // First time or resumed after the body?
             if (iterator == null) {
@@ -1355,8 +1365,8 @@ class InterpretedFunction implements Callable {
               } else if (iterableResult is Iterable) {
                 iterator = iterableResult.iterator;
                 currentState.currentForInIterator =
-                    iterator; // Save the iterator
-                Logger.debug("[StateMachine] ForIn: Iterator created.");
+                    iterator; // Save the iterator (keep for compatibility)
+                Logger.debug("[StateMachine] ForIn: Iterator created");
               } else {
                 throw RuntimeError(
                     "The value iterate over in a for-in loop must be an Iterable, but got ${iterableResult?.runtimeType}.");
@@ -1382,19 +1392,35 @@ class InterpretedFunction implements Callable {
 
                 if (parts is ForEachPartsWithDeclaration) {
                   final loopVariable = parts.loopVariable;
-                  // Create a dedicated environment for the loop if it hasn't been done yet
-                  if (currentState.loopEnvironmentStack.isEmpty) {
+                  // Find the environment for this loop
+                  final loopIndex = currentState.loopNodeStack.indexOf(forNode);
+                  if (loopIndex >= 0 &&
+                      loopIndex < currentState.loopEnvironmentStack.length) {
+                    // Environment already exists, use it
+                    visitor.environment =
+                        currentState.loopEnvironmentStack[loopIndex];
+                    // Assign (not define) the loop variable for the current iteration
+                    currentState.loopEnvironmentStack[loopIndex]
+                        .assign(loopVariable.name.lexeme, currentItem);
+                  } else {
+                    // Create a dedicated environment for the loop
+                    final parentEnv =
+                        currentState.loopEnvironmentStack.isNotEmpty
+                            ? currentState.loopEnvironmentStack.last
+                            : currentState.environment;
                     final newLoopEnvironment =
-                        Environment(enclosing: currentState.environment);
+                        Environment(enclosing: parentEnv);
                     currentState.forLoopEnvironment = newLoopEnvironment;
                     currentState.loopEnvironmentStack.add(newLoopEnvironment);
-                    currentState.loopNodeStack.add(
-                        forNode); // Track ForStatement for for-in loops too
+                    currentState.loopNodeStack.add(forNode);
+                    currentState.forInIteratorStack.add(iterator);
+                    visitor.environment = newLoopEnvironment;
+                    // Define the loop variable in this environment
+                    newLoopEnvironment.define(
+                        loopVariable.name.lexeme, currentItem);
+                    Logger.debug(
+                        "[StateMachine] ForIn: Created environment and added to stacks at index ${currentState.loopNodeStack.length - 1}");
                   }
-                  visitor.environment = currentState.loopEnvironmentStack.last;
-                  // Define the loop variable in this environment
-                  currentState.loopEnvironmentStack.last
-                      .define(loopVariable.name.lexeme, currentItem);
                 } else if (parts is ForEachPartsWithIdentifier) {
                   // No declaration, assign in the current environment
                   currentState.environment
@@ -1424,11 +1450,16 @@ class InterpretedFunction implements Callable {
                 currentState.currentForInIterator = null; // Clean the iterator
                 // Clean the loop environment if it existed
                 currentState.forLoopEnvironment = null;
-                if (currentState.loopEnvironmentStack.isNotEmpty) {
-                  currentState.loopEnvironmentStack.removeLast();
-                }
-                if (currentState.loopNodeStack.isNotEmpty) {
-                  currentState.loopNodeStack.removeLast();
+                // Remove from stacks
+                final loopIndex = currentState.loopNodeStack.indexOf(forNode);
+                if (loopIndex >= 0) {
+                  currentState.loopNodeStack.removeAt(loopIndex);
+                  if (loopIndex < currentState.loopEnvironmentStack.length) {
+                    currentState.loopEnvironmentStack.removeAt(loopIndex);
+                  }
+                  if (loopIndex < currentState.forInIteratorStack.length) {
+                    currentState.forInIteratorStack.removeAt(loopIndex);
+                  }
                 }
                 visitor.environment = currentState.environment;
                 currentNode = _findNextSequentialNode(visitor, forNode);

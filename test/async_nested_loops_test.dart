@@ -3,6 +3,7 @@ import 'package:d4rt/d4rt.dart';
 
 dynamic execute(String source, {Object? args}) {
   final d4rt = D4rt();
+  d4rt.setDebug(true);
   return d4rt.execute(
       library: 'package:test/main.dart',
       args: args,
@@ -234,5 +235,271 @@ void main() {
 
     final result = await execute(source);
     expect(result, equals(8));
+  });
+
+  test('Async nested for-in loops with lists', () async {
+    final source = '''
+      Future<String> processItem(String category, String item) async {
+        await Future.delayed(Duration(milliseconds: 5));
+        return '\$category:\$item';
+      }
+      
+      Future<List<String>> processCategories() async {
+        List<String> results = [];
+        
+        List<String> categories = ['fruits', 'vegetables', 'grains'];
+        Map<String, List<String>> items = {
+          'fruits': ['apple', 'banana', 'orange'],
+          'vegetables': ['carrot', 'broccoli'],
+          'grains': ['rice', 'wheat', 'oats', 'barley']
+        };
+        
+        // Outer for-in loop through categories
+        for (String category in categories) {
+          List<String> categoryItems = items[category] ?? [];
+          
+          // Inner for-in loop through items in each category
+          for (String item in categoryItems) {
+            String processed = await processItem(category, item);
+            results.add(processed);
+          }
+        }
+        
+        return results;
+      }
+
+      Future<int> main() async {
+        List<String> results = await processCategories();
+        return results.length;
+      }
+    ''';
+
+    final result = await execute(source);
+    expect(result, equals(9)); // 3 + 2 + 4 = 9 items total
+  });
+
+  test('Async nested for-in loops with maps and complex data', () async {
+    final source = '''
+      Future<Map<String, dynamic>> analyzeData(String department, Map<String, dynamic> employee) async {
+        await Future.delayed(Duration(milliseconds: 3));
+        
+        int salary = employee['salary'] as int;
+        String role = employee['role'] as String;
+        
+        return {
+          'department': department,
+          'name': employee['name'],
+          'role': role,
+          'processedSalary': salary * 1.1, // 10% bonus calculation
+          'category': salary > 50000 ? 'senior' : 'junior'
+        };
+      }
+      
+      Future<Map<String, dynamic>> processCompanyData() async {
+        List<Map<String, dynamic>> allProcessed = [];
+        int totalProcessed = 0;
+        double totalSalary = 0;
+        
+        Map<String, List<Map<String, dynamic>>> company = {
+          'engineering': [
+            {'name': 'Alice', 'salary': 75000, 'role': 'developer'},
+            {'name': 'Bob', 'salary': 85000, 'role': 'senior_dev'},
+          ],
+          'marketing': [
+            {'name': 'Carol', 'salary': 45000, 'role': 'coordinator'},
+            {'name': 'David', 'salary': 60000, 'role': 'manager'},
+          ],
+          'sales': [
+            {'name': 'Eve', 'salary': 55000, 'role': 'representative'},
+          ]
+        };
+        
+        // Outer for-in loop through departments
+        for (String department in company.keys) {
+          List<Map<String, dynamic>> employees = company[department] ?? [];
+          
+          // Inner for-in loop through employees
+          for (Map<String, dynamic> employee in employees) {
+            Map<String, dynamic> processed = await analyzeData(department, employee);
+            allProcessed.add(processed);
+            totalProcessed++;
+            totalSalary += processed['processedSalary'] as double;
+          }
+        }
+        
+        return {
+          'processed': allProcessed,
+          'totalEmployees': totalProcessed,
+          'averageSalary': totalSalary / totalProcessed,
+          'departments': company.keys.length
+        };
+      }
+
+      Future<int> main() async {
+        Map<String, dynamic> results = await processCompanyData();
+        return results['totalEmployees'] as int;
+      }
+    ''';
+
+    final result = await execute(source);
+    expect(result, equals(5)); // 2 + 2 + 1 = 5 employees total
+  });
+
+  test('Async nested for-in loops with break and continue', () async {
+    final source = '''
+      Future<bool> shouldSkipItem(String category, String item) async {
+        await Future.delayed(Duration(milliseconds: 2));
+        // Skip items containing 'skip'
+        return item.contains('skip');
+      }
+      
+      Future<bool> shouldStopCategory(String category) async {
+        await Future.delayed(Duration(milliseconds: 1));
+        // Stop processing when we hit 'stop' category
+        return category == 'stop';
+      }
+      
+      Future<List<String>> processWithControlFlow() async {
+        List<String> processed = [];
+        
+        List<String> categories = ['start', 'middle', 'stop', 'never_reached'];
+        Map<String, List<String>> items = {
+          'start': ['item1', 'skip_me', 'item2'],
+          'middle': ['item3', 'item4', 'skip_this', 'item5'],
+          'stop': ['item6', 'item7'],
+          'never_reached': ['item8', 'item9']
+        };
+        
+        // Outer for-in loop with break condition
+        for (String category in categories) {
+          if (await shouldStopCategory(category)) {
+            break; // Exit both loops when we hit 'stop'
+          }
+          
+          List<String> categoryItems = items[category] ?? [];
+          
+          // Inner for-in loop with continue condition
+          for (String item in categoryItems) {
+            if (await shouldSkipItem(category, item)) {
+              continue; // Skip this item and continue with next
+            }
+            
+            processed.add('\$category:\$item');
+          }
+        }
+        
+        return processed;
+      }
+
+      Future<int> main() async {
+        List<String> results = await processWithControlFlow();
+        return results.length;
+      }
+    ''';
+
+    final result = await execute(source);
+    expect(
+        result,
+        equals(
+            5)); // start:item1, start:item2, middle:item3, middle:item4, middle:item5
+  });
+
+  test('Async nested for-in loops with exception handling', () async {
+    final source = '''
+      Future<String> riskyProcessing(String category, String item) async {
+        await Future.delayed(Duration(milliseconds: 2));
+        
+        if (item == 'dangerous') {
+          throw Exception('Processing failed for dangerous item');
+        }
+        
+        if (category == 'unstable' && item == 'item2') {
+          throw StateError('Unstable category caused an error');
+        }
+        
+        return 'processed_\${category}_\${item}';
+      }
+      
+      Future<Map<String, dynamic>> processWithExceptionHandling() async {
+        List<String> successful = [];
+        List<String> errors = [];
+        int totalAttempts = 0;
+        
+        List<String> categories = ['stable', 'unstable', 'safe'];
+        Map<String, List<String>> items = {
+          'stable': ['item1', 'dangerous', 'item3'],
+          'unstable': ['item1', 'item2', 'item3'],
+          'safe': ['item1', 'item2']
+        };
+        
+        // Outer for-in loop
+        for (String category in categories) {
+          List<String> categoryItems = items[category] ?? [];
+          
+          // Inner for-in loop with exception handling
+          for (String item in categoryItems) {
+            totalAttempts++;
+            
+            try {
+              String result = await riskyProcessing(category, item);
+              successful.add(result);
+            } catch (e) {
+              String errorMsg = 'Error in \$category:\$item - \$e';
+              errors.add(errorMsg);
+            }
+          }
+        }
+        
+        return {
+          'successful': successful,
+          'errors': errors,
+          'totalAttempts': totalAttempts,
+          'successRate': successful.length / totalAttempts
+        };
+      }
+
+      Future<String> main() async {
+        Map<String, dynamic> results = await processWithExceptionHandling();
+        
+        int successful = (results['successful'] as List).length;
+        int errors = (results['errors'] as List).length;
+        int total = results['totalAttempts'] as int;
+        
+        return 'Processed \$total items: \$successful successful, \$errors errors';
+      }
+    ''';
+
+    final result = await execute(source);
+    expect(result, equals('Processed 8 items: 6 successful, 2 errors'));
+  });
+
+  test('Simple async nested for-in loops', () async {
+    final source = '''
+      Future<int> simpleNestedForIn() async {
+        int count = 0;
+        
+        List<List<String>> data = [
+          ['a', 'b'],
+          ['c', 'd', 'e']
+        ];
+        
+        // Simple nested for-in
+        for (List<String> sublist in data) {
+          for (String item in sublist) {
+            await Future.delayed(Duration(milliseconds: 1));
+            count++;
+          }
+        }
+        
+        return count;
+      }
+
+      Future<int> main() async {
+        return await simpleNestedForIn();
+      }
+    ''';
+
+    final result = await execute(source);
+    expect(result, equals(5)); // 2 + 3 = 5 items total
   });
 }

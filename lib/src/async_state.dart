@@ -46,6 +46,9 @@ class AsyncExecutionState {
   /// Stack of ForStatement nodes corresponding to the environments
   final List<ForStatement> loopNodeStack = [];
 
+  /// Stack of iterators for nested for-in loops
+  final List<Iterator<Object?>?> forInIteratorStack = [];
+
   /// Stack of loop nodes (ForStatement, WhileStatement, etc.) for break/continue.
   final List<AstNode> loopStack = [];
 
