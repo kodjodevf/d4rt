@@ -1210,10 +1210,26 @@ class InterpretedFunction implements Callable {
             Logger.debug(
                 "[StateMachine] Detected await for loop, handling natively.");
 
-            // Check if we have already converted the stream to a list
-            // Note: We only check currentAwaitForList here because await-for loops
-            // can be nested inside regular for-in loops, so currentForInIterator might be set
-            if (currentState.currentAwaitForList == null) {
+            // Check if this await-for loop is already in the stack
+            final awaitForLoopIndex =
+                currentState.awaitForNodeStack.indexOf(forNode);
+            final bool isExistingAwaitForLoop = awaitForLoopIndex >= 0;
+
+            // Get or initialize the state for this specific await-for loop
+            List<Object?>? awaitForList;
+            int? awaitForIndex;
+
+            if (isExistingAwaitForLoop) {
+              // This loop is already in the stack, retrieve its state
+              awaitForList = currentState.awaitForListStack[awaitForLoopIndex];
+              awaitForIndex =
+                  currentState.awaitForIndexStack[awaitForLoopIndex];
+              Logger.debug(
+                  "[StateMachine] AwaitForIn: Resuming existing loop at stack index $awaitForLoopIndex");
+            }
+
+            // Check if we need to initialize this await-for loop
+            if (!isExistingAwaitForLoop && awaitForList == null) {
               // First time: evaluate the stream and convert to list
               Logger.debug("[StateMachine] AwaitForIn: Evaluating stream.");
               final streamResult = parts.iterable.accept<Object?>(visitor);
@@ -1250,6 +1266,11 @@ class InterpretedFunction implements Callable {
                   );
                   // Mark that we're waiting for stream conversion
                   currentState.awaitingStreamConversion = true;
+                  // Add this loop to the stack as "pending initialization"
+                  currentState.awaitForNodeStack.add(forNode);
+                  currentState.awaitForListStack
+                      .add([]); // Placeholder until stream converts
+                  currentState.awaitForIndexStack.add(0);
                 }
               }
             } else if (currentState.awaitingStreamConversion == true) {
@@ -1257,30 +1278,73 @@ class InterpretedFunction implements Callable {
               currentState.awaitingStreamConversion = false;
               final List<Object?> items =
                   currentState.lastAwaitResult as List<Object?>;
+
+              // Store in the stack for the current await-for loop
+              final stackIndex =
+                  currentState.awaitForNodeStack.indexOf(forNode);
+              if (stackIndex >= 0) {
+                currentState.awaitForListStack[stackIndex] = items;
+                currentState.awaitForIndexStack[stackIndex] = 0;
+                awaitForList = items;
+                awaitForIndex = 0;
+              }
+
+              // Keep legacy fields for backward compatibility
               currentState.currentAwaitForList = items;
               currentState.currentAwaitForIndex = 0;
-              Logger.debug(
-                  "[StateMachine] AwaitForIn: Stream converted to list with ${items.length} items.");
 
-              // Set up the loop variable environment
+              Logger.debug(
+                  "[StateMachine] AwaitForIn: Stream converted to list with ${items.length} items at stack index $stackIndex.");
+
+              // Set up the loop variable environment - create a dedicated environment
               if (parts is ForEachPartsWithDeclaration) {
                 final loopVariable = parts.loopVariable;
-                visitor.environment.define(loopVariable.name.lexeme, null);
+                // Create an environment for this await-for loop
+                final parentEnv = currentState.loopEnvironmentStack.isNotEmpty
+                    ? currentState.loopEnvironmentStack.last
+                    : currentState.environment;
+                final awaitForEnv = Environment(enclosing: parentEnv);
+                awaitForEnv.define(loopVariable.name.lexeme, null);
+
+                // Add to the loop environment stack
+                currentState.loopEnvironmentStack.add(awaitForEnv);
+                currentState.loopNodeStack.add(forNode);
+                visitor.environment = awaitForEnv;
+
+                Logger.debug(
+                    "[StateMachine] AwaitForIn: Created environment ${awaitForEnv.hashCode} with parent ${parentEnv.hashCode}");
               }
 
               // Continue to process the first item
             }
 
-            // Process the current item if we have the list
-            if (currentState.currentAwaitForList != null) {
-              final items = currentState.currentAwaitForList!;
-              final currentIndex = currentState.currentAwaitForIndex ?? 0;
+            // Determine which list and index to use
+            if (isExistingAwaitForLoop && awaitForList != null) {
+              // Use the state from the stack
+              final items = awaitForList;
+              final currentIndex = awaitForIndex ?? 0;
 
               if (currentIndex < items.length) {
                 // Process current item
                 final currentItem = items[currentIndex];
                 Logger.debug(
-                    "[StateMachine] AwaitForIn: Processing item $currentIndex: $currentItem");
+                    "[StateMachine] AwaitForIn: Processing item $currentIndex: $currentItem (stack level ${currentState.awaitForNodeStack.length})");
+
+                // Restore the environment for this await-for loop
+                // Find the stack index for this await-for loop
+                final awaitForLoopIndex =
+                    currentState.awaitForNodeStack.indexOf(forNode);
+                if (awaitForLoopIndex >= 0 &&
+                    awaitForLoopIndex <
+                        currentState.loopEnvironmentStack.length) {
+                  visitor.environment =
+                      currentState.loopEnvironmentStack[awaitForLoopIndex];
+                  Logger.debug(
+                      "[StateMachine] AwaitForIn: Restored visitor environment to ${visitor.environment.hashCode} (await-for loop index $awaitForLoopIndex)");
+                } else {
+                  Logger.debug(
+                      "[StateMachine] AwaitForIn: Could NOT find environment for await-for loop at index $awaitForLoopIndex!");
+                }
 
                 if (parts is ForEachPartsWithDeclaration) {
                   visitor.environment
@@ -1290,47 +1354,67 @@ class InterpretedFunction implements Callable {
                       .assign(parts.identifier.name, currentItem);
                 }
 
-                // Execute the body synchronously for this item
+                // Execute the body through the state machine, not manually
+                // This ensures proper suspension/resumption handling for await expressions
                 Logger.debug(
                     "[StateMachine] AwaitForIn: Executing body for item $currentIndex");
-                try {
-                  if (forNode.body is Block) {
-                    for (final stmt in (forNode.body as Block).statements) {
-                      final result = stmt.accept<Object?>(visitor);
-                      if (result is AsyncSuspensionRequest) {
-                        // If the body has an async operation, we need to suspend
-                        Logger.debug(
-                            "[StateMachine] AwaitForIn: Body suspended during item $currentIndex");
-                        lastResult = result;
-                        break; // Exit and let the suspension logic handle this
-                      }
-                    }
-                  } else {
-                    final result = forNode.body.accept<Object?>(visitor);
-                    if (result is AsyncSuspensionRequest) {
-                      Logger.debug(
-                          "[StateMachine] AwaitForIn: Body suspended during item $currentIndex");
-                      lastResult = result;
-                    }
-                  }
+                Logger.debug(
+                    "[StateMachine] AwaitForIn: Next node is body: ${forNode.body.runtimeType}");
 
-                  // If no suspension occurred, move to next item
-                  if (lastResult is! AsyncSuspensionRequest) {
-                    currentState.currentAwaitForIndex = currentIndex + 1;
-                    // Continue with the next item (loop back to the start of this if block)
-                    continue;
-                  }
-                } catch (e) {
-                  // Clean up and rethrow
+                // Increment the index NOW, before executing the body
+                // This way, when the body completes and we return to ForStatement,
+                // we'll move to the next item instead of re-processing the current one
+                currentState.awaitForIndexStack[awaitForLoopIndex] =
+                    currentIndex + 1;
+                Logger.debug(
+                    "[StateMachine] AwaitForIn: Pre-incremented index to ${currentIndex + 1}");
+
+                if (forNode.body is Block) {
+                  currentNode = (forNode.body as Block).statements.firstOrNull;
+                } else {
+                  currentNode = forNode.body;
+                }
+                currentState.nextStateIdentifier = currentNode;
+                continue; // Let state machine execute the body
+              } else {
+                // End of iteration - remove this loop from the stack
+                Logger.debug(
+                    "[StateMachine] AwaitForIn: Iteration finished for stack level ${currentState.awaitForNodeStack.length}.");
+
+                final stackIdx =
+                    currentState.awaitForNodeStack.indexOf(forNode);
+                if (stackIdx >= 0) {
+                  currentState.awaitForNodeStack.removeAt(stackIdx);
+                  currentState.awaitForListStack.removeAt(stackIdx);
+                  currentState.awaitForIndexStack.removeAt(stackIdx);
+                  Logger.debug(
+                      "[StateMachine] AwaitForIn: Removed loop from stack. Remaining depth: ${currentState.awaitForNodeStack.length}");
+                }
+
+                // Clean up the loop environment
+                final loopEnvIndex =
+                    currentState.loopNodeStack.indexOf(forNode);
+                if (loopEnvIndex >= 0 &&
+                    loopEnvIndex < currentState.loopEnvironmentStack.length) {
+                  // Restore the parent environment
+                  final loopEnv =
+                      currentState.loopEnvironmentStack[loopEnvIndex];
+                  visitor.environment =
+                      loopEnv.enclosing ?? currentState.environment;
+
+                  // Remove from stacks
+                  currentState.loopEnvironmentStack.removeAt(loopEnvIndex);
+                  currentState.loopNodeStack.removeAt(loopEnvIndex);
+                  Logger.debug(
+                      "[StateMachine] AwaitForIn: Restored parent environment ${visitor.environment.hashCode}");
+                }
+
+                // Clean up legacy fields if this was the last await-for loop
+                if (currentState.awaitForNodeStack.isEmpty) {
                   currentState.currentAwaitForList = null;
                   currentState.currentAwaitForIndex = null;
-                  rethrow;
                 }
-              } else {
-                // End of iteration
-                Logger.debug("[StateMachine] AwaitForIn: Iteration finished.");
-                currentState.currentAwaitForList = null;
-                currentState.currentAwaitForIndex = null;
+
                 currentNode = _findNextSequentialNode(visitor, forNode);
                 currentState.nextStateIdentifier = currentNode;
                 continue; // Restart the state machine loop
@@ -1342,19 +1426,28 @@ class InterpretedFunction implements Callable {
             final loopIndex = currentState.loopNodeStack.indexOf(forNode);
             Iterator<Object?>? iterator;
 
-            if (loopIndex >= 0 &&
-                loopIndex < currentState.forInIteratorStack.length) {
+            Logger.debug(
+                "[StateMachine] ForIn: Checking for existing loop. loopIndex=$loopIndex, stack size=${currentState.loopNodeStack.length}, forNode hashCode=${forNode.hashCode}");
+            Logger.debug(
+                "[StateMachine] ForIn: forInIteratorMap size=${currentState.forInIteratorMap.length}");
+            if (currentState.loopNodeStack.isNotEmpty) {
+              Logger.debug(
+                  "[StateMachine] ForIn: Stack nodes hashCodes: ${currentState.loopNodeStack.map((n) => n.hashCode).join(', ')}");
+            }
+
+            // Check if iterator exists for this forNode in the map
+            if (currentState.forInIteratorMap.containsKey(forNode)) {
               // This loop is already initialized, retrieve its iterator
-              iterator = currentState.forInIteratorStack[loopIndex];
+              iterator = currentState.forInIteratorMap[forNode];
               Logger.debug(
                   "[StateMachine] ForIn: Resumed existing loop at index $loopIndex");
             }
 
-            // First time or resumed after the body?
-            if (iterator == null) {
-              // First time: evaluate the iterable and create the iterator
+            // First time OR node in stack but no iterator yet?
+            if (iterator == null && loopIndex == -1) {
+              // First time seeing this loop - evaluate iterable and create iterator
               Logger.debug(
-                  " [StateMachine] Handling ForIn: Evaluating iterable.");
+                  " [StateMachine] Handling ForIn: Evaluating iterable (first time).");
               final iterableResult = parts.iterable.accept<Object?>(visitor);
 
               // Handle if the iterable evaluation is suspended
@@ -1367,7 +1460,11 @@ class InterpretedFunction implements Callable {
                 iterator = iterableResult.iterator;
                 currentState.currentForInIterator =
                     iterator; // Save the iterator (keep for compatibility)
-                Logger.debug("[StateMachine] ForIn: Iterator created");
+                // Add node and iterator to map/stack immediately
+                currentState.loopNodeStack.add(forNode);
+                currentState.forInIteratorMap[forNode] = iterator;
+                Logger.debug(
+                    "[StateMachine] ForIn: Iterator created and added to stacks at index ${currentState.loopNodeStack.length - 1}");
               } else {
                 throw RuntimeError(
                     "The value iterate over in a for-in loop must be an Iterable, but got ${iterableResult?.runtimeType}.");
@@ -1395,16 +1492,18 @@ class InterpretedFunction implements Callable {
                   final loopVariable = parts.loopVariable;
                   // Find the environment for this loop
                   final loopIndex = currentState.loopNodeStack.indexOf(forNode);
+                  // Check if environment exists at this index
                   if (loopIndex >= 0 &&
                       loopIndex < currentState.loopEnvironmentStack.length) {
-                    // Environment already exists, use it
+                    // Environment already exists, use it and assign the variable
                     visitor.environment =
                         currentState.loopEnvironmentStack[loopIndex];
                     // Assign (not define) the loop variable for the current iteration
                     currentState.loopEnvironmentStack[loopIndex]
                         .assign(loopVariable.name.lexeme, currentItem);
                   } else {
-                    // Create a dedicated environment for the loop
+                    // Environment doesn't exist yet - create it
+                    // Note: node and iterator were already added to stacks above
                     final parentEnv =
                         currentState.loopEnvironmentStack.isNotEmpty
                             ? currentState.loopEnvironmentStack.last
@@ -1413,14 +1512,12 @@ class InterpretedFunction implements Callable {
                         Environment(enclosing: parentEnv);
                     currentState.forLoopEnvironment = newLoopEnvironment;
                     currentState.loopEnvironmentStack.add(newLoopEnvironment);
-                    currentState.loopNodeStack.add(forNode);
-                    currentState.forInIteratorStack.add(iterator);
                     visitor.environment = newLoopEnvironment;
                     // Define the loop variable in this environment
                     newLoopEnvironment.define(
                         loopVariable.name.lexeme, currentItem);
                     Logger.debug(
-                        "[StateMachine] ForIn: Created environment and added to stacks at index ${currentState.loopNodeStack.length - 1}");
+                        "[StateMachine] ForIn: Created environment at index ${currentState.loopEnvironmentStack.length - 1}");
                   }
                 } else if (parts is ForEachPartsWithIdentifier) {
                   // No declaration, assign in the current environment
@@ -1451,16 +1548,14 @@ class InterpretedFunction implements Callable {
                 currentState.currentForInIterator = null; // Clean the iterator
                 // Clean the loop environment if it existed
                 currentState.forLoopEnvironment = null;
-                // Remove from stacks
+                // Remove from stacks and map
                 final loopIndex = currentState.loopNodeStack.indexOf(forNode);
                 if (loopIndex >= 0) {
                   currentState.loopNodeStack.removeAt(loopIndex);
                   if (loopIndex < currentState.loopEnvironmentStack.length) {
                     currentState.loopEnvironmentStack.removeAt(loopIndex);
                   }
-                  if (loopIndex < currentState.forInIteratorStack.length) {
-                    currentState.forInIteratorStack.removeAt(loopIndex);
-                  }
+                  currentState.forInIteratorMap.remove(forNode);
                 }
                 visitor.environment = currentState.environment;
                 currentNode = _findNextSequentialNode(visitor, forNode);
@@ -1483,7 +1578,7 @@ class InterpretedFunction implements Callable {
           // Check if this ForStatement is already on the stack (returning to existing loop)
           // vs a new nested ForStatement (needs initialization)
           bool isExistingLoop = currentState.loopNodeStack.isNotEmpty &&
-              currentState.loopNodeStack.last == forNode;
+              currentState.loopNodeStack.contains(forNode);
 
           bool currentLoopInitialized = false;
           if (isExistingLoop) {
@@ -1846,20 +1941,14 @@ class InterpretedFunction implements Callable {
             rethrow; // Propagate to the outer catch
           } catch (error, stackTrace) {
             if (error is InternalInterpreterException) {
-              // This is an exception rethrown by rethrow. Propagate immediately.
+              // This is a thrown exception (from throw statement). Try to handle it.
               Logger.debug(
-                  " [StateMachine] Caught InternalInterpreterException from accept()/rethrow. Propagating.");
-              // Reset the rethrow state
-              currentState.isHandlingErrorForRethrow = false;
-              currentState.originalErrorForRethrow = null;
-              if (!currentState.completer.isCompleted) {
-                // Unwrap BridgedInstance exceptions to get native objects
-                final errorToComplete =
-                    _unwrapExceptionForPropagation(error.originalThrownValue);
-                currentState.completer
-                    .completeError(errorToComplete, stackTrace);
-              }
-              return; // Stop the state machine
+                  " [StateMachine] Caught InternalInterpreterException from accept(). Attempting to handle with try/catch.");
+              // Store the error and try to find a catch block
+              currentState.currentError = error;
+              currentState.currentStackTrace = stackTrace;
+              _handleAsyncError(visitor, currentState, currentNode);
+              return; // Stop this iteration, _handleAsyncError will reschedule if caught
             } else {
               // Standard synchronous error during accept(): store and try to handle
               Logger.debug(
@@ -2150,9 +2239,23 @@ class InterpretedFunction implements Callable {
     Logger.debug(
         "[_handleAsyncError] Handling error: $error from node: ${nodeWhereErrorOccurred.toSource()}");
 
+    // Check if this is a rethrow - if so, skip the current try/catch
+    bool isRethrow = state.isCurrentlyRethrowing;
+    TryStatement? currentTry = state.activeTryStatement;
+
     // 1. Find an enclosing TryStatement
     TryStatement? enclosingTry =
         _findEnclosingTryStatement(nodeWhereErrorOccurred);
+
+    // If this is a rethrow and we found the same try statement, look for an outer one
+    if (isRethrow && enclosingTry != null && enclosingTry == currentTry) {
+      Logger.debug(
+          " [_handleAsyncError] Rethrow detected - skipping current try/catch and looking for outer one");
+      // Find the next enclosing try outside of the current one
+      enclosingTry = _findEnclosingTryStatement(enclosingTry.parent);
+      // Reset the flag after handling
+      state.isCurrentlyRethrowing = false;
+    }
 
     CatchClause? matchingCatchClause;
     if (enclosingTry != null) {
@@ -2176,10 +2279,12 @@ class InterpretedFunction implements Callable {
       state.nextStateIdentifier = matchingCatchClause
           .body.statements.firstOrNull; // Start of the catch block
 
-      // Update the state for rethrow
+      // Update the state for rethrow - store the original error
       final internalError = InternalInterpreterException(
           error ?? Exception("Unknown error caught")); // Pass only the error
       state.originalErrorForRethrow = internalError;
+      // NOTE: We set isHandlingErrorForRethrow to true here to indicate we're in a catch block
+      // and ready to handle potential rethrow statements
       state.isHandlingErrorForRethrow = true;
 
       // Define the exception variable in the catch environment
@@ -2237,8 +2342,10 @@ class InterpretedFunction implements Callable {
         Logger.debug(
             " [_handleAsyncError] Error not caught and no finally block. Propagating error.");
         if (!state.completer.isCompleted) {
-          state.completer
-              .completeError(error ?? Exception("Unknown error"), stackTrace);
+          // Unwrap BridgedInstance exceptions to get native objects
+          final errorToComplete = _unwrapExceptionForPropagation(
+              error ?? Exception("Unknown error"));
+          state.completer.completeError(errorToComplete, stackTrace);
         }
       }
     }
@@ -3143,6 +3250,17 @@ class InterpretedFunction implements Callable {
             "[_determineNextNodeAfterAwait] Setting up await for list iteration.");
         state.awaitingStreamConversion = false;
         final List<Object?> items = futureResult as List<Object?>;
+
+        // Update the stack for this await-for loop
+        final stackIndex = state.awaitForNodeStack.indexOf(awaitContextNode);
+        if (stackIndex >= 0) {
+          state.awaitForListStack[stackIndex] = items;
+          state.awaitForIndexStack[stackIndex] = 0;
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Updated stack index $stackIndex with ${items.length} items");
+        }
+
+        // Also update legacy fields for backward compatibility
         state.currentAwaitForList = items;
         state.currentAwaitForIndex = 0;
 
@@ -3156,11 +3274,20 @@ class InterpretedFunction implements Callable {
         return awaitContextNode;
       } else {
         // If we're in the middle of await for iteration but got suspended (e.g., body had async operation)
-        // Increment the index to move to the next item after the suspension is resolved
-        final currentIndex = state.currentAwaitForIndex ?? 0;
-        state.currentAwaitForIndex = currentIndex + 1;
-        Logger.debug(
-            "[_determineNextNodeAfterAwait] Continuing await for iteration after body suspension. Moving to index ${state.currentAwaitForIndex}");
+        // Increment the index in the stack for this specific await-for loop
+        final stackIndex = state.awaitForNodeStack.indexOf(awaitContextNode);
+        if (stackIndex >= 0) {
+          final currentIndex = state.awaitForIndexStack[stackIndex];
+          state.awaitForIndexStack[stackIndex] = currentIndex + 1;
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Continuing await for iteration at stack level $stackIndex. Moving to index ${state.awaitForIndexStack[stackIndex]}");
+        } else {
+          // Fallback to legacy approach
+          final currentIndex = state.currentAwaitForIndex ?? 0;
+          state.currentAwaitForIndex = currentIndex + 1;
+          Logger.debug(
+              "[_determineNextNodeAfterAwait] Continuing await for iteration (legacy). Moving to index ${state.currentAwaitForIndex}");
+        }
         // Continue back to the ForStatement to process next item
         return awaitContextNode;
       }

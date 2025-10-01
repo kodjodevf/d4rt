@@ -46,8 +46,8 @@ class AsyncExecutionState {
   /// Stack of ForStatement nodes corresponding to the environments
   final List<ForStatement> loopNodeStack = [];
 
-  /// Stack of iterators for nested for-in loops
-  final List<Iterator<Object?>?> forInIteratorStack = [];
+  /// Map of ForStatement -> Iterator for for-in loops
+  final Map<ForStatement, Iterator<Object?>?> forInIteratorMap = {};
 
   /// Stack of loop nodes (ForStatement, WhileStatement, etc.) for break/continue.
   final List<AstNode> loopStack = [];
@@ -82,6 +82,10 @@ class AsyncExecutionState {
   /// Store the original exception wrapped for potential rethrow.
   InternalInterpreterException? originalErrorForRethrow;
 
+  /// Flag to indicate we are currently executing a rethrow statement
+  /// (as opposed to just being in a catch block)
+  bool isCurrentlyRethrowing = false;
+
   /// Flag to indicate if we are resuming an invocation with await in arguments
   /// When true, await expressions should return the last resolved value instead of suspending
   bool isInvocationResumptionMode = false;
@@ -96,6 +100,18 @@ class AsyncExecutionState {
   /// Flag indicating if the interpreter is currently waiting for stream conversion.
   /// When true, indicates that a stream is being converted to a list for await-for processing.
   bool awaitingStreamConversion = false;
+
+  /// Stack of lists for nested await-for loops
+  /// Each level of nesting has its own list
+  final List<List<Object?>> awaitForListStack = [];
+
+  /// Stack of indices for nested await-for loops
+  /// Each level of nesting has its own index
+  final List<int> awaitForIndexStack = [];
+
+  /// Stack of ForStatement nodes for nested await-for loops
+  /// Used to track which await-for loop we're in
+  final List<ForStatement> awaitForNodeStack = [];
 
   /// For async* generators: the stream controller to send yields to
   StreamController<Object?>? generatorStreamController;

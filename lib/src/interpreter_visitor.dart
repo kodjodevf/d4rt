@@ -6415,6 +6415,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     }
     Logger.debug(
         "[Rethrow] Rethrowing original internal exception: ${originalError.originalThrownValue}");
+    // Set flag to indicate this is a rethrow, not a new exception
+    asyncState.isCurrentlyRethrowing = true;
     // Relaunch the original exception stored in the async state
     throw originalError;
   }
