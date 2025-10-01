@@ -473,6 +473,52 @@ void main() {
     expect(result, equals('Processed 8 items: 6 successful, 2 errors'));
   });
 
+  test('Async nested for-in loops with await for streams', () async {
+    final source = '''
+      Future<Stream<String>> createAsyncStream(List<String> items) async {
+        await Future.delayed(Duration(milliseconds: 5));
+        
+        Stream<String> stream = Stream.fromIterable(items);
+        return stream;
+      }
+      
+      Future<List<String>> processStreams() async {
+        List<String> allResults = [];
+        
+        List<String> streamNames = ['stream1', 'stream2'];
+        Map<String, List<String>> streamData = {
+          'stream1': ['a', 'b', 'c'],
+          'stream2': ['x', 'y']
+        };
+        
+        // Outer for-in loop through stream names
+        for (String streamName in streamNames) {
+          List<String> data = streamData[streamName] ?? [];
+          Stream<String> stream = await createAsyncStream(data);
+          
+          // Inner await for loop to process stream items
+          await for (String item in stream) {
+            String processed = '\${streamName}:\$item';
+            allResults.add(processed);
+            
+            // Simulate async processing for each stream item
+            await Future.delayed(Duration(milliseconds: 1));
+          }
+        }
+        
+        return allResults;
+      }
+
+      Future<int> main() async {
+        List<String> results = await processStreams();
+        return results.length;
+      }
+    ''';
+
+    final result = await execute(source);
+    expect(result, equals(5)); // 3 items from stream1 + 2 items from stream2
+  });
+
   test('Simple async nested for-in loops', () async {
     final source = '''
       Future<int> simpleNestedForIn() async {

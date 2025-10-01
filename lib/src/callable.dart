@@ -1211,8 +1211,9 @@ class InterpretedFunction implements Callable {
                 "[StateMachine] Detected await for loop, handling natively.");
 
             // Check if we have already converted the stream to a list
-            if (currentState.currentForInIterator == null &&
-                currentState.currentAwaitForList == null) {
+            // Note: We only check currentAwaitForList here because await-for loops
+            // can be nested inside regular for-in loops, so currentForInIterator might be set
+            if (currentState.currentAwaitForList == null) {
               // First time: evaluate the stream and convert to list
               Logger.debug("[StateMachine] AwaitForIn: Evaluating stream.");
               final streamResult = parts.iterable.accept<Object?>(visitor);
@@ -3155,9 +3156,12 @@ class InterpretedFunction implements Callable {
         return awaitContextNode;
       } else {
         // If we're in the middle of await for iteration but got suspended (e.g., body had async operation)
-        // Just continue back to the ForStatement to process next item
+        // Increment the index to move to the next item after the suspension is resolved
+        final currentIndex = state.currentAwaitForIndex ?? 0;
+        state.currentAwaitForIndex = currentIndex + 1;
         Logger.debug(
-            "[_determineNextNodeAfterAwait] Continuing await for iteration after body suspension.");
+            "[_determineNextNodeAfterAwait] Continuing await for iteration after body suspension. Moving to index ${state.currentAwaitForIndex}");
+        // Continue back to the ForStatement to process next item
         return awaitContextNode;
       }
     }
