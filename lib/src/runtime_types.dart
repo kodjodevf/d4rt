@@ -1084,6 +1084,49 @@ class InterpretedInstance implements RuntimeValue {
       if (method != null) {
         return method.bind(this); // Bind to the *original* instance ('this')
       }
+
+      // Check bridged superclass at this level before moving up
+      if (currentClass.bridgedSuperclass != null &&
+          bridgedSuperObject != null) {
+        final bridgedSuper = currentClass.bridgedSuperclass!;
+        final nativeTarget = bridgedSuperObject!;
+
+        // Try getter first
+        final getterAdapter = bridgedSuper.findInstanceGetterAdapter(name);
+        if (getterAdapter != null) {
+          Logger.debug(
+              "[Instance.get] Found getter '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Calling adapter.");
+          try {
+            final result = getterAdapter(visitor, nativeTarget);
+
+            // Check if result is a native enum that has been bridged
+            if (result != null && visitor != null) {
+              final bridgedEnumValue =
+                  visitor.environment.getBridgedEnumValue(result);
+              if (bridgedEnumValue != null) {
+                return bridgedEnumValue;
+              }
+            }
+
+            return result;
+          } catch (e, s) {
+            Logger.error(
+                "Native exception during bridged superclass getter '$name': $e\n$s");
+            throw RuntimeError(
+                "Native error in bridged superclass getter '$name': $e");
+          }
+        }
+
+        // Try method next
+        final methodAdapter = bridgedSuper.findInstanceMethodAdapter(name);
+        if (methodAdapter != null) {
+          Logger.debug(
+              "[Instance.get] Found method '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Returning bound callable.");
+          return BridgedSuperMethodCallable(
+              nativeTarget, methodAdapter, name, bridgedSuper.name);
+        }
+      }
+
       // Move up to the superclass
       currentClass = currentClass.superclass;
     }
@@ -1141,50 +1184,6 @@ class InterpretedInstance implements RuntimeValue {
       }
     }
 
-    if (klass.bridgedSuperclass != null && bridgedSuperObject != null) {
-      final bridgedSuper = klass.bridgedSuperclass!;
-      final nativeTarget = bridgedSuperObject!;
-
-      // Try getter first
-      final getterAdapter = bridgedSuper.findInstanceGetterAdapter(name);
-      if (getterAdapter != null) {
-        Logger.debug(
-            " [Instance.get] Found getter '$name' in bridged superclass '${bridgedSuper.name}'. Calling adapter.");
-        try {
-          // Adapter needs visitor (null ok?), target object, name
-          // Assuming getter adapter doesn't need visitor?
-          // Adapters MUST handle potential exceptions from native code.
-          final result = getterAdapter(null, nativeTarget);
-
-          // Check if result is a native enum that has been bridged
-          if (result != null && visitor != null) {
-            final bridgedEnumValue =
-                visitor.environment.getBridgedEnumValue(result);
-            if (bridgedEnumValue != null) {
-              return bridgedEnumValue;
-            }
-          }
-
-          return result;
-        } catch (e, s) {
-          Logger.error(
-              "Native exception during bridged superclass getter '$name': $e\n$s");
-          throw RuntimeError(
-              "Native error in bridged superclass getter '$name': $e");
-        }
-      }
-
-      // Try method next
-      final methodAdapter = bridgedSuper.findInstanceMethodAdapter(name);
-      if (methodAdapter != null) {
-        Logger.debug(
-            " [Instance.get] Found method '$name' in bridged superclass '${bridgedSuper.name}'. Returning bound callable.");
-        // Return a callable wrapper that knows the target object and the adapter
-        return BridgedSuperMethodCallable(
-            nativeTarget, methodAdapter, name, bridgedSuper.name);
-      }
-    }
-
     // If not found anywhere in the hierarchy or bridge
     throw RuntimeError("Undefined property '$name' on ${klass.name}.");
   }
@@ -1229,30 +1228,31 @@ class InterpretedInstance implements RuntimeValue {
         setter.bind(this).call(visitor!, [value], {});
         return; // Setter called, assignment done
       }
-      // Move up to the superclass
-      currentClass = currentClass.superclass;
-    }
 
-    if (klass.bridgedSuperclass != null && bridgedSuperObject != null) {
-      final bridgedSuper = klass.bridgedSuperclass!;
-      final nativeTarget = bridgedSuperObject!;
-      final setterAdapter = bridgedSuper.findInstanceSetterAdapter(name);
+      // Check bridged superclass at this level before moving up
+      if (currentClass.bridgedSuperclass != null &&
+          bridgedSuperObject != null) {
+        final bridgedSuper = currentClass.bridgedSuperclass!;
+        final nativeTarget = bridgedSuperObject!;
+        final setterAdapter = bridgedSuper.findInstanceSetterAdapter(name);
 
-      if (setterAdapter != null) {
-        Logger.debug(
-            " [Instance.set] Found setter '$name' in bridged superclass '${bridgedSuper.name}'. Calling adapter.");
-        try {
-          // Adapter needs visitor (null ok?), target object, value
-          // Assuming setter adapter doesn't need visitor?
-          setterAdapter(null, nativeTarget, value);
-          return; // Setter called, assignment done
-        } catch (e, s) {
-          Logger.error(
-              "Native exception during bridged superclass setter '$name': $e\n$s");
-          throw RuntimeError(
-              "Native error in bridged superclass setter '$name': $e");
+        if (setterAdapter != null) {
+          Logger.debug(
+              "[Instance.set] Found setter '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Calling adapter.");
+          try {
+            setterAdapter(visitor, nativeTarget, value);
+            return; // Setter called, assignment done
+          } catch (e, s) {
+            Logger.error(
+                "Native exception during bridged superclass setter '$name': $e\n$s");
+            throw RuntimeError(
+                "Native error in bridged superclass setter '$name': $e");
+          }
         }
       }
+
+      // Move up to the superclass
+      currentClass = currentClass.superclass;
     }
 
     // No setter found in the hierarchy or bridge, assign directly to the field
@@ -1410,12 +1410,29 @@ class InterpretedEnum implements RuntimeType {
 
   final List<FieldDeclaration> fieldDeclarations = [];
 
+  // Mixin support - similar to InterpretedClass
+  List<InterpretedClass> mixins;
+  List<BridgedClass> bridgedMixins;
+
   // Constructor used during Interpretation Pass (Populates members)
-  InterpretedEnum(this.name, this.declarationEnvironment, this.valueNames);
+  InterpretedEnum(
+    this.name,
+    this.declarationEnvironment,
+    this.valueNames, {
+    List<InterpretedClass>? mixins,
+    List<BridgedClass>? bridgedMixins,
+  })  : mixins = mixins ?? [],
+        bridgedMixins = bridgedMixins ?? [];
 
   // Constructor for Declaration Pass (Placeholder)
   InterpretedEnum.placeholder(
-      this.name, this.declarationEnvironment, this.valueNames);
+    this.name,
+    this.declarationEnvironment,
+    this.valueNames, {
+    List<InterpretedClass>? mixins,
+    List<BridgedClass>? bridgedMixins,
+  })  : mixins = mixins ?? [],
+        bridgedMixins = bridgedMixins ?? [];
 
   @override
   String toString() => '<enum $name>';
@@ -1486,6 +1503,13 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       return name; // Return the stored name of the enum value
     }
 
+    // Handle implicit 'index' property
+    if (memberName == 'index') {
+      Logger.debug(
+          " [EnumValue.get] Accessing implicit property 'index'. Returning: $index");
+      return index;
+    }
+
     // 1. Check instance fields specific to this enum value
     if (_fields.containsKey(memberName)) {
       final fieldValue = _fields[memberName];
@@ -1519,6 +1543,65 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       Logger.debug(
           " [EnumValue.get] Found method '$memberName'. Returning bound method: $boundMethod");
       return boundMethod;
+    }
+
+    // 4. Check mixins (similar to InterpretedInstance)
+    // Search in reverse order (last mixin wins)
+    for (final mixin in parentEnum.mixins.reversed) {
+      // Check mixin getters
+      final mixinGetter = mixin.getters[memberName];
+      if (mixinGetter != null) {
+        if (visitor == null) {
+          throw RuntimeError(
+              "Internal error: Visitor required to execute mixin getter '$memberName'.");
+        }
+        final boundGetter = mixinGetter.bind(this);
+        final getterResult = boundGetter.call(visitor, [], {});
+        Logger.debug(
+            " [EnumValue.get] Executed mixin getter '$memberName' from '${mixin.name}'. Result: $getterResult");
+        return getterResult;
+      }
+
+      // Check mixin methods
+      final mixinMethod = mixin.methods[memberName];
+      if (mixinMethod != null) {
+        final boundMethod = mixinMethod.bind(this);
+        Logger.debug(
+            " [EnumValue.get] Found mixin method '$memberName' from '${mixin.name}'. Returning bound method.");
+        return boundMethod;
+      }
+    }
+
+    // 5. Check bridged mixins
+    for (final bridgedMixin in parentEnum.bridgedMixins.reversed) {
+      // Try getter first
+      final getterAdapter = bridgedMixin.findInstanceGetterAdapter(memberName);
+      if (getterAdapter != null) {
+        if (visitor == null) {
+          throw RuntimeError(
+              "Internal error: Visitor required to execute bridged mixin getter '$memberName'.");
+        }
+        Logger.debug(
+            " [EnumValue.get] Executing bridged mixin getter '$memberName' from '${bridgedMixin.name}'.");
+        try {
+          return getterAdapter(visitor, this);
+        } catch (e, s) {
+          Logger.error(
+              "Native exception during bridged mixin getter '$memberName': $e\n$s");
+          throw RuntimeError(
+              "Native error in bridged mixin getter '$memberName': $e");
+        }
+      }
+
+      // Try method next
+      final methodAdapter = bridgedMixin.findInstanceMethodAdapter(memberName);
+      if (methodAdapter != null) {
+        Logger.debug(
+            " [EnumValue.get] Found bridged mixin method '$memberName' from '${bridgedMixin.name}'.");
+        // Return a callable that wraps the bridged method
+        return BridgedEnumMixinMethodCallable(
+            this, methodAdapter, memberName, bridgedMixin.name);
+      }
     }
 
     // Property not found
@@ -1556,17 +1639,63 @@ class InterpretedExtension {
   final String? name; // Optional name of the extension
   final RuntimeType onType; // The type the extension applies to
   final Map<String, Callable>
-      members; // Static methods, instance methods, getters, setters
+      members; // Instance methods, getters, setters, operators
+
+  // Static members
+  final Map<String, Callable> staticMethods;
+  final Map<String, Callable> staticGetters;
+  final Map<String, Callable> staticSetters;
+  final Map<String, Object?> staticFields;
 
   InterpretedExtension({
     this.name,
     required this.onType,
     required this.members,
-  });
+    Map<String, Callable>? staticMethods,
+    Map<String, Callable>? staticGetters,
+    Map<String, Callable>? staticSetters,
+    Map<String, Object?>? staticFields,
+  })  : staticMethods = staticMethods ?? {},
+        staticGetters = staticGetters ?? {},
+        staticSetters = staticSetters ?? {},
+        staticFields = staticFields ?? {};
 
-  // Helper to find a member, could be expanded later
+  // Helper to find an instance member
   Callable? findMember(String name) {
     return members[name];
+  }
+
+  // Helper to find a static method
+  Callable? findStaticMethod(String name) {
+    return staticMethods[name];
+  }
+
+  // Helper to find a static getter
+  Callable? findStaticGetter(String name) {
+    return staticGetters[name];
+  }
+
+  // Helper to find a static setter
+  Callable? findStaticSetter(String name) {
+    return staticSetters[name];
+  }
+
+  // Helper to get a static field
+  Object? getStaticField(String name) {
+    if (!staticFields.containsKey(name)) {
+      throw RuntimeError(
+          "Extension '${this.name ?? '<unnamed>'}' has no static field '$name'.");
+    }
+    return staticFields[name];
+  }
+
+  // Helper to set a static field
+  void setStaticField(String name, Object? value) {
+    if (!staticFields.containsKey(name)) {
+      throw RuntimeError(
+          "Extension '${this.name ?? '<unnamed>'}' has no static field '$name'.");
+    }
+    staticFields[name] = value;
   }
 }
 
@@ -1642,5 +1771,39 @@ class BridgedMixinMethodCallable implements Callable {
   @override
   String toString() {
     return '<bridged mixin method $bridgedMixinName.$methodName>';
+  }
+}
+
+/// Callable for bridged mixin methods on enum values
+class BridgedEnumMixinMethodCallable implements Callable {
+  final InterpretedEnumValue enumValue;
+  final BridgedMethodAdapter adapter;
+  final String methodName;
+  final String bridgedMixinName;
+
+  BridgedEnumMixinMethodCallable(
+      this.enumValue, this.adapter, this.methodName, this.bridgedMixinName);
+
+  @override
+  int get arity => 0; // Arity validation is done by the adapter
+
+  @override
+  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
+      [Map<String, Object?> namedArguments = const {},
+      List<RuntimeType>? typeArguments]) {
+    try {
+      // Pass the enum value as the target for the adapter
+      return adapter(visitor, enumValue, positionalArguments, namedArguments);
+    } catch (e, s) {
+      Logger.error(
+          "[BridgedEnumMixinMethodCallable] Native exception during call to '$bridgedMixinName.$methodName': $e\n$s");
+      throw RuntimeError(
+          "Native error in bridged mixin method '$bridgedMixinName.$methodName': $e");
+    }
+  }
+
+  @override
+  String toString() {
+    return '<bridged enum mixin method $bridgedMixinName.$methodName>';
   }
 }

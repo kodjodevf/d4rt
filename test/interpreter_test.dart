@@ -14,6 +14,21 @@ dynamic execute(String source, {Object? args}) {
       sources: {'package:test/main.dart': source});
 }
 
+// Async version that awaits Future results for complex await tests
+Future<dynamic> executeAsync(String source, {Object? args}) async {
+  final d4rt = D4rt()..setDebug(false);
+  final result = d4rt.execute(
+      library: 'package:test/main.dart',
+      args: args,
+      sources: {'package:test/main.dart': source});
+
+  // If the result is a Future, await it
+  if (result is Future) {
+    return await result;
+  }
+  return result;
+}
+
 void main() {
   group('Basic Interpreter', () {
     test('Variable declaration and retrieval', () {

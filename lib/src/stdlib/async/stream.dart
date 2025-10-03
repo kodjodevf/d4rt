@@ -584,8 +584,7 @@ class StreamTransformerAsync {
         nativeType: StreamTransformer,
         name: 'StreamTransformer',
         typeParameterCount: 2,
-        constructors: {},
-        staticMethods: {
+        constructors: {
           'fromHandlers': (visitor, positionalArgs, namedArgs) {
             final handleData = namedArgs['handleData'] as InterpretedFunction?;
             final handleError =
@@ -626,6 +625,7 @@ class StreamTransformerAsync {
                 positionalArgs[0] as StreamTransformer);
           },
         },
+        staticMethods: {},
         methods: {
           'bind': (visitor, target, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 || positionalArgs[0] is! Stream) {
@@ -779,6 +779,47 @@ class MultiStreamControllerAsync {
       );
 }
 
+class EventSinkAsync {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: EventSink,
+        name: 'EventSink',
+        typeParameterCount: 1,
+        nativeNames: [
+          '_EventSinkWrapper',
+          '_HandlerEventSink',
+        ],
+        constructors: {},
+        staticMethods: {},
+        methods: {
+          'add': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw RuntimeError('EventSink.add requires a value argument.');
+            }
+            (target as EventSink).add(positionalArgs[0]);
+            return null;
+          },
+          'addError': (visitor, target, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty) {
+              throw RuntimeError(
+                  'EventSink.addError requires an error argument.');
+            }
+            final error = positionalArgs[0] as Object;
+            final stackTrace = positionalArgs.length > 1
+                ? positionalArgs[1] as StackTrace?
+                : null;
+            (target as EventSink).addError(error, stackTrace);
+            return null;
+          },
+          'close': (visitor, target, positionalArgs, namedArgs) {
+            (target as EventSink).close();
+            return null;
+          },
+        },
+        getters: {},
+        setters: {},
+      );
+}
+
 class AsyncStreamStdlib {
   static void register(Environment environment) {
     environment.defineBridge(StreamAsync.definition);
@@ -787,5 +828,6 @@ class AsyncStreamStdlib {
     environment.defineBridge(StreamTransformerAsync.definition);
     environment.defineBridge(StreamIteratorAsync.definition);
     environment.defineBridge(MultiStreamControllerAsync.definition);
+    environment.defineBridge(EventSinkAsync.definition);
   }
 }

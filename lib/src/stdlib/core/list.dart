@@ -122,42 +122,42 @@ class ListCore {
             return null;
           },
           'any': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             return (target as List)
-                .any((element) => test.call(visitor, [element]) as bool);
+                .any((element) => test.call(visitor, [element], {}) as bool);
           },
           'every': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             return (target as List)
-                .every((element) => test.call(visitor, [element]) as bool);
+                .every((element) => test.call(visitor, [element], {}) as bool);
           },
           'map': (visitor, target, positionalArgs, namedArgs) {
-            final toElement = positionalArgs[0] as InterpretedFunction;
+            final toElement = positionalArgs[0] as Callable;
             return (target as List)
-                .map((element) => toElement.call(visitor, [element]));
+                .map((element) => toElement.call(visitor, [element], {}));
           },
           'where': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             return (target as List)
-                .where((element) => test.call(visitor, [element]) as bool);
+                .where((element) => test.call(visitor, [element], {}) as bool);
           },
           'expand': (visitor, target, positionalArgs, namedArgs) {
-            final toElements = positionalArgs[0] as InterpretedFunction;
-            return (target as List).expand(
-                (element) => toElements.call(visitor, [element]) as Iterable);
+            final toElements = positionalArgs[0] as Callable;
+            return (target as List).expand((element) =>
+                toElements.call(visitor, [element], {}) as Iterable);
           },
           'reduce': (visitor, target, positionalArgs, namedArgs) {
-            final combine = positionalArgs[0] as InterpretedFunction;
-            return (target as List).reduce(
-                (value, element) => combine.call(visitor, [value, element]));
+            final combine = positionalArgs[0] as Callable;
+            return (target as List).reduce((value, element) =>
+                combine.call(visitor, [value, element], {}));
           },
           'fold': (visitor, target, positionalArgs, namedArgs) {
             final initialValue = positionalArgs[0];
-            final combine = positionalArgs[1] as InterpretedFunction;
+            final combine = positionalArgs[1] as Callable;
             return (target as List).fold(
               initialValue,
               (previousValue, element) =>
-                  combine.call(visitor, [previousValue, element]),
+                  combine.call(visitor, [previousValue, element], {}),
             );
           },
           'join': (visitor, target, positionalArgs, namedArgs) {
@@ -169,17 +169,17 @@ class ListCore {
             return (target as List).take(positionalArgs[0] as int);
           },
           'takeWhile': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             return (target as List)
-                .takeWhile((value) => test.call(visitor, [value]) as bool);
+                .takeWhile((value) => test.call(visitor, [value], {}) as bool);
           },
           'skip': (visitor, target, positionalArgs, namedArgs) {
             return (target as List).skip(positionalArgs[0] as int);
           },
           'skipWhile': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             return (target as List)
-                .skipWhile((value) => test.call(visitor, [value]) as bool);
+                .skipWhile((value) => test.call(visitor, [value], {}) as bool);
           },
           'toList': (visitor, target, positionalArgs, namedArgs) {
             return (target as List)
@@ -189,39 +189,41 @@ class ListCore {
             return (target as List).toSet();
           },
           'firstWhere': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
-            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            final test = positionalArgs[0] as Callable;
+            final orElse = namedArgs['orElse'] as Callable?;
 
             // Implémentation manuelle pour éviter les problèmes de types génériques
             final list = target as List;
             for (final element in list) {
-              if (test.call(visitor, [element]) as bool) {
+              if (test.call(visitor, [element], {}) as bool) {
                 return element;
               }
             }
 
             // Si aucun élément trouvé, utilise orElse ou lance une exception
             if (orElse != null) {
-              return orElse.call(visitor, []);
+              return orElse.call(visitor, [], {});
             } else {
               throw RuntimeError(
                   'No element found matching the test condition');
             }
           },
           'lastWhere': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
-            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            final test = positionalArgs[0] as Callable;
+            final orElse = namedArgs['orElse'] as Callable?;
             return (target as List).lastWhere(
-              (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+              (element) => test.call(visitor, [element], {}) as bool,
+              orElse:
+                  orElse == null ? null : () => orElse.call(visitor, [], {}),
             );
           },
           'singleWhere': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
-            final orElse = namedArgs['orElse'] as InterpretedFunction?;
+            final test = positionalArgs[0] as Callable;
+            final orElse = namedArgs['orElse'] as Callable?;
             return (target as List).singleWhere(
-              (element) => test.call(visitor, [element]) as bool,
-              orElse: orElse == null ? null : () => orElse.call(visitor, []),
+              (element) => test.call(visitor, [element], {}) as bool,
+              orElse:
+                  orElse == null ? null : () => orElse.call(visitor, [], {}),
             );
           },
           'insert': (visitor, target, positionalArgs, namedArgs) {
@@ -261,24 +263,24 @@ class ListCore {
             return null;
           },
           'retainWhere': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             (target as List).retainWhere(
-                (element) => test.call(visitor, [element]) as bool);
+                (element) => test.call(visitor, [element], {}) as bool);
             return null;
           },
           'removeWhere': (visitor, target, positionalArgs, namedArgs) {
-            final test = positionalArgs[0] as InterpretedFunction;
+            final test = positionalArgs[0] as Callable;
             (target as List).removeWhere(
-                (element) => test.call(visitor, [element]) as bool);
+                (element) => test.call(visitor, [element], {}) as bool);
             return null;
           },
           'sort': (visitor, target, positionalArgs, namedArgs) {
             if (positionalArgs.isEmpty) {
               (target as List).sort();
             } else {
-              final compare = positionalArgs[0] as InterpretedFunction;
+              final compare = positionalArgs[0] as Callable;
               (target as List)
-                  .sort((a, b) => compare.call(visitor, [a, b]) as int);
+                  .sort((a, b) => compare.call(visitor, [a, b], {}) as int);
             }
             return null;
           },

@@ -5,6 +5,11 @@ class SetCore {
         nativeType: Set,
         name: 'Set',
         typeParameterCount: 1,
+        nativeNames: [
+          'UnmodifiableSetView',
+          '_UnmodifiableSetView',
+          '_CompactLinkedHashSet',
+        ],
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return <dynamic>{};

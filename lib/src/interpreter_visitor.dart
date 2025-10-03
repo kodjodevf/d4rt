@@ -568,17 +568,71 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         Logger.debug(
             "[PrefixedIdentifier] Accessing static getter 'values' on enum '${prefixValue.name}'.");
         return prefixValue.valuesList;
-      } else {
-        final value = prefixValue.values[memberName];
-        if (value != null) {
+      }
+
+      // Check enum values first
+      final value = prefixValue.values[memberName];
+      if (value != null) {
+        Logger.debug(
+            "[PrefixedIdentifier] Accessing enum value '$memberName' on enum '${prefixValue.name}'.");
+        return value;
+      }
+
+      // Check static fields
+      if (prefixValue.staticFields.containsKey(memberName)) {
+        Logger.debug(
+            "[PrefixedIdentifier] Accessing static field '$memberName' on enum '${prefixValue.name}'.");
+        return prefixValue.staticFields[memberName];
+      }
+
+      // Check static getters
+      final staticGetter = prefixValue.staticGetters[memberName];
+      if (staticGetter != null) {
+        Logger.debug(
+            "[PrefixedIdentifier] Calling static getter '$memberName' on enum '${prefixValue.name}'.");
+        return staticGetter.call(this, [], {});
+      }
+
+      // Check static methods
+      final staticMethod = prefixValue.staticMethods[memberName];
+      if (staticMethod != null) {
+        Logger.debug(
+            "[PrefixedIdentifier] Accessing static method '$memberName' on enum '${prefixValue.name}'.");
+        return staticMethod;
+      }
+
+      // Check mixins for static members (reverse order)
+      for (final mixin in prefixValue.mixins.reversed) {
+        // Check static fields
+        try {
+          final mixinStaticField = mixin.getStaticField(memberName);
           Logger.debug(
-              "[PrefixedIdentifier] Accessing static value '$memberName' on enum '${prefixValue.name}'.");
-          return value;
-        } else {
-          throw RuntimeError(
-              "Undefined static value '$memberName' on enum '${prefixValue.name}'. Available: ${prefixValue.valueNames.join(', ')}");
+              "[PrefixedIdentifier] Found static field '$memberName' from mixin '${mixin.name}' for enum '${prefixValue.name}'");
+          return mixinStaticField;
+        } on RuntimeError {
+          // Continue to next check
+        }
+
+        // Check static getters
+        final mixinStaticGetter = mixin.findStaticGetter(memberName);
+        if (mixinStaticGetter != null) {
+          Logger.debug(
+              "[PrefixedIdentifier] Found static getter '$memberName' from mixin '${mixin.name}' for enum '${prefixValue.name}'");
+          return mixinStaticGetter.call(this, [], {});
+        }
+
+        // Check static methods
+        final mixinStaticMethod = mixin.findStaticMethod(memberName);
+        if (mixinStaticMethod != null) {
+          Logger.debug(
+              "[PrefixedIdentifier] Found static method '$memberName' from mixin '${mixin.name}' for enum '${prefixValue.name}'");
+          return mixinStaticMethod;
         }
       }
+
+      // Not found
+      throw RuntimeError(
+          "Undefined static member '$memberName' on enum '${prefixValue.name}'. Available enum values: ${prefixValue.valueNames.join(', ')}");
     } else if (prefixValue is BridgedClass) {
       final bridgedClass = prefixValue;
       Logger.debug(
@@ -589,12 +643,40 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
       final staticMethod = bridgedClass.findStaticMethodAdapter(memberName);
       if (staticMethod != null) {
-        throw UnimplementedError(
-            "Returning bridged static methods as values from PrefixedIdentifier is not yet supported.");
+        // Return the static method as a callable value
+        Logger.debug(
+            "[PrefixedIdentifier] Returning bridged static method '$memberName' as value from '${bridgedClass.name}'.");
+        return BridgedStaticMethodCallable(
+            bridgedClass, staticMethod, memberName);
       } else {
         throw RuntimeError(
             "Undefined static member '$memberName' on bridged class '${bridgedClass.name}'.");
       }
+    } else if (prefixValue is InterpretedExtension) {
+      // Handle static member access on extensions
+      final extension = prefixValue;
+      Logger.debug(
+          "[PrefixedIdentifier] Static access on Extension: ${extension.name ?? '<unnamed>'}.$memberName");
+
+      // Check static field
+      if (extension.staticFields.containsKey(memberName)) {
+        return extension.staticFields[memberName];
+      }
+
+      // Check static getter
+      final staticGetter = extension.findStaticGetter(memberName);
+      if (staticGetter != null) {
+        return staticGetter.call(this, [], {});
+      }
+
+      // Check static method
+      final staticMethod = extension.findStaticMethod(memberName);
+      if (staticMethod != null) {
+        return staticMethod;
+      }
+
+      throw RuntimeError(
+          "Undefined static member '$memberName' on extension '${extension.name ?? '<unnamed>'}'.");
     } else if (prefixValue is InterpretedInstance) {
       try {
         final member = prefixValue.get(memberName);
@@ -1373,36 +1455,127 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // rhsValue and operatorType already available from the top
 
       if (targetValue is BoundSuper) {
-        // This handles cases like: super.value = expression;
-        if (operatorType != TokenType.EQ) {
-          throw UnimplementedError(
-              "Compound assignment operators (+=, -=, etc.) on 'super' properties are not yet implemented.");
-        }
+        // This handles cases like: super.value = expression; or super.value += expression;
         final instance = targetValue.instance;
         final startClass = targetValue.startLookupClass;
         InterpretedClass? currentClass = startClass;
         InterpretedFunction? superSetter;
+        InterpretedFunction? superGetter;
 
         // Look for the setter in the superclass hierarchy starting from startClass
+        BridgedClass? bridgedSetter;
         while (currentClass != null) {
           final setter = currentClass.findInstanceSetter(propertyName);
           if (setter != null) {
             superSetter = setter;
             break;
           }
+          // Check bridged superclass
+          if (currentClass.bridgedSuperclass != null) {
+            final bridged = currentClass.bridgedSuperclass!;
+            if (bridged.setters.containsKey(propertyName)) {
+              bridgedSetter = bridged;
+              break;
+            }
+          }
           currentClass = currentClass.superclass;
         }
 
-        if (superSetter != null) {
-          // Bind the found super setter to the original instance ('this') and call it
-          superSetter.bind(instance).call(this, [rhsValue], {});
-          return rhsValue; // Simple assignment returns RHS value
+        // For compound operators, we also need to get the current value
+        Object? currentValue;
+        BridgedClass? bridgedGetter;
+        if (operatorType != TokenType.EQ) {
+          // First try to find a getter
+          currentClass = startClass;
+          while (currentClass != null) {
+            final getter = currentClass.findInstanceGetter(propertyName);
+            if (getter != null) {
+              superGetter = getter;
+              break;
+            }
+            // Check bridged superclass
+            if (currentClass.bridgedSuperclass != null) {
+              final bridged = currentClass.bridgedSuperclass!;
+              if (bridged.getters.containsKey(propertyName)) {
+                bridgedGetter = bridged;
+                break;
+              }
+            }
+            currentClass = currentClass.superclass;
+          }
+
+          // Get the current value using getter or bridged getter
+          if (superGetter != null) {
+            currentValue = superGetter.bind(instance).call(this, [], {});
+          } else if (bridgedGetter != null) {
+            final bridgedTarget = instance.bridgedSuperObject;
+            if (bridgedTarget == null) {
+              throw RuntimeError(
+                  "Cannot access bridged property '$propertyName': bridgedSuperObject is null");
+            }
+            currentValue =
+                bridgedGetter.getters[propertyName]!(this, bridgedTarget);
+          } else {
+            // Try to get field value directly
+            try {
+              currentValue = instance.get(propertyName);
+            } catch (e) {
+              throw RuntimeError(
+                  "Cannot read '$propertyName' from superclass chain of '${instance.klass.name}' for compound 'super' assignment: $e");
+            }
+          }
+        }
+
+        if (operatorType == TokenType.EQ) {
+          // Simple assignment: super.value = rhsValue
+          if (superSetter != null) {
+            superSetter.bind(instance).call(this, [rhsValue], {});
+            return rhsValue;
+          } else if (bridgedSetter != null) {
+            final bridgedTarget = instance.bridgedSuperObject;
+            if (bridgedTarget == null) {
+              throw RuntimeError(
+                  "Cannot set bridged property '$propertyName': bridgedSuperObject is null");
+            }
+            bridgedSetter.setters[propertyName]!(this, bridgedTarget, rhsValue);
+            return rhsValue;
+          } else {
+            // Try direct field assignment
+            try {
+              instance.set(propertyName, rhsValue);
+              return rhsValue;
+            } catch (e) {
+              throw RuntimeError(
+                  "Setter for '$propertyName' not found in superclass chain of '${instance.klass.name}' for 'super' assignment: $e");
+            }
+          }
         } else {
-          // No setter found in superclass hierarchy.
-          // Dart would typically throw an error here unless a field is directly accessible
-          // via super and assignable, which isn't common. Let's throw.
-          throw RuntimeError(
-              "Setter for '$propertyName' not found in superclass chain of '${instance.klass.name}' for 'super' assignment.");
+          // Compound assignment: super.value += rhsValue, etc.
+          // Compute new value
+          final newValue =
+              computeCompoundValue(currentValue, rhsValue, operatorType);
+
+          // Set new value
+          if (superSetter != null) {
+            superSetter.bind(instance).call(this, [newValue], {});
+          } else if (bridgedSetter != null) {
+            final bridgedTarget = instance.bridgedSuperObject;
+            if (bridgedTarget == null) {
+              throw RuntimeError(
+                  "Cannot set bridged property '$propertyName': bridgedSuperObject is null");
+            }
+            bridgedSetter.setters[propertyName]!(this, bridgedTarget, newValue);
+          } else {
+            // Try direct field assignment
+            try {
+              instance.set(propertyName, newValue);
+            } catch (e) {
+              throw RuntimeError(
+                  "Cannot set '$propertyName' in superclass chain of '${instance.klass.name}' for compound 'super' assignment: $e");
+            }
+          }
+
+          return newValue;
         }
       } else if (targetValue is InterpretedInstance) {
         // This code block was accidentally removed or modified, restore it.
@@ -1544,11 +1717,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (rhsValue is BridgedEnumValue) {
           rhsValue = rhsValue.nativeValue;
         }
-        // This handles: super.property = rhsValue;
-        if (operatorType != TokenType.EQ) {
-          throw UnimplementedError(
-              "Compound assignment operators (+=, -=, etc.) on bridged 'super' properties are not yet implemented.");
-        }
+        // This handles: super.property = rhsValue; or super.property += rhsValue;
         final instance = targetValue.instance; // Instance 'this'
         final bridgedSuper = targetValue.startLookupClass;
         final nativeSuperObject = instance.bridgedSuperObject;
@@ -1561,21 +1730,57 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // Find the bridged setter adapter
         final setterAdapter =
             bridgedSuper.findInstanceSetterAdapter(propertyName);
-        if (setterAdapter != null) {
-          try {
-            // Call the setter adapter with the native object and the new value
-            setterAdapter(this, nativeSuperObject, rhsValue);
-            return rhsValue; // Assignment returns the right value
-          } catch (e, s) {
-            Logger.error(
-                "Native exception during super assignment to bridged setter '${bridgedSuper.name}.$propertyName': $e\\n$s");
+
+        if (operatorType == TokenType.EQ) {
+          // Simple assignment
+          if (setterAdapter != null) {
+            try {
+              // Call the setter adapter with the native object and the new value
+              setterAdapter(this, nativeSuperObject, rhsValue);
+              return rhsValue; // Assignment returns the right value
+            } catch (e, s) {
+              Logger.error(
+                  "Native exception during super assignment to bridged setter '${bridgedSuper.name}.$propertyName': $e\\n$s");
+              throw RuntimeError(
+                  "Native error during super assignment to bridged setter '$propertyName': $e");
+            }
+          } else {
+            // No setter found
             throw RuntimeError(
-                "Native error during super assignment to bridged setter '$propertyName': $e");
+                "Setter for '$propertyName' not found in bridged superclass '${bridgedSuper.name}' for 'super' assignment.");
           }
         } else {
-          // No setter found
-          throw RuntimeError(
-              "Setter for '$propertyName' not found in bridged superclass '${bridgedSuper.name}' for 'super' assignment.");
+          // Compound assignment: super.property += rhsValue, etc.
+          // Need both getter and setter
+          final getterAdapter =
+              bridgedSuper.findInstanceGetterAdapter(propertyName);
+          if (getterAdapter == null) {
+            throw RuntimeError(
+                "Cannot perform compound assignment on bridged super property '${bridgedSuper.name}.$propertyName': No getter adapter found.");
+          }
+          if (setterAdapter == null) {
+            throw RuntimeError(
+                "Cannot perform compound assignment on bridged super property '${bridgedSuper.name}.$propertyName': No setter adapter found.");
+          }
+
+          try {
+            // Get current value
+            final currentValue = getterAdapter(this, nativeSuperObject);
+
+            // Compute new value
+            final newValue =
+                computeCompoundValue(currentValue, rhsValue, operatorType);
+
+            // Set new value
+            setterAdapter(this, nativeSuperObject, newValue);
+
+            return newValue;
+          } catch (e, s) {
+            Logger.error(
+                "Native exception during compound super assignment to bridged property '${bridgedSuper.name}.$propertyName': $e\\n$s");
+            throw RuntimeError(
+                "Native error during compound super assignment to bridged property '$propertyName': $e");
+          }
         }
       } else {
         throw RuntimeError(
@@ -1709,6 +1914,52 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "[Assignment] Compound assigning to static bridged property '${bridgedClass.name}.$propertyName' via setter adapter.");
           staticSetter(this, newValue);
           return newValue; // Compound returns new value
+        }
+      } else if (target is InterpretedExtension) {
+        final extension = target;
+        if (operatorType == TokenType.EQ) {
+          // Simple assignment: Extension.staticField = rhsValue
+          final staticSetter = extension.findStaticSetter(propertyName);
+          if (staticSetter != null) {
+            staticSetter.call(this, [rhsValue], {});
+            Logger.debug(
+                "[Assignment] Assigned to static extension property '${extension.name ?? '<unnamed>'}.$propertyName' via setter.");
+          } else if (extension.staticFields.containsKey(propertyName)) {
+            extension.setStaticField(propertyName, rhsValue);
+            Logger.debug(
+                "[Assignment] Assigned to static extension field '${extension.name ?? '<unnamed>'}.$propertyName'.");
+          } else {
+            throw RuntimeError(
+                "Extension '${extension.name ?? '<unnamed>'}' has no static setter or field named '$propertyName'.");
+          }
+          return rhsValue;
+        } else {
+          // Compound assignment: Extension.property op= rhsValue
+          // 1. Get current value
+          Object? currentValue;
+          final staticGetter = extension.findStaticGetter(propertyName);
+          if (staticGetter != null) {
+            currentValue = staticGetter.call(this, [], {});
+          } else if (extension.staticFields.containsKey(propertyName)) {
+            currentValue = extension.getStaticField(propertyName);
+          } else {
+            throw RuntimeError(
+                "Cannot get value for compound assignment on static extension member '$propertyName'. No getter or field found.");
+          }
+          // 2. Calculate new value
+          Object? newValue =
+              computeCompoundValue(currentValue, rhsValue, operatorType);
+          // 3. Set new value
+          final staticSetter = extension.findStaticSetter(propertyName);
+          if (staticSetter != null) {
+            staticSetter.call(this, [newValue], {});
+          } else if (extension.staticFields.containsKey(propertyName)) {
+            extension.setStaticField(propertyName, newValue);
+          } else {
+            throw RuntimeError(
+                "Cannot set value for compound assignment on static extension member '$propertyName'. No setter or field found.");
+          }
+          return newValue;
         }
       } else if (toBridgedInstance(target).$2) {
         if (rhsValue is BridgedEnumValue) {
@@ -2310,11 +2561,38 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (staticMethod != null) {
           calleeValue = staticMethod; // Static method, no binding needed
         } else {
-          // Before throwing, let's check if it's a built-in method call like 'values'
-          // This could potentially be handled by the stdlib call later, but maybe check here?
-          // For now, assume only user-defined static methods are intended.
+          // Check mixins for static methods (reverse order)
+          bool found = false;
+          for (final mixin in targetValue.mixins.reversed) {
+            final mixinStaticMethod = mixin.findStaticMethod(methodName);
+            if (mixinStaticMethod != null) {
+              calleeValue = mixinStaticMethod;
+              found = true;
+              Logger.debug(
+                  "[MethodInvocation] Found static method '$methodName' from mixin '${mixin.name}' for enum '${targetValue.name}'");
+              break;
+            }
+          }
+
+          if (!found) {
+            // Before throwing, let's check if it's a built-in method call like 'values'
+            // This could potentially be handled by the stdlib call later, but maybe check here?
+            // For now, assume only user-defined static methods are intended.
+            throw RuntimeError(
+                "Enum '${targetValue.name}' has no static method named '$methodName'.");
+          }
+        }
+      } else if (targetValue is InterpretedExtension) {
+        // Static method call on extension
+        final extension = targetValue;
+        final staticMethod = extension.findStaticMethod(methodName);
+        if (staticMethod != null) {
+          calleeValue = staticMethod;
+          Logger.debug(
+              "[MethodInvocation] Found static method '$methodName' on extension '${extension.name ?? '<unnamed>'}'");
+        } else {
           throw RuntimeError(
-              "Enum '${targetValue.name}' has no static method named '$methodName'.");
+              "Extension '${extension.name ?? '<unnamed>'}' has no static method named '$methodName'.");
         }
       } else if (targetValue is BridgedEnumValue) {
         // This is a method call on a bridged enum value.
@@ -2807,6 +3085,33 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       if (staticMethod != null) {
         // Return the static method itself (tear-off)
         return staticMethod;
+      }
+
+      // Check mixins for static members (reverse order)
+      for (final mixin in target.mixins.reversed) {
+        final mixinStaticGetter = mixin.findStaticGetter(propertyName);
+        if (mixinStaticGetter != null) {
+          Logger.debug(
+              "[PropertyAccess] Found static getter '$propertyName' from mixin '${mixin.name}' for enum '${target.name}'");
+          return mixinStaticGetter.call(this, [], {});
+        }
+
+        final mixinStaticMethod = mixin.findStaticMethod(propertyName);
+        if (mixinStaticMethod != null) {
+          Logger.debug(
+              "[PropertyAccess] Found static method '$propertyName' from mixin '${mixin.name}' for enum '${target.name}'");
+          return mixinStaticMethod;
+        }
+
+        // Check static fields - use try/catch since getStaticField throws if not found
+        try {
+          final mixinStaticField = mixin.getStaticField(propertyName);
+          Logger.debug(
+              "[PropertyAccess] Found static field '$propertyName' from mixin '${mixin.name}' for enum '${target.name}'");
+          return mixinStaticField;
+        } on RuntimeError {
+          // Continue to next mixin
+        }
       }
 
       // Check for built-in 'values'
@@ -3671,6 +3976,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     for (final element in node.elements) {
       _processCollectionElement(element, list, isMap: false);
     }
+
+    // If this is a const list, return an unmodifiable version
+    if (node.constKeyword != null) {
+      return List.unmodifiable(list);
+    }
+
     return list;
   }
 
@@ -4668,6 +4979,46 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
             // Return the *new* value for prefix operators
             return newValue;
+          } else if (targetValue is InterpretedExtension) {
+            // Handle static field/getter increment/decrement on extension (prefix)
+            final extension = targetValue;
+
+            // Get current value via static getter or field
+            Object? currentValue;
+            final staticGetter = extension.findStaticGetter(propertyName);
+            if (staticGetter != null) {
+              currentValue = staticGetter.call(this, [], {});
+            } else if (extension.staticFields.containsKey(propertyName)) {
+              currentValue = extension.getStaticField(propertyName);
+            } else {
+              throw RuntimeError(
+                  "Extension '${extension.name}' has no static field or getter named '$propertyName'.");
+            }
+
+            // Calculate new value
+            Object? newValue;
+            if (currentValue is num) {
+              newValue = operatorType == TokenType.PLUS_PLUS
+                  ? currentValue + 1
+                  : currentValue - 1;
+            } else {
+              throw RuntimeError(
+                  "Cannot increment/decrement static property '$propertyName' of type '${currentValue?.runtimeType}': Expected number.");
+            }
+
+            // Set new value via static setter or field
+            final staticSetter = extension.findStaticSetter(propertyName);
+            if (staticSetter != null) {
+              staticSetter.call(this, [newValue], {});
+            } else if (extension.staticFields.containsKey(propertyName)) {
+              extension.setStaticField(propertyName, newValue);
+            } else {
+              throw RuntimeError(
+                  "Extension '${extension.name}' has no static setter or field named '$propertyName'.");
+            }
+
+            // Return the *new* value for prefix operators
+            return newValue;
           } else {
             throw RuntimeError(
                 "Cannot increment/decrement property on non-instance object of type '${targetValue?.runtimeType}'.");
@@ -5039,6 +5390,48 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           setter.bind(targetValue).call(this, [newValue], {});
         } else {
           targetValue.set(propertyName, newValue, this);
+        }
+
+        // Return the *original* value for postfix operators
+        return originalValue;
+      } else if (targetValue is InterpretedExtension) {
+        // Handle static field/getter increment/decrement on extension
+        final extension = targetValue;
+
+        // Get current value via static getter or field
+        Object? currentValue;
+        final staticGetter = extension.findStaticGetter(propertyName);
+        if (staticGetter != null) {
+          currentValue = staticGetter.call(this, [], {});
+        } else if (extension.staticFields.containsKey(propertyName)) {
+          currentValue = extension.getStaticField(propertyName);
+        } else {
+          throw RuntimeError(
+              "Extension '${extension.name}' has no static field or getter named '$propertyName'.");
+        }
+
+        final originalValue = currentValue; // Save for return
+
+        // Calculate new value
+        Object? newValue;
+        if (currentValue is num) {
+          newValue = operatorType == TokenType.PLUS_PLUS
+              ? currentValue + 1
+              : currentValue - 1;
+        } else {
+          throw RuntimeError(
+              "Cannot increment/decrement static property '$propertyName' of type '${currentValue?.runtimeType}': Expected number.");
+        }
+
+        // Set new value via static setter or field
+        final staticSetter = extension.findStaticSetter(propertyName);
+        if (staticSetter != null) {
+          staticSetter.call(this, [newValue], {});
+        } else if (extension.staticFields.containsKey(propertyName)) {
+          extension.setStaticField(propertyName, newValue);
+        } else {
+          throw RuntimeError(
+              "Extension '${extension.name}' has no static setter or field named '$propertyName'.");
         }
 
         // Return the *original* value for postfix operators
@@ -5697,6 +6090,51 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           "Enum placeholder object for '$enumName' not found or invalid during Pass 2.");
     }
 
+    // Process Mixin Application (similar to class mixin handling)
+    if (node.withClause != null) {
+      Logger.debug(
+          "[Visitor.visitEnumDeclaration] Processing 'with' clause for '$enumName'");
+      for (final mixinType in node.withClause!.mixinTypes) {
+        final mixinName = mixinType.name2.lexeme;
+        Logger.debug(
+            "[Visitor.visitEnumDeclaration]   Trying to get mixin '$mixinName'");
+
+        Object? mixin;
+        try {
+          mixin = environment.get(mixinName);
+        } on RuntimeError {
+          throw RuntimeError(
+              "Mixin '$mixinName' not found during lookup for enum '$enumName'. Ensure it's defined (as a mixin or class mixin).");
+        }
+
+        if (mixin is InterpretedClass) {
+          if (!mixin.isMixin) {
+            throw RuntimeError(
+                "Class '$mixinName' cannot be used as a mixin because it's not declared with 'mixin' or 'class mixin'.");
+          }
+
+          // Add to the mixins list of the enum object
+          enumObj.mixins.add(mixin);
+          Logger.debug(
+              "[Visitor.visitEnumDeclaration] Applied interpreted mixin '$mixinName' to '$enumName'");
+        } else if (mixin is BridgedClass) {
+          // Support for bridged classes as mixins
+          if (!mixin.canBeUsedAsMixin) {
+            throw RuntimeError(
+                "Bridged class '$mixinName' cannot be used as a mixin. Set canBeUsedAsMixin=true when registering the bridge.");
+          }
+
+          // Add to the bridged mixins list
+          enumObj.bridgedMixins.add(mixin);
+          Logger.debug(
+              "[Visitor.visitEnumDeclaration] Applied bridged mixin '$mixinName' to '$enumName'");
+        } else {
+          throw RuntimeError(
+              "Identifier '$mixinName' resolved to ${mixin?.runtimeType}, which is not a class/mixin, for enum '$enumName'.");
+        }
+      }
+    }
+
     // Process Members (Static and Instance)
     // Members defined in the enum body (methods, getters, fields, constructors)
     final originalVisitorEnv = environment; // Save original environment
@@ -5910,6 +6348,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         return left + right;
       } else if (left is String && right != null) {
         return left + stringify(right);
+      } else if (left is List && right is List) {
+        // For List += List, create a new list with both elements
+        // This is how Dart's List + operator works
+        return [...left, ...right];
       }
       // Fall through to extension check if standard types don't match
     } else if (operatorType == TokenType.MINUS_EQ) {
@@ -6071,6 +6513,111 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // TokenType.QUESTION_QUESTION_EQ (??=) doesn't map to a binary operator method.
       default:
         return null;
+    }
+  }
+
+  /// Check if a List matches the expected generic type argument
+  bool _checkGenericListType(List list, TypeAnnotation elementTypeNode) {
+    // If list is empty, we can't verify element types
+    if (list.isEmpty) {
+      return true; // Accept empty lists for any type
+    }
+
+    // Check each element
+    for (final element in list) {
+      if (!_checkValueMatchesType(element, elementTypeNode)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Check if a Map matches the expected generic type arguments
+  bool _checkGenericMapType(
+      Map map, TypeAnnotation keyTypeNode, TypeAnnotation valueTypeNode) {
+    // If map is empty, we can't verify key/value types
+    if (map.isEmpty) {
+      return true; // Accept empty maps for any type
+    }
+
+    // Check each key-value pair
+    for (final entry in map.entries) {
+      if (!_checkValueMatchesType(entry.key, keyTypeNode)) {
+        return false;
+      }
+      if (!_checkValueMatchesType(entry.value, valueTypeNode)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Check if a value matches a type annotation
+  bool _checkValueMatchesType(Object? value, TypeAnnotation typeNode) {
+    if (typeNode is! NamedType) {
+      // For now, only handle NamedType
+      return true;
+    }
+
+    final typeName = typeNode.name2.lexeme;
+
+    // Handle nullable types
+    if (typeNode.question != null && value == null) {
+      return true; // null matches nullable types
+    }
+
+    // Check built-in types
+    switch (typeName) {
+      case 'int':
+        return value is int;
+      case 'double':
+        return value is double;
+      case 'num':
+        return value is num;
+      case 'String':
+        return value is String;
+      case 'bool':
+        return value is bool;
+      case 'List':
+        if (value is! List) return false;
+        // Check nested generic type if present
+        if (typeNode.typeArguments != null &&
+            typeNode.typeArguments!.arguments.isNotEmpty) {
+          return _checkGenericListType(
+              value, typeNode.typeArguments!.arguments[0]);
+        }
+        return true;
+      case 'Map':
+        if (value is! Map) return false;
+        // Check nested generic types if present
+        if (typeNode.typeArguments != null &&
+            typeNode.typeArguments!.arguments.length >= 2) {
+          return _checkGenericMapType(
+              value,
+              typeNode.typeArguments!.arguments[0],
+              typeNode.typeArguments!.arguments[1]);
+        }
+        return true;
+      case 'Object':
+      case 'dynamic':
+        return value !=
+            null; // Everything matches Object/dynamic (except null for Object)
+      default:
+        // For user-defined types, try to resolve from environment
+        try {
+          final targetType = environment.get(typeName);
+          if (targetType is InterpretedClass) {
+            return value is InterpretedInstance &&
+                value.klass.isSubtypeOf(targetType);
+          } else if (targetType is BridgedClass) {
+            return value is BridgedInstance &&
+                value.bridgedClass.isSubtypeOf(targetType);
+          }
+        } catch (_) {
+          // If type not found, assume it matches (lenient approach)
+          return true;
+        }
+        return true;
     }
   }
 
@@ -6448,10 +6995,35 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           result = expressionValue is bool;
           break;
         case 'List':
-          result = expressionValue is List;
+          if (expressionValue is! List) {
+            result = false;
+          } else if (typeNode.typeArguments == null ||
+              typeNode.typeArguments!.arguments.isEmpty) {
+            // No type arguments specified, just check if it's a List
+            result = true;
+          } else {
+            // Check generic type arguments
+            result = _checkGenericListType(
+                expressionValue, typeNode.typeArguments!.arguments[0]);
+          }
           break;
         case 'Map':
-          result = expressionValue is Map;
+          if (expressionValue is! Map) {
+            result = false;
+          } else if (typeNode.typeArguments == null ||
+              typeNode.typeArguments!.arguments.isEmpty) {
+            // No type arguments specified, just check if it's a Map
+            result = true;
+          } else {
+            // Check generic type arguments
+            final typeArgs = typeNode.typeArguments!.arguments;
+            if (typeArgs.length >= 2) {
+              result = _checkGenericMapType(
+                  expressionValue, typeArgs[0], typeArgs[1]);
+            } else {
+              result = true; // Partial generic, just accept
+            }
+          }
           break;
         case 'Null':
           result = expressionValue == null;
@@ -6602,6 +7174,15 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         } else {
           rethrow; // Rethrow original error with context
         }
+      }
+    }
+
+    // If this is a const collection, return an unmodifiable version
+    if (node.constKeyword != null) {
+      if (isMap) {
+        return Map.unmodifiable(collection as Map<Object?, Object?>);
+      } else {
+        return Set.unmodifiable(collection as Set<Object?>);
       }
     }
 
@@ -7840,22 +8421,48 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
     }
 
-    // 2. Process members (methods, getters, setters, operators)
+    // 2. Process members (methods, getters, setters, operators) - both instance and static
     final members = <String, Callable>{};
+    final staticMethods = <String, Callable>{};
+    final staticGetters = <String, Callable>{};
+    final staticSetters = <String, Callable>{};
+    final staticFields = <String, Object?>{};
+
     for (final member in node.members) {
       if (member is MethodDeclaration) {
         final methodName = member
             .name.lexeme; // Operator names like '+', '[]' are also lexemes
-        // Create InterpretedExtensionMethod for all method-like declarations
-        final function =
-            InterpretedExtensionMethod(member, environment, onRuntimeType);
-        members[methodName] = function;
-        String memberType = "method";
-        if (member.isGetter) memberType = "getter";
-        if (member.isSetter) memberType = "setter";
-        if (member.isOperator) memberType = "operator";
-        Logger.debug(
-            "[visitExtensionDeclaration]   Added extension $memberType: $methodName");
+
+        if (member.isStatic) {
+          // Handle static methods, getters, and setters
+          final function =
+              InterpretedFunction.method(member, environment, null);
+
+          if (member.isGetter) {
+            staticGetters[methodName] = function;
+            Logger.debug(
+                "[visitExtensionDeclaration]   Added static getter: $methodName");
+          } else if (member.isSetter) {
+            staticSetters[methodName] = function;
+            Logger.debug(
+                "[visitExtensionDeclaration]   Added static setter: $methodName");
+          } else {
+            staticMethods[methodName] = function;
+            Logger.debug(
+                "[visitExtensionDeclaration]   Added static method: $methodName");
+          }
+        } else {
+          // Create InterpretedExtensionMethod for instance method-like declarations
+          final function =
+              InterpretedExtensionMethod(member, environment, onRuntimeType);
+          members[methodName] = function;
+          String memberType = "method";
+          if (member.isGetter) memberType = "getter";
+          if (member.isSetter) memberType = "setter";
+          if (member.isOperator) memberType = "operator";
+          Logger.debug(
+              "[visitExtensionDeclaration]   Added extension $memberType: $methodName");
+        }
       } else if (member is FieldDeclaration) {
         // Only static fields are allowed in extensions.
         if (!member.isStatic) {
@@ -7863,13 +8470,12 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "[visitExtensionDeclaration] Instance fields are not allowed in extensions. Skipping field '$member'.");
           continue; // Skip instance fields
         }
-        // Handle static fields
+        // Handle static fields - store in the InterpretedExtension object
         for (final variable in member.fields.variables) {
           final fieldName = variable.name.lexeme;
           Object? value;
           if (variable.initializer != null) {
             // Evaluate static initializer immediately in the current environment
-            // (Environment where the extension is declared)
             try {
               value = variable.initializer!.accept<Object?>(this);
             } catch (e) {
@@ -7877,15 +8483,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                   "Error evaluating static initializer for extension field '$fieldName': $e");
             }
           }
-          // Define static field directly in the environment, potentially prefixed?
-          // Option 1: Prefix with extension name (if named)
-          // Option 2: Store directly on InterpretedExtension object?
-          // Let's use Option 1 for now for simplicity.
-          final staticFieldName =
-              "${extensionName ?? '_'}.$fieldName"; // Use '_' if unnamed
-          environment.define(staticFieldName, value);
+          // Store in staticFields map instead of environment
+          staticFields[fieldName] = value;
           Logger.debug(
-              "[visitExtensionDeclaration]   Defined static field '$staticFieldName' in environment.");
+              "[visitExtensionDeclaration]   Stored static field: $fieldName");
         }
       } else {
         Logger.warn(
@@ -7898,6 +8499,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       name: extensionName,
       onType: onRuntimeType,
       members: members,
+      staticMethods: staticMethods,
+      staticGetters: staticGetters,
+      staticSetters: staticSetters,
+      staticFields: staticFields,
     );
 
     // How to store it? In the environment associated with its name?

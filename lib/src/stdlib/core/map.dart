@@ -5,6 +5,11 @@ class MapCore {
         nativeType: Map,
         name: 'Map',
         typeParameterCount: 2,
+        nativeNames: [
+          'UnmodifiableMapView',
+          '_UnmodifiableMapView',
+          '_CompactLinkedHashMap',
+        ],
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return <dynamic, dynamic>{};

@@ -3999,6 +3999,47 @@ class BridgedMethodCallable implements Callable {
       '<bridged method ${_instance.bridgedClass.name}.$_methodName>';
 }
 
+/// Represents a static method from a bridged class that can be passed as a value
+class BridgedStaticMethodCallable implements Callable {
+  final BridgedClass _bridgedClass;
+  final BridgedStaticMethodAdapter _adapter;
+  final String _methodName;
+
+  BridgedStaticMethodCallable(
+      this._bridgedClass, this._adapter, this._methodName);
+
+  @override
+  int get arity {
+    // The arity is complex to determine statically for native adapters.
+    // For now, return 0, but the adapter itself will do the validation.
+    return 0;
+  }
+
+  @override
+  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
+      [Map<String, Object?> namedArguments = const {},
+      List<RuntimeType>? typeArguments]) {
+    try {
+      // Call the adapter with the visitor and arguments
+      return _adapter(visitor, positionalArguments, namedArguments);
+    } on ArgumentError catch (e) {
+      // Convert native ArgumentError to RuntimeError
+      throw RuntimeError(
+          "Invalid arguments for bridged static method '${_bridgedClass.name}.$_methodName': ${e.message}");
+    } catch (e, s) {
+      // Handle other native errors
+      Logger.error(
+          "[BridgedStaticMethodCallable] Native exception during call to '${_bridgedClass.name}.$_methodName': $e\n$s");
+      throw RuntimeError(
+          "Native error in bridged static method '${_bridgedClass.name}.$_methodName': $e");
+    }
+  }
+
+  @override
+  String toString() =>
+      '<bridged static method ${_bridgedClass.name}.$_methodName>';
+}
+
 // Represents an extension method during interpretation.
 class InterpretedExtensionMethod implements Callable {
   final MethodDeclaration declaration; // The AST node for the method
