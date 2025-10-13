@@ -29,16 +29,42 @@ class ModuleLoader {
   final Map<Uri, LoadedModule> _moduleCache = {};
   final List<Map<String, BridgedEnumDefinition>> bridgedEnumDefinitions;
   final List<Map<String, BridgedClass>> bridgedClases;
+  final D4rt? d4rt; // Reference to D4rt instance for permission checking
   Uri?
       currentlibrary; // Keep for the initial relative URI resolution in _fetchModuleSource and for relative imports
 
   ModuleLoader(this.globalEnvironment, this.sources,
-      this.bridgedEnumDefinitions, this.bridgedClases) {
+      this.bridgedEnumDefinitions, this.bridgedClases,
+      {this.d4rt}) {
     Logger.debug(
         "[ModuleLoader] Initialized with ${sources.length} preloaded sources.");
   }
 
+  /// Checks if the given URI requires special permissions and verifies they are granted.
+  void _checkModulePermissions(Uri uri) {
+    if (d4rt == null) return; // No permission checking if no D4rt instance
+
+    final uriString = uri.toString();
+
+    // Define dangerous modules that require permissions
+    if (uriString == 'dart:io') {
+      if (!d4rt!.checkPermission({'type': 'filesystem'})) {
+        throw RuntimeError('Access to dart:io requires FilesystemPermission. '
+            'Use d4rt.grant(FilesystemPermission.any) to allow filesystem access.');
+      }
+    } else if (uriString == 'dart:isolate') {
+      if (!d4rt!.checkPermission({'type': 'isolate'})) {
+        throw RuntimeError('Access to dart:isolate requires IsolatePermission. '
+            'Use d4rt.grant(IsolatePermission.any) to allow isolate operations.');
+      }
+    }
+    // Add more dangerous modules as needed
+  }
+
   LoadedModule loadModule(Uri uri) {
+    // Check permissions for dangerous modules
+    _checkModulePermissions(uri);
+
     // Save the current source URI for resolving relative exports of this module
     Uri? previouslibraryForRecursiveLoad = currentlibrary;
     currentlibrary = uri;
@@ -158,6 +184,66 @@ class ModuleLoader {
         } catch (e, s) {
           Logger.error(
               "[ModuleLoader loadModule for $uri] Error processing export directive for '$exportedUriString' from ${uri.toString()}: $e\nStackTrace: $s");
+          rethrow;
+        }
+      } else if (directive is ImportDirective) {
+        final importedUriString = directive.uri.stringValue;
+        if (importedUriString == null) {
+          Logger.warn(
+              "[ModuleLoader loadModule for $uri] Import directive with null URI string in ${uri.toString()}");
+          continue;
+        }
+        try {
+          Uri resolvedImportUri = uri.resolve(
+              importedUriString); // Resolve relative to the current module's URI
+          Logger.debug(
+              "[ModuleLoader loadModule for $uri]   Importing from ${uri.toString()}: URI '$importedUriString', resolved to '${resolvedImportUri.toString()}'");
+          LoadedModule importedModule = loadModule(
+              resolvedImportUri); // Recursive call - this will check permissions
+
+          // Get the show/hide combinators and prefix
+          Set<String>? showNames;
+          Set<String>? hideNames;
+          String? prefix = directive.prefix?.name;
+
+          for (final combinator in directive.combinators) {
+            if (combinator is ShowCombinator) {
+              showNames ??= {};
+              showNames.addAll(combinator.shownNames.map((id) => id.name));
+              Logger.debug(
+                  "[ModuleLoader loadModule for $uri]   Import combinator: show ${combinator.shownNames.map((id) => id.name).join(', ')}");
+            } else if (combinator is HideCombinator) {
+              hideNames ??= {};
+              hideNames.addAll(combinator.hiddenNames.map((id) => id.name));
+              Logger.debug(
+                  "[ModuleLoader loadModule for $uri]   Import combinator: hide ${combinator.hiddenNames.map((id) => id.name).join(', ')}");
+            }
+          }
+
+          // Import the environment of the imported module into the current module environment
+          if (prefix != null) {
+            // For prefixed imports, create a filtered environment and define it with the prefix
+            Environment prefixedEnv =
+                importedModule.exportedEnvironment.shallowCopyFiltered(
+              showNames: showNames,
+              hideNames: hideNames,
+            );
+            moduleEnvironment.definePrefixedImport(prefix, prefixedEnv);
+            Logger.debug(
+                "[ModuleLoader loadModule for $uri]   Successfully defined prefixed import '$prefix' from ${resolvedImportUri.toString()} into ${uri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
+          } else {
+            // For regular imports, import directly into the module environment
+            moduleEnvironment.importEnvironment(
+              importedModule.exportedEnvironment,
+              show: showNames,
+              hide: hideNames,
+            );
+            Logger.debug(
+                "[ModuleLoader loadModule for $uri]   Successfully imported environment from ${resolvedImportUri.toString()} into ${uri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
+          }
+        } catch (e, s) {
+          Logger.error(
+              "[ModuleLoader loadModule for $uri] Error processing import directive for '$importedUriString' from ${uri.toString()}: $e\nStackTrace: $s");
           rethrow;
         }
       }

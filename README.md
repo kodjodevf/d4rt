@@ -15,6 +15,7 @@ It allows you to execute Dart code dynamically, bridge native classes, and build
 - **Class, enum, and extension support**: Use most Dart language features, including classes, inheritance, mixins, enums, and extensions.
 - **Pattern matching**: Support for Dart's pattern matching in switch/case and assignments.
 - **Runtime type validation**: Validate generic type arguments and method parameters at runtime.
+- **Security sandboxing**: Permission-based security system to restrict dangerous operations and prevent malicious code execution.
 - **Custom logging**: Integrated, configurable logger for debugging interpreted code.
 - **Extensible**: Add your own bridges for custom types and native APIs.
 
@@ -57,6 +58,79 @@ void main() {
   final result = interpreter.execute(source: code);
   print('Result: $result'); // Result: 8
 }
+```
+
+## Security Sandboxing
+
+d4rt includes a comprehensive permission-based security system to prevent malicious code execution. By default, access to dangerous modules like `dart:io` and `dart:isolate` is blocked unless explicitly granted.
+
+### Granting Permissions
+
+```dart
+import 'package:d4rt/d4rt.dart';
+
+void main() {
+  final interpreter = D4rt();
+
+  // Grant filesystem access
+  interpreter.grant(FilesystemPermission.any);
+
+  // Grant network access
+  interpreter.grant(NetworkPermission.any);
+
+  // Grant process execution
+  interpreter.grant(ProcessRunPermission.any);
+
+  // Grant isolate operations
+  interpreter.grant(IsolatePermission.any);
+
+  // Now execute code that uses dangerous operations
+  final result = interpreter.execute(source: '''
+    import 'dart:io';
+    import 'dart:isolate';
+
+    void main() {
+      // This code can now access filesystem, network, etc.
+      print('Secure execution with granted permissions');
+    }
+  ''');
+}
+```
+
+### Permission Types
+
+- **`FilesystemPermission`**: Controls file and directory operations
+  - `FilesystemPermission.any` - Allow all filesystem operations
+  - `FilesystemPermission.read` - Allow read-only operations
+  - `FilesystemPermission.write` - Allow write operations
+  - `FilesystemPermission.path('/specific/path')` - Allow operations on specific paths
+
+- **`NetworkPermission`**: Controls network operations
+  - `NetworkPermission.any` - Allow all network operations
+  - `NetworkPermission.connect('host:port')` - Allow connections to specific hosts
+
+- **`ProcessRunPermission`**: Controls process execution
+  - `ProcessRunPermission.any` - Allow execution of any command
+  - `ProcessRunPermission.command('specific-command')` - Allow execution of specific commands
+
+- **`IsolatePermission`**: Controls isolate creation and communication
+  - `IsolatePermission.any` - Allow all isolate operations
+
+### Permission Management
+
+```dart
+final interpreter = D4rt();
+
+// Grant permissions
+interpreter.grant(FilesystemPermission.any);
+
+// Check permissions
+if (interpreter.hasPermission(FilesystemPermission.any)) {
+  print('Filesystem access granted');
+}
+
+// Revoke permissions
+interpreter.revoke(FilesystemPermission.any);
 ```
 
 ## Bridging Native Classes & Enums

@@ -1,3 +1,13 @@
+## 0.1.7
+- **feat: Security sandboxing system** - Comprehensive permission-based security system to restrict dangerous operations
+  - Implement modular permission system with `FilesystemPermission`, `NetworkPermission`, `ProcessRunPermission`, `IsolatePermission`
+  - Block access to dangerous modules (`dart:io`, `dart:isolate`) by default unless explicitly granted
+  - Add `d4rt.grant()`, `d4rt.revoke()`, `d4rt.hasPermission()` methods for permission management
+  - Integrate permission checking into module loading and import directives
+  - Support fine-grained permissions (specific paths, commands, network hosts)
+  - Add comprehensive security tests to prevent malicious code execution
+  - Enable safe execution environment for untrusted code
+
 ## 0.1.6
 - fix: Nested for-in loops in async contexts now work correctly
 - fix: Async nested for-in loops with await for streams works

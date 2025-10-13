@@ -15,6 +15,7 @@ import 'package:d4rt/src/callable.dart';
 import 'package:d4rt/src/declaration_visitor.dart';
 import 'package:d4rt/src/stdlib/stdlib.dart';
 import 'package:d4rt/src/bridge/registration.dart';
+import 'package:d4rt/src/security/permissions.dart';
 
 /// The main D4rt interpreter class.
 ///
@@ -42,6 +43,7 @@ class D4rt {
   InterpretedInstance? _interpretedInstance;
   InterpreterVisitor? _visitor;
   final Map<Type, BridgedClass> _bridgedDefLookupByType = {};
+  final Set<Permission> _grantedPermissions = {};
 
   /// Gets the current interpreter visitor instance.
   ///
@@ -82,7 +84,8 @@ class D4rt {
 
   ModuleLoader _initModule(Map<String, String>? sources) {
     final moduleLoader = ModuleLoader(
-        Environment(), sources ?? {}, _bridgedEnumDefinitions, _bridgedClases);
+        Environment(), sources ?? {}, _bridgedEnumDefinitions, _bridgedClases,
+        d4rt: this);
     _visitor = InterpreterVisitor(
         globalEnvironment: moduleLoader.globalEnvironment,
         moduleLoader: moduleLoader);
@@ -97,6 +100,54 @@ class D4rt {
   ///
   /// [enabled] Whether to enable debug logging.
   void setDebug(bool enabled) => Logger.setDebug(enabled);
+
+  /// Grants a permission for security-sensitive operations.
+  ///
+  /// This method allows granting specific permissions that are required for
+  /// accessing dangerous modules like dart:io, dart:isolate, or performing
+  /// file system operations, network access, or process execution.
+  ///
+  /// [permission] The permission to grant.
+  ///
+  /// ## Example:
+  /// ```dart
+  /// final interpreter = D4rt();
+  /// interpreter.grant(FilesystemPermission.any);
+  /// interpreter.grant(NetworkPermission.any);
+  /// ```
+  void grant(Permission permission) {
+    _grantedPermissions.add(permission);
+    Logger.debug("[D4rt.grant] Granted permission: ${permission.description}");
+  }
+
+  /// Revokes a previously granted permission.
+  ///
+  /// [permission] The permission to revoke.
+  void revoke(Permission permission) {
+    _grantedPermissions.remove(permission);
+    Logger.debug("[D4rt.revoke] Revoked permission: ${permission.description}");
+  }
+
+  /// Checks if a specific permission is granted.
+  ///
+  /// [permission] The permission to check.
+  /// Returns true if the permission is granted, false otherwise.
+  bool hasPermission(Permission permission) {
+    return _grantedPermissions.contains(permission);
+  }
+
+  /// Checks if any permission in the granted set allows the given operation.
+  ///
+  /// [operation] The operation to check permissions for.
+  /// Returns true if any granted permission allows the operation.
+  bool checkPermission(dynamic operation) {
+    for (final permission in _grantedPermissions) {
+      if (permission.allows(operation)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Execute the given source code.
   ///

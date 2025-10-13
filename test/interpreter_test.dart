@@ -8,6 +8,11 @@ Matcher throwsRuntimeError(dynamic messageMatcher) {
 
 dynamic execute(String source, {Object? args}) {
   final d4rt = D4rt()..setDebug(false);
+  // Grant all permissions for existing tests to maintain compatibility
+  d4rt.grant(FilesystemPermission.any);
+  d4rt.grant(NetworkPermission.any);
+  d4rt.grant(ProcessRunPermission.any);
+  d4rt.grant(IsolatePermission.any);
   return d4rt.execute(
       library: 'package:test/main.dart',
       args: args,
@@ -17,6 +22,11 @@ dynamic execute(String source, {Object? args}) {
 // Async version that awaits Future results for complex await tests
 Future<dynamic> executeAsync(String source, {Object? args}) async {
   final d4rt = D4rt()..setDebug(false);
+  // Grant all permissions for existing tests to maintain compatibility
+  d4rt.grant(FilesystemPermission.any);
+  d4rt.grant(NetworkPermission.any);
+  d4rt.grant(ProcessRunPermission.any);
+  d4rt.grant(IsolatePermission.any);
   final result = d4rt.execute(
       library: 'package:test/main.dart',
       args: args,
