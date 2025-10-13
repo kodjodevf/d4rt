@@ -25,7 +25,7 @@
 ///   // within the granted permissions
 /// ''');
 /// ```
-library security;
+library;
 
 /// Base class for all permissions in the d4rt security system.
 abstract class Permission {
@@ -181,7 +181,7 @@ class NetworkPermission extends Permission {
 
     final ops = operations.join('/');
     if (_host != null && _port != null) {
-      return '$ops to ${_host}:${_port}';
+      return '$ops to $_host:$_port';
     } else if (_host != null) {
       return '$ops to $_host';
     } else if (_port != null) {
