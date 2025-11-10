@@ -10,14 +10,25 @@ class ProcessIo {
         name: 'Process',
         typeParameterCount: 0,
         staticMethods: {
-          'start': (visitor, positionalArgs, namedArgs) =>
-              _start(positionalArgs, namedArgs),
-          'run': (visitor, positionalArgs, namedArgs) =>
-              _run(positionalArgs, namedArgs),
-          'runSync': (visitor, positionalArgs, namedArgs) =>
-              _runSync(positionalArgs, namedArgs),
-          'killPid': (visitor, positionalArgs, namedArgs) =>
-              _killPid(positionalArgs, namedArgs),
+          'start': (visitor, positionalArgs, namedArgs) {
+            _checkProcessPermission(visitor,
+                positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '');
+            return _start(positionalArgs, namedArgs);
+          },
+          'run': (visitor, positionalArgs, namedArgs) {
+            _checkProcessPermission(visitor,
+                positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '');
+            return _run(positionalArgs, namedArgs);
+          },
+          'runSync': (visitor, positionalArgs, namedArgs) {
+            _checkProcessPermission(visitor,
+                positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '');
+            return _runSync(positionalArgs, namedArgs);
+          },
+          'killPid': (visitor, positionalArgs, namedArgs) {
+            _checkProcessPermission(visitor, 'kill');
+            return _killPid(positionalArgs, namedArgs);
+          },
         },
         methods: {
           'kill': (visitor, target, positionalArgs, namedArgs) =>
@@ -100,10 +111,14 @@ class ProcessIo {
       throw ArgumentError('Process.runSync requires executable path');
     }
 
+    // Check process permission
     final executable = positionalArgs[0].toString();
     final arguments = positionalArgs.length > 1
         ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
         : <String>[];
+
+    // Note: We can't get visitor here, so we need to modify the approach
+    // The permission check should be done in the static methods wrapper
 
     final workingDirectory = namedArgs['workingDirectory']?.toString();
     final environment = namedArgs['environment'] as Map?;
@@ -147,6 +162,19 @@ class ProcessIo {
 
     final signal = namedArgs['signal'] ?? ProcessSignal.sigterm;
     return instance.kill(signal);
+  }
+
+  /// Helper method to check if ProcessRunPermission is granted
+  static void _checkProcessPermission(
+      InterpreterVisitor visitor, String command) {
+    final d4rt = visitor.moduleLoader.d4rt;
+    if (d4rt == null) return;
+
+    // Check for ProcessRunPermission
+    if (!d4rt.checkPermission({'type': 'process'})) {
+      throw RuntimeError('Process execution requires ProcessRunPermission. '
+          'Use d4rt.grant(ProcessRunPermission.any) to allow process execution.');
+    }
   }
 }
 

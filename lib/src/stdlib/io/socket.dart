@@ -452,6 +452,9 @@ class InternetAddressIo {
               throw ArgumentError('InternetAddress.lookup requires host');
             }
 
+            // Check network permission
+            _checkNetworkPermission(visitor, positionalArgs[0].toString());
+
             final host = positionalArgs[0].toString();
             final type = namedArgs['type'] as InternetAddressType? ??
                 InternetAddressType.any;
@@ -511,6 +514,18 @@ class InternetAddressIo {
           },
         },
       );
+
+  /// Helper method to check if NetworkPermission is granted
+  static void _checkNetworkPermission(InterpreterVisitor visitor, String host) {
+    final d4rt = visitor.moduleLoader.d4rt;
+    if (d4rt == null) return;
+
+    // Check for NetworkPermission
+    if (!d4rt.checkPermission({'type': 'network', 'connect': true})) {
+      throw RuntimeError('Network operations require NetworkPermission. '
+          'Use d4rt.grant(NetworkPermission.any) to allow network access.');
+    }
+  }
 }
 
 /// Bridged InternetAddress class

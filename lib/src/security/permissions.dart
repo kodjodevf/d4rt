@@ -331,64 +331,6 @@ class IsolatePermission extends Permission {
   }
 }
 
-/// Reflection permissions control access to runtime type information and reflection.
-class ReflectionPermission extends Permission {
-  @override
-  final String type = 'reflection';
-
-  final bool _typeInfo;
-  final bool _fieldAccess;
-  final bool _methodInvocation;
-
-  ReflectionPermission._(
-      this._typeInfo, this._fieldAccess, this._methodInvocation);
-
-  /// Allows accessing runtime type information.
-  static final ReflectionPermission typeInfo =
-      ReflectionPermission._(true, false, false);
-
-  /// Allows accessing private fields.
-  static final ReflectionPermission fieldAccess =
-      ReflectionPermission._(false, true, false);
-
-  /// Allows invoking private methods.
-  static final ReflectionPermission methodInvocation =
-      ReflectionPermission._(false, false, true);
-
-  /// Allows all reflection operations.
-  static final ReflectionPermission any =
-      ReflectionPermission._(true, true, true);
-
-  @override
-  String get description {
-    final operations = [];
-    if (_typeInfo) operations.add('type info');
-    if (_fieldAccess) operations.add('field access');
-    if (_methodInvocation) operations.add('method invocation');
-    return '${operations.join('/')} reflection';
-  }
-
-  @override
-  bool allows(dynamic operation) {
-    if (operation is! Map<String, dynamic>) return false;
-
-    final opType = operation['type'];
-    if (opType != 'reflection') return false;
-
-    final requiredTypeInfo = operation['typeInfo'] ?? false;
-    final requiredFieldAccess = operation['fieldAccess'] ?? false;
-    final requiredMethodInvocation = operation['methodInvocation'] ?? false;
-
-    if ((requiredTypeInfo && !_typeInfo) ||
-        (requiredFieldAccess && !_fieldAccess) ||
-        (requiredMethodInvocation && !_methodInvocation)) {
-      return false;
-    }
-
-    return true;
-  }
-}
-
 /// Dangerous permissions that should be granted with extreme caution.
 class DangerousPermission extends Permission {
   @override

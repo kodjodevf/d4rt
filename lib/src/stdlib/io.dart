@@ -5,6 +5,7 @@ import 'package:d4rt/src/stdlib/io/file.dart';
 import 'package:d4rt/src/stdlib/io/stdio.dart';
 import 'package:d4rt/src/stdlib/io/http.dart';
 import 'package:d4rt/src/stdlib/io/process.dart';
+import 'package:d4rt/src/stdlib/io/platform.dart';
 import 'package:d4rt/src/stdlib/io/io_sink.dart';
 import 'package:d4rt/src/stdlib/io/string_sink.dart';
 import 'package:d4rt/src/stdlib/io/socket.dart';
@@ -16,6 +17,7 @@ export 'package:d4rt/src/stdlib/io/file.dart';
 export 'package:d4rt/src/stdlib/io/stdio.dart';
 export 'package:d4rt/src/stdlib/io/http.dart';
 export 'package:d4rt/src/stdlib/io/process.dart';
+export 'package:d4rt/src/stdlib/io/platform.dart';
 export 'package:d4rt/src/stdlib/io/io_sink.dart';
 export 'package:d4rt/src/stdlib/io/string_sink.dart';
 export 'package:d4rt/src/stdlib/io/socket.dart';
@@ -51,6 +53,9 @@ class IoStdlib {
     environment.defineBridge(ProcessResultIo.definition);
     environment.defineBridge(ProcessSignalIo.definition);
     environment.defineBridge(ProcessStartModeIo.definition);
+
+    // Register Platform class
+    environment.defineBridge(PlatformIo.definition);
 
     // Register IOSink bridge
     environment.defineBridge(IOSinkIo.definition);
