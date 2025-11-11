@@ -2,7 +2,7 @@ import 'package:test/test.dart';
 
 import '../../interpreter_test.dart';
 
-main() {
+void main() {
   group('List stdlib tests', () {
     test('List literal and basic properties', () {
       final result = execute(r'''
