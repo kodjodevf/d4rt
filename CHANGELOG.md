@@ -1,3 +1,6 @@
+## 0.1.8
+- fix: security sandboxing with permission checks for file, process, and network operations; add platform access control
+
 ## 0.1.7
 - **feat: Security sandboxing system** - Comprehensive permission-based security system to restrict dangerous operations
   - Implement modular permission system with `FilesystemPermission`, `NetworkPermission`, `ProcessRunPermission`, `IsolatePermission`
