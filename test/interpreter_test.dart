@@ -6,7 +6,7 @@ Matcher throwsRuntimeError(dynamic messageMatcher) {
       isA<RuntimeError>().having((e) => e.message, 'message', messageMatcher));
 }
 
-dynamic execute(String source, {Object? args}) {
+dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt()..setDebug(false);
   // Grant all permissions for existing tests to maintain compatibility
   d4rt.grant(FilesystemPermission.any);
@@ -15,12 +15,12 @@ dynamic execute(String source, {Object? args}) {
   d4rt.grant(IsolatePermission.any);
   return d4rt.execute(
       library: 'package:test/main.dart',
-      args: args,
+      positionalArgs: args,
       sources: {'package:test/main.dart': source});
 }
 
 // Async version that awaits Future results for complex await tests
-Future<dynamic> executeAsync(String source, {Object? args}) async {
+Future<dynamic> executeAsync(String source, {List<Object?>? args}) async {
   final d4rt = D4rt()..setDebug(false);
   // Grant all permissions for existing tests to maintain compatibility
   d4rt.grant(FilesystemPermission.any);
@@ -29,7 +29,7 @@ Future<dynamic> executeAsync(String source, {Object? args}) async {
   d4rt.grant(IsolatePermission.any);
   final result = d4rt.execute(
       library: 'package:test/main.dart',
-      args: args,
+      positionalArgs: args,
       sources: {'package:test/main.dart': source});
 
   // If the result is a Future, await it
@@ -156,7 +156,9 @@ void main() {
       ''';
       final result = execute(
         source,
-        args: ['arg1', 'test', 'more'], // Pass arguments
+        args: [
+          ['arg1', 'test', 'more']
+        ], // Pass arguments
       );
       expect(result, equals('3:arg1')); // Length 3, first argument 'arg1'
     });
@@ -172,8 +174,8 @@ void main() {
           source,
           args: ['fail'], // Passer des arguments quand même
         ),
-        throwsRuntimeError(
-            contains("'main' function does not accept arguments")),
+        throwsRuntimeError(contains(
+            "'main' function accepts at most 0 positional argument(s)")),
       );
     });
 

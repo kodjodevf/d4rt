@@ -510,8 +510,16 @@ class Environment {
 
     // Perform the merge from sourceEnvToImportFrom
     sourceEnvToImportFrom._values.forEach((name, value) {
-      if (_values.containsKey(name) ||
-          _bridgedClasses.containsKey(name) ||
+      if (_values.containsKey(name)) {
+        // Allow if it's the same value (e.g., same class/function imported via different paths)
+        if (!identical(_values[name], value)) {
+          throw RuntimeError(
+              "Name conflict in environment: Symbol '$name' is already defined with a different value.");
+        }
+        // Same value, skip the duplicate
+        return;
+      }
+      if (_bridgedClasses.containsKey(name) ||
           _bridgedEnums.containsKey(name) ||
           _prefixedImports.containsKey(name)) {
         throw RuntimeError(
@@ -521,8 +529,15 @@ class Environment {
     });
 
     sourceEnvToImportFrom._bridgedClasses.forEach((name, bridgedClass) {
+      if (_bridgedClasses.containsKey(name)) {
+        // Allow if it's the same bridged class
+        if (!identical(_bridgedClasses[name], bridgedClass)) {
+          throw RuntimeError(
+              "Name conflict in environment: Symbol '$name' (bridged class) is already defined with a different value.");
+        }
+        return;
+      }
       if (_values.containsKey(name) ||
-          _bridgedClasses.containsKey(name) ||
           _bridgedEnums.containsKey(name) ||
           _prefixedImports.containsKey(name)) {
         throw RuntimeError(
@@ -533,9 +548,16 @@ class Environment {
     });
 
     sourceEnvToImportFrom._bridgedEnums.forEach((name, bridgedEnum) {
+      if (_bridgedEnums.containsKey(name)) {
+        // Allow if it's the same bridged enum
+        if (!identical(_bridgedEnums[name], bridgedEnum)) {
+          throw RuntimeError(
+              "Name conflict in environment: Symbol '$name' (bridged enum) is already defined with a different value.");
+        }
+        return;
+      }
       if (_values.containsKey(name) ||
           _bridgedClasses.containsKey(name) ||
-          _bridgedEnums.containsKey(name) ||
           _prefixedImports.containsKey(name)) {
         throw RuntimeError(
             "Name conflict in environment: Symbol '$name' (bridged enum) is already defined.");
@@ -544,10 +566,17 @@ class Environment {
     });
 
     sourceEnvToImportFrom._prefixedImports.forEach((name, env) {
+      if (_prefixedImports.containsKey(name)) {
+        // Allow if it's the same prefixed environment
+        if (!identical(_prefixedImports[name], env)) {
+          throw RuntimeError(
+              "Name conflict in environment: Symbol '$name' (prefixed import) is already defined with a different environment.");
+        }
+        return;
+      }
       if (_values.containsKey(name) ||
           _bridgedClasses.containsKey(name) ||
-          _bridgedEnums.containsKey(name) ||
-          _prefixedImports.containsKey(name)) {
+          _bridgedEnums.containsKey(name)) {
         throw RuntimeError(
             "Name conflict in environment: Symbol '$name' (prefixed import) is already defined or collides with another symbol type.");
       }

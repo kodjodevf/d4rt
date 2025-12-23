@@ -9,7 +9,7 @@ void main() {
       d4rtInstance = D4rt();
     });
 
-    dynamic execute(String mainFunctionBody, {Object? args}) {
+    dynamic execute(String mainFunctionBody, {List<Object?>? args}) {
       final source = '''
         import 'dart:collection';
 
@@ -20,7 +20,7 @@ void main() {
       return d4rtInstance.execute(
         library: 'd4rt-mem:/main_hash_map_test.dart',
         name: 'main',
-        args: args,
+        positionalArgs: args,
         sources: {'d4rt-mem:/main_hash_map_test.dart': source},
       );
     }

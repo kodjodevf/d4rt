@@ -8644,15 +8644,18 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           "[visitImportDirective] Using absolute/unresolvable URI: $resolvedUri");
     } else {
       final baseUri = moduleLoader.currentlibrary;
-      if (baseUri == null) {
+
+      if (baseUri != null) {
+        Logger.debug(
+            "[visitImportDirective] Attempting to resolve relative URI '$importUriString' relative to '$baseUri'");
+        resolvedUri = baseUri.resolveUri(importUri);
+        Logger.debug(
+            "[visitImportDirective] Resolved relative URI: $resolvedUri");
+      } else {
         throw RuntimeError(
-            "Unable to resolve relative import '$importUriString': Base URI not defined in ModuleLoader.");
+            "Unable to resolve relative import '$importUriString': Base URI not defined in ModuleLoader. "
+            "Either provide a basePath parameter or use absolute URIs.");
       }
-      Logger.debug(
-          "[visitImportDirective] Attempting to resolve relative URI '$importUriString' relative to '$baseUri'");
-      resolvedUri = baseUri.resolveUri(importUri);
-      Logger.debug(
-          "[visitImportDirective] Resolved relative URI: $resolvedUri");
     }
 
     final prefixIdentifier = node.prefix; // Get the prefix identifier

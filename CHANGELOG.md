@@ -1,3 +1,36 @@
+## 0.1.9
+- **feat:positionalArgs and namedArgs** - Pass arguments directly to functions via execute()
+  - Add `positionalArgs` parameter to D4rt.execute() for passing positional arguments
+  - Add `namedArgs` parameter to D4rt.execute() for passing named arguments
+  - Support complex data types (List, Map, nested structures) as arguments
+  - Support function callbacks and async functions as arguments
+  - Add 33 comprehensive test cases covering all argument passing patterns
+  - Add parameter introspection methods: `positionalParameterNames` and `namedParameterNames` getters
+
+- **feat: Introspection API** - Analyze code structure and get metadata at runtime
+  - Add `analyze()` method to D4rt for code analysis without execution
+  - Create IntrospectionResult with metadata about functions, classes, enums, variables, and extensions
+  - Extract function signatures including parameter names, types, and default values
+  - Extract class information: inheritance, mixins, interfaces, constructors, methods
+  - Extract enum values and variants
+  - Extract variable declarations and initializers
+  - Extract extension definitions and extended types
+  - Use AST-based analysis for accurate metadata extraction
+  - Add 38 comprehensive test cases covering all declaration types and complex scenarios
+
+- **feat: eval() method** - Dynamically execute code with current execution state
+  - Add `eval()` method to D4rt for dynamic code execution
+  - Preserve execution environment across eval calls
+  - Support access to previously defined variables and functions
+  - Support complex expressions and statements in eval
+  - Support async/await in eval expressions
+  - Add 39 comprehensive test cases covering expression evaluation and statement execution
+
+- **fix: Environment import handling** - Tolerate duplicate imports with identical values
+  - Allow re-importing the same symbol if the value is identical (same reference)
+  - Use `identical()` comparison for duplicate detection
+  - Support imports via multiple paths without conflict errors
+
 ## 0.1.8
 - fix: security sandboxing with permission checks for file, process, and network operations; add platform access control
 

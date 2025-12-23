@@ -272,6 +272,58 @@ class InterpretedFunction implements Callable {
     return params.where((p) => p.isPositional).length;
   }
 
+  /// Get all positional parameter names (required and optional).
+  List<String> get positionalParameterNames {
+    final params = _parameters?.parameters;
+    if (params == null) return [];
+    return params
+        .where((p) => p.isPositional)
+        .map((p) {
+          if (p is SimpleFormalParameter) {
+            return p.name?.lexeme ?? '';
+          } else if (p is DefaultFormalParameter) {
+            final inner = p.parameter;
+            if (inner is SimpleFormalParameter) {
+              return inner.name?.lexeme ?? '';
+            } else if (inner is FieldFormalParameter) {
+              return inner.name.lexeme;
+            } else if (inner is FunctionTypedFormalParameter) {
+              return inner.name.lexeme;
+            }
+          } else if (p is FieldFormalParameter) {
+            return p.name.lexeme;
+          } else if (p is FunctionTypedFormalParameter) {
+            return p.name.lexeme;
+          }
+          return '';
+        })
+        .where((n) => n.isNotEmpty)
+        .toList();
+  }
+
+  /// Get all named parameter names.
+  List<String> get namedParameterNames {
+    final params = _parameters?.parameters;
+    if (params == null) return [];
+    return params
+        .where((p) => p.isNamed)
+        .map((p) {
+          if (p is DefaultFormalParameter) {
+            final inner = p.parameter;
+            if (inner is SimpleFormalParameter) {
+              return inner.name?.lexeme ?? '';
+            } else if (inner is FieldFormalParameter) {
+              return inner.name.lexeme;
+            } else if (inner is FunctionTypedFormalParameter) {
+              return inner.name.lexeme;
+            }
+          }
+          return '';
+        })
+        .where((n) => n.isNotEmpty)
+        .toList();
+  }
+
   /// Binds 'this' to a specific instance, returning a new callable
   /// where the closure has 'this' defined.
   Callable bind(RuntimeValue instance) {

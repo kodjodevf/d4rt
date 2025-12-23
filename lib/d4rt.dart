@@ -44,3 +44,4 @@ export 'src/runtime_interfaces.dart';
 export 'package:d4rt/src/async_state.dart';
 export 'package:d4rt/src/utils/logger/logger.dart';
 export 'package:d4rt/src/security/permissions.dart';
+export 'package:d4rt/src/introspection.dart';

@@ -16,6 +16,7 @@ import 'package:d4rt/src/declaration_visitor.dart';
 import 'package:d4rt/src/stdlib/stdlib.dart';
 import 'package:d4rt/src/bridge/registration.dart';
 import 'package:d4rt/src/security/permissions.dart';
+import 'package:d4rt/src/introspection.dart';
 
 /// The main D4rt interpreter class.
 ///
@@ -52,6 +53,7 @@ class D4rt {
   final List<NativeFunction> _nativeFunctions = [];
 
   late ModuleLoader _moduleLoader;
+  bool _hasExecutedOnce = false;
 
   /// Registers a bridged enum definition for use in interpreted code.
   ///
@@ -82,10 +84,15 @@ class D4rt {
     _nativeFunctions.add(NativeFunction(function, name: name, arity: 0));
   }
 
-  ModuleLoader _initModule(Map<String, String>? sources) {
+  ModuleLoader _initModule(Map<String, String>? sources,
+      {String? basePath, bool allowFileSystemImports = false}) {
     final moduleLoader = ModuleLoader(
-        Environment(), sources ?? {}, _bridgedEnumDefinitions, _bridgedClases,
-        d4rt: this);
+      Environment(),
+      sources ?? {},
+      _bridgedEnumDefinitions,
+      _bridgedClases,
+      d4rt: this,
+    );
     _visitor = InterpreterVisitor(
         globalEnvironment: moduleLoader.globalEnvironment,
         moduleLoader: moduleLoader);
@@ -151,23 +158,91 @@ class D4rt {
 
   /// Execute the given source code.
   ///
-  /// String? source : The source code to execute. If not provided, the main source will be loaded from the given library.
+  /// [source] The source code to execute. If not provided, the main source will be loaded from the given library.
   ///
-  /// String name = 'main' : The name of the function to call.
+  /// [name] The name of the function to call. Defaults to 'main'.
   ///
-  /// Object? args : The arguments to pass to the name function.
+  /// [positionalArgs] The positional arguments to pass to the function.
   ///
-  /// String? library : The URI of the named function source to load. example: 'package:my_package/main.dart' (if provided, the source parameter will be ignored).
+  /// [namedArgs] The named arguments to pass to the function.
   ///
-  /// Map&lt;String, String&gt;? sources : The sources to load. example: {'package:my_package/main.dart': 'main() { return "Hello, World!"; }'}
+  /// [args] @deprecated Use [positionalArgs] instead. Legacy argument passing (will be wrapped in a list).
+  ///
+  /// [library] The URI of the named function source to load. example: 'package:my_package/main.dart' (if provided, the source parameter will be ignored).
+  ///
+  /// [sources] The sources to load. example: {'package:my_package/main.dart': 'main() { return "Hello, World!"; }'}
+  ///
+  /// [basePath] Base directory path for resolving relative imports from the filesystem.
+  /// When provided, relative imports (e.g., './utils.dart', '../models/user.dart')
+  /// will be resolved against this path.
+  ///
+  /// [allowFileSystemImports] Whether to allow loading modules from the filesystem.
+  /// When true, relative imports and file:// URIs will be resolved and loaded from disk.
+  /// Requires FilesystemPermission when using D4rt's permission system.
+  ///
+  /// ## Example:
+  /// ```dart
+  /// final d4rt = D4rt();
+  ///
+  /// // Simple execution
+  /// d4rt.execute(source: 'main() => "Hello";');
+  ///
+  /// // With positional arguments
+  /// d4rt.execute(
+  ///   source: 'greet(String name, int age) => "Hello \$name, you are \$age";',
+  ///   name: 'greet',
+  ///   positionalArgs: ['John', 25],
+  /// );
+  ///
+  /// // With named arguments
+  /// d4rt.execute(
+  ///   source: 'greet({required String name, int age = 0}) => "Hello \$name, \$age";',
+  ///   name: 'greet',
+  ///   namedArgs: {'name': 'John', 'age': 30},
+  /// );
+  ///
+  /// // Mixed positional and named arguments
+  /// d4rt.execute(
+  ///   source: 'greet(String greeting, {required String name}) => "\$greeting \$name";',
+  ///   name: 'greet',
+  ///   positionalArgs: ['Hello'],
+  ///   namedArgs: {'name': 'World'},
+  /// );
+  ///
+  /// // With relative imports from filesystem
+  /// d4rt.grant(FilesystemPermission.any);
+  /// d4rt.execute(
+  ///   source: '''
+  ///     import './utils.dart';
+  ///     main() => greetFromUtils();
+  ///   ''',
+  ///   basePath: '/path/to/project/lib',
+  ///   allowFileSystemImports: true,
+  /// );
+  /// ```
   dynamic execute({
     String? source,
     String name = 'main',
-    Object? args,
+    List<Object?>? positionalArgs,
+    Map<String, Object?>? namedArgs,
+    @Deprecated('Use positionalArgs instead') Object? args,
     String? library,
     Map<String, String>? sources,
+    String? basePath,
+    bool allowFileSystemImports = false,
   }) {
-    _moduleLoader = _initModule(sources);
+    // Handle deprecated args parameter
+    if (args != null && positionalArgs != null) {
+      throw ArgumentError(
+          'Cannot use both "args" (deprecated) and "positionalArgs". Use only "positionalArgs".');
+    }
+    if (args != null) {
+      Logger.warn(
+          '[D4rt.execute] The "args" parameter is deprecated. Use "positionalArgs" instead.');
+      positionalArgs = [args];
+    }
+    _moduleLoader = _initModule(sources,
+        basePath: basePath, allowFileSystemImports: allowFileSystemImports);
     Logger.debug("[D4rt.execute] Starting execution. library: $library");
     CompilationUnit compilationUnit;
 
@@ -287,34 +362,33 @@ class D4rt {
       Logger.debug("[execute] Looking for $name function");
       final functionCallable = executionEnvironment.get(name);
       if (functionCallable is Callable) {
-        List<dynamic> interpreterArgs = [];
-        bool functionAcceptsArgs = false;
+        List<Object?> interpreterArgs = positionalArgs ?? [];
+        final Map<String, Object?> interpreterNamedArgs = namedArgs ?? {};
 
-        if (functionCallable.arity == 1) {
-          functionAcceptsArgs = true;
+        // Special handling for 'main' function: if it expects args but none provided,
+        // pass an empty list automatically (standard Dart behavior)
+        final expectedArity = functionCallable.arity;
+        if (name == 'main' &&
+            expectedArity > 0 &&
+            interpreterArgs.isEmpty &&
+            namedArgs?.isEmpty != false) {
+          // main expects args but none were provided - pass empty list
+          interpreterArgs = [<String>[]];
           Logger.debug(
-              "[execute] Detected '$name' function has arity 1, assuming it accepts arguments.");
+              "[execute] 'main' expects arguments but none provided. Passing empty list.");
         }
 
-        if (args != null) {
-          if (functionAcceptsArgs) {
-            interpreterArgs = [args];
-            Logger.debug(" [execute] Passing provided args: [$args]");
-          } else {
-            throw RuntimeError(
-                "'$name' function does not accept arguments (arity 0), but arguments were provided: $args");
-          }
-        } else {
-          if (functionAcceptsArgs) {
-            Logger.debug(
-                " [execute] '$name' accepts arguments (arity 1), but none provided. Passing [[]] (list containing empty list).");
-            interpreterArgs = [[]];
-          } else {
-            interpreterArgs = [];
-          }
+        // Validate arity (only for positional args, named args are validated by the function itself)
+        if (interpreterArgs.length > expectedArity) {
+          throw RuntimeError(
+              "'$name' function accepts at most $expectedArity positional argument(s), but ${interpreterArgs.length} were provided.");
         }
 
-        functionResult = functionCallable.call(_visitor!, interpreterArgs, {});
+        Logger.debug(
+            "[execute] Calling '$name' with positionalArgs: $interpreterArgs, namedArgs: $interpreterNamedArgs");
+
+        functionResult = functionCallable.call(
+            _visitor!, interpreterArgs, interpreterNamedArgs);
       } else {
         throw Exception(
             "No callable '$name' function found in the test source code.");
@@ -339,6 +413,7 @@ class D4rt {
     final resultValue = _bridgeInterpreterValueToNative(functionResult);
     if (resultValue is Future) {
       try {
+        _hasExecutedOnce = true;
         return resultValue
             .then((value) => _bridgeInterpreterValueToNative(value));
       } on InternalInterpreterException catch (e) {
@@ -355,7 +430,318 @@ class D4rt {
         }
       }
     }
+    _hasExecutedOnce = true;
     return resultValue;
+  }
+
+  /// Analyzes the given source code and returns introspection information
+  /// about all declared functions, classes, variables, enums, and extensions.
+  ///
+  /// This method parses and processes the source code without executing any function,
+  /// allowing you to inspect what declarations are available.
+  ///
+  /// [source] The source code to analyze.
+  ///
+  /// [sources] Additional sources for multi-file analysis.
+  ///
+  /// [includeBuiltins] Whether to include built-in types and functions in the result.
+  ///
+  /// ## Example:
+  /// ```dart
+  /// final d4rt = D4rt();
+  /// final result = d4rt.analyze(source: '''
+  ///   class Person {
+  ///     String name;
+  ///     int age;
+  ///     Person(this.name, this.age);
+  ///     String greet() => "Hello, I'm \$name";
+  ///   }
+  ///
+  ///   int add(int a, int b) => a + b;
+  ///
+  ///   final greeting = "Hello";
+  /// ''');
+  ///
+  /// print(result.classes); // [ClassInfo(Person)]
+  /// print(result.functions); // [FunctionInfo(add)]
+  /// print(result.variables); // [VariableInfo(greeting)]
+  /// ```
+  IntrospectionResult analyze({
+    required String source,
+    Map<String, String>? sources,
+    bool includeBuiltins = false,
+  }) {
+    Logger.debug("[D4rt.analyze] Starting analysis...");
+
+    _moduleLoader = _initModule(sources);
+
+    final parseResult = parseString(
+      content: source,
+      throwIfDiagnostics: false,
+      featureSet: FeatureSet.fromEnableFlags2(
+        sdkLanguageVersion: Version(3, 0, 0),
+        flags: [
+          'non-nullable',
+          'null-aware-elements',
+          'triple-shift',
+          'spread-collections',
+          'control-flow-collections',
+          'extension-methods',
+          'extension-types',
+        ],
+      ),
+    );
+
+    final errors = parseResult.errors
+        .where((e) => e.errorCode.errorSeverity == ErrorSeverity.ERROR)
+        .toList();
+    if (errors.isNotEmpty) {
+      final errorMessages = errors.map((e) {
+        final location = parseResult.lineInfo.getLocation(e.offset);
+        return "- ${e.message} (line ${location.lineNumber}, column ${location.columnNumber})";
+      }).join("\n");
+      throw SourceCodeException('Parsing errors:\n$errorMessages');
+    }
+
+    final compilationUnit = parseResult.unit;
+    final Environment executionEnvironment = _moduleLoader.globalEnvironment;
+
+    // Register native functions
+    for (var function in _nativeFunctions) {
+      executionEnvironment.define(function.name, function);
+    }
+
+    // Pass 1: Declaration
+    final declarationVisitor = DeclarationVisitor(executionEnvironment);
+    for (final declaration in compilationUnit.declarations) {
+      declaration.accept<void>(declarationVisitor);
+    }
+
+    // Pass 2: Process imports and interpret declarations (for variable values)
+    _visitor = InterpreterVisitor(
+        globalEnvironment: executionEnvironment, moduleLoader: _moduleLoader);
+
+    for (final directive in compilationUnit.directives) {
+      if (directive is ImportDirective) {
+        _visitor!.visitImportDirective(directive);
+      }
+    }
+
+    for (final declaration in compilationUnit.declarations) {
+      declaration.accept<Object?>(_visitor!);
+    }
+
+    Logger.debug("[D4rt.analyze] Analysis complete.");
+    return IntrospectionBuilder.buildFromEnvironment(
+      executionEnvironment,
+      includeBuiltins: includeBuiltins,
+      compilationUnit: compilationUnit,
+    );
+  }
+
+  /// Evaluates an expression or statement in the context of previously executed code.
+  ///
+  /// This method allows you to execute additional code in the same environment
+  /// as a previous `execute()` call, similar to a REPL experience.
+  ///
+  /// **Important**: You must call `execute()` at least once before calling `eval()`
+  /// to establish the execution context.
+  ///
+  /// [expression] The Dart expression or statement to evaluate.
+  ///
+  /// ## Example:
+  /// ```dart
+  /// final d4rt = D4rt();
+  ///
+  /// // First, set up the context
+  /// d4rt.execute(source: '''
+  ///   var counter = 0;
+  ///   void increment() { counter++; }
+  ///   int getCounter() => counter;
+  /// ''', name: 'getCounter');
+  ///
+  /// // Now use eval to interact with the established context
+  /// d4rt.eval('increment()');
+  /// d4rt.eval('increment()');
+  /// final result = d4rt.eval('getCounter()'); // Returns 2
+  ///
+  /// // You can also define new functions
+  /// d4rt.eval('int double(int x) => x * 2;');
+  /// final doubled = d4rt.eval('double(counter)'); // Returns 4
+  /// ```
+  dynamic eval(String expression) {
+    if (_visitor == null || !_hasExecutedOnce) {
+      throw RuntimeError(
+          'eval() requires an existing execution context. Call execute() first.');
+    }
+
+    Logger.debug("[D4rt.eval] Evaluating: $expression");
+    final executionEnvironment = _moduleLoader.globalEnvironment;
+
+    // First, try to parse as a top-level declaration (function, class, variable)
+    final declarationParseResult = parseString(
+      content: expression,
+      throwIfDiagnostics: false,
+      featureSet: FeatureSet.fromEnableFlags2(
+        sdkLanguageVersion: Version(3, 0, 0),
+        flags: [
+          'non-nullable',
+          'null-aware-elements',
+          'triple-shift',
+          'spread-collections',
+          'control-flow-collections',
+          'extension-methods',
+          'extension-types',
+        ],
+      ),
+    );
+
+    // Check if it parses as valid declaration(s)
+    final declErrors = declarationParseResult.errors
+        .where((e) => e.errorCode.errorSeverity == ErrorSeverity.ERROR)
+        .toList();
+
+    if (declErrors.isEmpty &&
+        declarationParseResult.unit.declarations.isNotEmpty) {
+      // It's a declaration - process it directly in the global environment
+      final compilationUnit = declarationParseResult.unit;
+
+      // Declaration pass
+      final declarationVisitor = DeclarationVisitor(executionEnvironment);
+      for (final declaration in compilationUnit.declarations) {
+        declaration.accept<void>(declarationVisitor);
+      }
+
+      // Interpretation pass
+      for (final declaration in compilationUnit.declarations) {
+        declaration.accept<Object?>(_visitor!);
+      }
+
+      Logger.debug("[D4rt.eval] Processed declaration(s)");
+      return null;
+    }
+
+    // Try wrapping as expression to get return value
+    final wrappedSource = '''
+      dynamic __eval__() {
+        return $expression;
+      }
+    ''';
+
+    final parseResult = parseString(
+      content: wrappedSource,
+      throwIfDiagnostics: false,
+      featureSet: FeatureSet.fromEnableFlags2(
+        sdkLanguageVersion: Version(3, 0, 0),
+        flags: [
+          'non-nullable',
+          'null-aware-elements',
+          'triple-shift',
+          'spread-collections',
+          'control-flow-collections',
+          'extension-methods',
+          'extension-types',
+        ],
+      ),
+    );
+
+    if (parseResult.errors.isEmpty) {
+      // Execute as expression with return value
+      final compilationUnit = parseResult.unit;
+
+      final declarationVisitor = DeclarationVisitor(executionEnvironment);
+      for (final declaration in compilationUnit.declarations) {
+        declaration.accept<void>(declarationVisitor);
+      }
+
+      for (final declaration in compilationUnit.declarations) {
+        declaration.accept<Object?>(_visitor!);
+      }
+
+      // Call the __eval__ function
+      final evalFunc = executionEnvironment.get('__eval__');
+      Object? result;
+      if (evalFunc is Callable) {
+        try {
+          result = evalFunc.call(_visitor!, [], {});
+        } on InternalInterpreterException catch (e) {
+          if (e.originalThrownValue is RuntimeError) {
+            throw e.originalThrownValue as RuntimeError;
+          }
+          throw e.originalThrownValue ?? e;
+        }
+      }
+
+      final bridgedResult = _bridgeInterpreterValueToNative(result);
+      Logger.debug("[D4rt.eval] Result: $bridgedResult");
+
+      if (bridgedResult is Future) {
+        return bridgedResult
+            .then((value) => _bridgeInterpreterValueToNative(value));
+      }
+
+      return bridgedResult;
+    }
+
+    // Try parsing as a statement (no return value expected)
+    final statementSource = '''
+      void __eval__() {
+        $expression
+      }
+    ''';
+
+    final statementParseResult = parseString(
+      content: statementSource,
+      throwIfDiagnostics: false,
+      featureSet: FeatureSet.fromEnableFlags2(
+        sdkLanguageVersion: Version(3, 0, 0),
+        flags: [
+          'non-nullable',
+          'null-aware-elements',
+          'triple-shift',
+          'spread-collections',
+          'control-flow-collections',
+          'extension-methods',
+          'extension-types',
+        ],
+      ),
+    );
+
+    if (statementParseResult.errors.isEmpty) {
+      final compilationUnit = statementParseResult.unit;
+
+      final declarationVisitor = DeclarationVisitor(executionEnvironment);
+      for (final declaration in compilationUnit.declarations) {
+        declaration.accept<void>(declarationVisitor);
+      }
+
+      for (final declaration in compilationUnit.declarations) {
+        declaration.accept<Object?>(_visitor!);
+      }
+
+      // Call the __eval__ function
+      final evalFunc = executionEnvironment.get('__eval__');
+      if (evalFunc is Callable) {
+        try {
+          evalFunc.call(_visitor!, [], {});
+        } on InternalInterpreterException catch (e) {
+          if (e.originalThrownValue is RuntimeError) {
+            throw e.originalThrownValue as RuntimeError;
+          }
+          throw e.originalThrownValue ?? e;
+        }
+      }
+
+      Logger.debug("[D4rt.eval] Executed statement");
+      return null;
+    }
+
+    // All parsing attempts failed
+    final errorMessages = declErrors.map((e) {
+      final location = declarationParseResult.lineInfo.getLocation(e.offset);
+      return "- ${e.message} (line ${location.lineNumber}, column ${location.columnNumber})";
+    }).join("\n");
+    throw SourceCodeException('Failed to parse expression:\n$errorMessages');
   }
 
   /// Invoke a property or method on the given instance.
