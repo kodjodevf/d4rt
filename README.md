@@ -17,6 +17,9 @@ It allows you to execute Dart code dynamically, bridge native classes, and build
 - **Runtime type validation**: Validate generic type arguments and method parameters at runtime.
 - **Security sandboxing**: Permission-based security system to restrict dangerous operations and prevent malicious code execution.
 - **Custom logging**: Integrated, configurable logger for debugging interpreted code.
+- **Function argument passing**: Pass positional and named arguments directly to functions via `execute()`.
+- **Code introspection**: Analyze Dart code structure with the `analyze()` method to extract metadata.
+- **Dynamic code evaluation**: Execute code dynamically with `eval()` while preserving execution state.
 - **Extensible**: Add your own bridges for custom types and native APIs.
 
 ---
@@ -59,7 +62,60 @@ void main() {
   print('Result: $result'); // Result: 8
 }
 ```
+## Advanced Features
 
+### Function Argument Passing
+
+Pass positional and named arguments directly to functions:
+
+```dart
+final interpreter = D4rt();
+
+final result = interpreter.execute(
+  source: '''
+    String greet(String name, {String greeting = "Hello"}) {
+      return "\$greeting, \$name!";
+    }
+  ''',
+  name: 'greet',
+  positionalArgs: ['Alice'],
+  namedArgs: {'greeting': 'Hi'},
+);
+print(result); // Hi, Alice!
+```
+
+### Code Introspection
+
+Analyze Dart code structure without execution:
+
+```dart
+final interpreter = D4rt();
+
+final analysis = interpreter.analyze('''
+  class User {
+    String name;
+    int age;
+    User(this.name, this.age);
+  }
+  
+  int getAge(User user) => user.age;
+''');
+
+// Access metadata about functions, classes, variables, etc.
+print(analysis.functions['getAge']?.parameters);
+print(analysis.classes['User']?.constructors);
+```
+
+### Dynamic Code Evaluation
+
+Execute code dynamically while preserving execution state:
+
+```dart
+final interpreter = D4rt();
+
+interpreter.execute(source: 'int x = 10;');
+final result = interpreter.eval('x + 5'); // Returns 15
+```
 ## Security Sandboxing
 
 d4rt includes a comprehensive permission-based security system to prevent malicious code execution. By default, access to dangerous modules like `dart:io` and `dart:isolate` is blocked unless explicitly granted.
