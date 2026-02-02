@@ -89,7 +89,7 @@ class InterpretedClass implements Callable, RuntimeType {
   static RuntimeType resolveTypeAnnotationDynamic(
       TypeAnnotation typeNode, Environment env) {
     if (typeNode is NamedType) {
-      final typeName = typeNode.name2.lexeme;
+      final typeName = typeNode.name.lexeme;
 
       Logger.debug(
           "[InterpretedClass._resolveTypeAnnotationDynamic] Resolving NamedType: $typeName");

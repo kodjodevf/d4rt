@@ -7,7 +7,6 @@ import 'package:d4rt/src/stdlib/isolate.dart';
 import 'package:d4rt/src/stdlib/math.dart';
 import 'package:d4rt/src/stdlib/collection.dart';
 import 'package:d4rt/src/stdlib/typed_data.dart';
-import 'package:pub_semver/pub_semver.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/stdlib/stdlib_io.dart'
     if (dart.library.html) 'package:d4rt/src/stdlib/stdlib_web.dart';
@@ -383,22 +382,11 @@ class ModuleLoader {
       content: sourceCode,
       throwIfDiagnostics: false,
       path: pathToReport,
-      featureSet: FeatureSet.fromEnableFlags2(
-        sdkLanguageVersion: Version(3, 0, 0), // Keep a SDK version
-        flags: [
-          'non-nullable',
-          'null-aware-elements',
-          'triple-shift',
-          'spread-collections',
-          'control-flow-collections',
-          'extension-methods',
-          'extension-types',
-        ],
-      ),
+      featureSet: FeatureSet.latestLanguageVersion(),
     );
 
     final errors = result.errors
-        .where((e) => e.errorCode.errorSeverity == ErrorSeverity.ERROR)
+        .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
         .toList();
     if (errors.isNotEmpty) {
       final errorMessages = errors.map((e) {

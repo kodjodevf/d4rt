@@ -1,3 +1,7 @@
+## 0.2.0
+- Update analyzer to version to 10.0.2
+- Refactor deprecated field
+
 ## 0.1.9
 - **feat:positionalArgs and namedArgs** - Pass arguments directly to functions via execute()
   - Add `positionalArgs` parameter to D4rt.execute() for passing positional arguments

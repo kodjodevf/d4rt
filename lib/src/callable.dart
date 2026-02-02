@@ -124,7 +124,7 @@ class InterpretedFunction implements Callable {
   static RuntimeType _resolveTypeAnnotationDynamic(
       TypeAnnotation typeNode, Environment env) {
     if (typeNode is NamedType) {
-      final typeName = typeNode.name2.lexeme;
+      final typeName = typeNode.name.lexeme;
 
       Logger.debug(
           "[InterpretedFunction._resolveTypeAnnotationDynamic] Resolving NamedType: $typeName");

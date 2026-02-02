@@ -149,7 +149,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final value = node.expression.accept<Object?>(this);
     final typeNode = node.type;
     if (typeNode is NamedType) {
-      final typeName = typeNode.name2.lexeme;
+      final typeName = typeNode.name.lexeme;
       switch (typeName) {
         case 'int':
           if (value is int) return value;
@@ -5637,7 +5637,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitClassDeclaration(ClassDeclaration node) {
-    final className = node.name.lexeme;
+    final className = node.namePart.typeName.lexeme;
     Logger.debug(
         "[Visitor.visitClassDeclaration] START for '$className' in env: ${environment.hashCode}");
 
@@ -5656,7 +5656,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     // Superclass lookup
     // InterpretedClass? superclass; // Keep this commented or remove
     if (node.extendsClause != null) {
-      final superclassName = node.extendsClause!.superclass.name2.lexeme;
+      final superclassName = node.extendsClause!.superclass.name.lexeme;
       Logger.debug(
           "[Visitor.visitClassDeclaration]   Trying to get superclass '$superclassName' from env: ${environment.hashCode}");
       Object? potentialSuperclass;
@@ -5710,7 +5710,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       Logger.debug(
           "[Visitor.visitClassDeclaration] Processing 'implements' clause for '$className' in env: ${environment.hashCode}");
       for (final interfaceType in node.implementsClause!.interfaces) {
-        final interfaceName = interfaceType.name2.lexeme;
+        final interfaceName = interfaceType.name.lexeme;
         Logger.debug(
             "[Visitor.visitClassDeclaration]   Trying to get interface '$interfaceName' from env: ${environment.hashCode}");
         try {
@@ -5746,7 +5746,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       Logger.debug(
           "[Visitor.visitClassDeclaration] Processing 'with' clause for '$className' in env: ${environment.hashCode}");
       for (final mixinType in node.withClause!.mixinTypes) {
-        final mixinName = mixinType.name2.lexeme;
+        final mixinName = mixinType.name.lexeme;
         Logger.debug(
             "[Visitor.visitClassDeclaration]   Trying to get mixin '$mixinName' from env: ${environment.hashCode}");
 
@@ -5803,7 +5803,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     Logger.debug(
         "[Visitor.visitClassDeclaration] Processing members for '$className' (hash: ${klass.hashCode})");
 
-    for (final member in node.members) {
+    for (final member in node.body.childEntities.whereType<ClassMember>()) {
       if (member is MethodDeclaration) {
         final methodName = member.name.lexeme;
         // Pass the ALREADY RETRIEVED klass object
@@ -5999,7 +5999,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     if (node.onClause != null) {
       mixinClass.onClauseTypes.clear(); // Clear existing before populating
       for (final typeNode in node.onClause!.superclassConstraints) {
-        final typeName = typeNode.name2.lexeme;
+        final typeName = typeNode.name.lexeme;
         try {
           final potentialType = environment.get(typeName);
           if (potentialType is InterpretedClass) {
@@ -6028,7 +6028,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     try {
       environment = declarationEnv;
-      for (final member in node.members) {
+      for (final member in node.body.childEntities.whereType<ClassMember>()) {
         if (member is MethodDeclaration) {
           final methodName = member.name.lexeme;
           // Methods capture the GLOBAL environment via the mixinClass
@@ -6079,7 +6079,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitEnumDeclaration(EnumDeclaration node) {
-    final enumName = node.name.lexeme;
+    final enumName = node.namePart.typeName.lexeme;
     Logger.debug(
         "[Visitor.visitEnumDeclaration] START (Pass 2) for '$enumName'");
 
@@ -6095,7 +6095,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       Logger.debug(
           "[Visitor.visitEnumDeclaration] Processing 'with' clause for '$enumName'");
       for (final mixinType in node.withClause!.mixinTypes) {
-        final mixinName = mixinType.name2.lexeme;
+        final mixinName = mixinType.name.lexeme;
         Logger.debug(
             "[Visitor.visitEnumDeclaration]   Trying to get mixin '$mixinName'");
 
@@ -6141,7 +6141,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     try {
       // Members are defined in the enum's declaration scope
       environment = enumObj.declarationEnvironment;
-      for (final member in node.members) {
+      for (final member in node.body.members) {
         if (member is MethodDeclaration) {
           final methodName = member.name.lexeme;
           // Methods capture the enum's declaration environment implicitly
@@ -6225,8 +6225,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     // Instantiate Enum Values
     Logger.debug(
         "[Visitor.visitEnumDeclaration]   Instantiating enum values...");
-    for (int i = 0; i < node.constants.length; i++) {
-      final constantDecl = node.constants[i];
+    for (int i = 0; i < node.body.constants.length; i++) {
+      final constantDecl = node.body.constants[i];
       final valueName = constantDecl.name.lexeme;
 
       if (enumObj.values.containsKey(valueName)) {
@@ -6559,7 +6559,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       return true;
     }
 
-    final typeName = typeNode.name2.lexeme;
+    final typeName = typeNode.name.lexeme;
 
     // Handle nullable types
     if (typeNode.question != null && value == null) {
@@ -6705,7 +6705,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         } else {
           final typeNode = clause.exceptionType!;
           if (typeNode is NamedType) {
-            targetCatchTypeName = typeNode.name2.lexeme;
+            targetCatchTypeName = typeNode.name.lexeme;
             Logger.debug(
                 "[TryStatement] Checking catch clause for type: $targetCatchTypeName");
 
@@ -6975,7 +6975,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     bool result = false;
 
     if (typeNode is NamedType) {
-      final typeName = typeNode.name2.lexeme;
+      final typeName = typeNode.name.lexeme;
 
       // Handle built-in types first
       switch (typeName) {
@@ -7210,7 +7210,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               .replaceAll('?', '')
               .substringAfter('<')
               .substringBeforeLast('>')
-          : typeNode.name2.lexeme;
+          : typeNode.name.lexeme;
       if (typeName.contains('<') && typeName.contains('>')) {
         typeName = typeName.substring(0, typeName.indexOf('<'));
       }
@@ -7251,7 +7251,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   Object? visitInstanceCreationExpression(InstanceCreationExpression node) {
     final constructorNameNode = node.constructorName.type;
     final constructorName =
-        constructorNameNode.name2.lexeme; // Name of the class
+        constructorNameNode.name.lexeme; // Name of the class
     final namedConstructorPart = node
         .constructorName.name?.name; // Name of the named constructor (or null)
 
@@ -7611,7 +7611,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final constructorLookupName = constructorId?.name ?? '';
 
     // Resolve the class type
-    final className = typeNode.name2.lexeme;
+    final className = typeNode.name.lexeme;
     Object? classValue;
     try {
       classValue = environment.get(className);
@@ -8127,10 +8127,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     } else if (pattern is ObjectPattern) {
       // Handles: ClassName(field1: pattern1, field2: pattern2)
       Logger.debug(
-          '[_matchAndBind] Matching object pattern ${pattern.type.name2.lexeme} against value ${value?.runtimeType}');
+          '[_matchAndBind] Matching object pattern ${pattern.type.name.lexeme} against value ${value?.runtimeType}');
 
       // Get the expected type name
-      final expectedTypeName = pattern.type.name2.lexeme;
+      final expectedTypeName = pattern.type.name.lexeme;
 
       // Check if the value is of the expected type
       // For now, we'll do basic runtime type checking
@@ -8361,7 +8361,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     // Resolve the type name from the AST node
     String onTypeName;
     if (onTypeNode is NamedType) {
-      onTypeName = onTypeNode.name2.lexeme;
+      onTypeName = onTypeNode.name.lexeme;
     } else {
       Logger.warn(
           "[visitExtensionDeclaration] Unsupported 'on' type node for resolution: ${onTypeNode.runtimeType}. Skipping extension.");
@@ -8428,7 +8428,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final staticSetters = <String, Callable>{};
     final staticFields = <String, Object?>{};
 
-    for (final member in node.members) {
+    for (final member in node.body.childEntities.whereType<ClassMember>()) {
       if (member is MethodDeclaration) {
         final methodName = member
             .name.lexeme; // Operator names like '+', '[]' are also lexemes

@@ -3,7 +3,6 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/logger/logger.dart';
-import 'package:pub_semver/pub_semver.dart';
 import 'package:d4rt/src/bridge/bridged_types.dart';
 import 'package:d4rt/src/runtime_types.dart';
 import 'package:analyzer/dart/ast/ast.dart';
@@ -286,22 +285,11 @@ class D4rt {
       final result = parseString(
         content: source,
         throwIfDiagnostics: false,
-        featureSet: FeatureSet.fromEnableFlags2(
-          sdkLanguageVersion: Version(3, 0, 0),
-          flags: [
-            'non-nullable',
-            'null-aware-elements',
-            'triple-shift',
-            'spread-collections',
-            'control-flow-collections',
-            'extension-methods',
-            'extension-types',
-          ],
-        ),
+        featureSet: FeatureSet.latestLanguageVersion(),
       );
 
       final errors = result.errors
-          .where((e) => e.errorCode.errorSeverity == ErrorSeverity.ERROR)
+          .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
           .toList();
       if (errors.isNotEmpty) {
         final errorMessages = errors.map((e) {
@@ -478,22 +466,11 @@ class D4rt {
     final parseResult = parseString(
       content: source,
       throwIfDiagnostics: false,
-      featureSet: FeatureSet.fromEnableFlags2(
-        sdkLanguageVersion: Version(3, 0, 0),
-        flags: [
-          'non-nullable',
-          'null-aware-elements',
-          'triple-shift',
-          'spread-collections',
-          'control-flow-collections',
-          'extension-methods',
-          'extension-types',
-        ],
-      ),
+      featureSet: FeatureSet.latestLanguageVersion(),
     );
 
     final errors = parseResult.errors
-        .where((e) => e.errorCode.errorSeverity == ErrorSeverity.ERROR)
+        .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
         .toList();
     if (errors.isNotEmpty) {
       final errorMessages = errors.map((e) {
@@ -582,23 +559,12 @@ class D4rt {
     final declarationParseResult = parseString(
       content: expression,
       throwIfDiagnostics: false,
-      featureSet: FeatureSet.fromEnableFlags2(
-        sdkLanguageVersion: Version(3, 0, 0),
-        flags: [
-          'non-nullable',
-          'null-aware-elements',
-          'triple-shift',
-          'spread-collections',
-          'control-flow-collections',
-          'extension-methods',
-          'extension-types',
-        ],
-      ),
+      featureSet: FeatureSet.latestLanguageVersion(),
     );
 
     // Check if it parses as valid declaration(s)
     final declErrors = declarationParseResult.errors
-        .where((e) => e.errorCode.errorSeverity == ErrorSeverity.ERROR)
+        .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
         .toList();
 
     if (declErrors.isEmpty &&
@@ -631,18 +597,7 @@ class D4rt {
     final parseResult = parseString(
       content: wrappedSource,
       throwIfDiagnostics: false,
-      featureSet: FeatureSet.fromEnableFlags2(
-        sdkLanguageVersion: Version(3, 0, 0),
-        flags: [
-          'non-nullable',
-          'null-aware-elements',
-          'triple-shift',
-          'spread-collections',
-          'control-flow-collections',
-          'extension-methods',
-          'extension-types',
-        ],
-      ),
+      featureSet: FeatureSet.latestLanguageVersion(),
     );
 
     if (parseResult.errors.isEmpty) {
@@ -693,18 +648,7 @@ class D4rt {
     final statementParseResult = parseString(
       content: statementSource,
       throwIfDiagnostics: false,
-      featureSet: FeatureSet.fromEnableFlags2(
-        sdkLanguageVersion: Version(3, 0, 0),
-        flags: [
-          'non-nullable',
-          'null-aware-elements',
-          'triple-shift',
-          'spread-collections',
-          'control-flow-collections',
-          'extension-methods',
-          'extension-types',
-        ],
-      ),
+      featureSet: FeatureSet.latestLanguageVersion(),
     );
 
     if (statementParseResult.errors.isEmpty) {
