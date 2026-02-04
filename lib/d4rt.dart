@@ -26,6 +26,7 @@
 library;
 
 export 'package:d4rt/src/bridge/bridged_types.dart';
+export 'package:d4rt/src/bridge/bridged_enum.dart';
 export 'package:d4rt/src/runtime_types.dart';
 export 'package:d4rt/src/callable.dart';
 export 'package:d4rt/src/declaration_visitor.dart';
@@ -45,3 +46,9 @@ export 'package:d4rt/src/async_state.dart';
 export 'package:d4rt/src/utils/logger/logger.dart';
 export 'package:d4rt/src/security/permissions.dart';
 export 'package:d4rt/src/introspection.dart';
+
+// Bridge utilities and extensions
+export 'package:d4rt/src/bridge/bridge_helpers.dart';
+export 'package:d4rt/src/bridge/bridge_annotations.dart';
+export 'package:d4rt/src/bridge/library_tracking.dart';
+export 'package:d4rt/src/bridge/bridge_registry_manager.dart';

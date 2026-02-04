@@ -191,9 +191,62 @@ interpreter.revoke(FilesystemPermission.any);
 
 ## Bridging Native Classes & Enums
 
-You can expose your own Dart classes and enums to the interpreter using the bridge system. Here are minimal examples:
+d4rt provides a powerful bridging system that allows you to automate the process of exposing your Dart and Flutter classes, enums, and functions to the interpreter using `build_runner`.
 
-### Bridge a Dart Class (Minimal)
+### Automated Bridge Generation (Recommended)
+
+1. **Add `build_runner` and `d4rt` dev dependencies:**
+
+   ```yaml
+   dev_dependencies:
+     build_runner: ^2.4.0
+   ```
+
+2. **Annotate your classes or enums with `@D4rtBridge()`:**
+
+   ```dart
+   import 'package:d4rt/d4rt.dart';
+   part 'color.g.dart';
+   @D4rtBridge(libraryUri: 'package:app/color.dart')
+   class Color {
+     final int value;
+     const Color(this.value);
+     
+     static const Color black = Color(0xFF000000);
+     
+     int get red => (value >> 16) & 0xFF;
+   }
+   ```
+
+3. **Run the code generator:**
+
+   ```sh
+   dart run build_runner build
+   ```
+
+   This will generate a `.g.dart` file containing the bridge definitions and an automatic registration function.
+
+4. **Register the bridges with the interpreter:**
+
+   ```dart
+   import 'package:d4rt/d4rt.dart';
+   import 'color.dart'; // Import the generated file
+
+   void main() {
+     final interpreter = D4rt();
+     
+     // Register all bridges in the file with a single line:
+     registerColorBridges(interpreter);
+     
+     // Now 'Color' is available in the interpreter under 'package:app/color.dart'
+   }
+   ```
+
+### Manual Bridge Definition
+
+If you prefer to define bridges manually (without code generation), you can use the `BridgedClass` and `BridgedEnumDefinition` classes:
+
+#### Bridge a Dart Class (Manual)
 
 ```dart
 import 'package:d4rt/d4rt.dart';
@@ -251,7 +304,7 @@ void main() {
 }
 ```
 
-### Bridge a Dart Enum (Minimal)
+#### Bridge a Dart Enum (Manual)
 
 ```dart
 import 'package:d4rt/d4rt.dart';
@@ -280,6 +333,24 @@ void main() {
   final result = interpreter.execute(source: code);
   print(result); // 1
 }
+```
+
+### Advanced Annotation Options
+
+The `@D4rtBridge` annotation provides several configuration parameters:
+
+- `libraryUri`: The namespace where the class will be registered (e.g., `'package:app/color.dart'`).
+- `includePrivate`: Whether to generate bridges for private members (default: `false`).
+- `bridgeName`: A custom variable name for the generated bridge (useful for avoiding name collisions).
+
+Example:
+```dart
+@D4rtBridge(
+  libraryUri: 'package:app/models.dart',
+  includePrivate: true,
+  bridgeName: 'customUserBridge',
+)
+class User { ... }
 ```
 
 ---

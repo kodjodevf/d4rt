@@ -1,0 +1,8 @@
+builders:
+  d4rt_bridge_builder:
+    import: "package:d4rt/src/generator/builder.dart"
+    builder_factories: ["d4rtBridgeBuilder"]
+    build_extensions: { ".dart": [".d4rt_bridge.g.part"] }
+    auto_apply: all_packages
+    build_to: cache
+    applies_builders: ["source_gen|combining_builder"]

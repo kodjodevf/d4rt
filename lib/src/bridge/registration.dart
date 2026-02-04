@@ -72,11 +72,23 @@ class BridgedEnumDefinition<T extends Enum> {
   /// The key is the method name.
   final Map<String, BridgedMethodAdapter> methods;
 
+  /// Adapters for static getters on the enum class.
+  final Map<String, BridgedStaticGetterAdapter> staticGetters;
+
+  /// Adapters for static methods on the enum class.
+  final Map<String, BridgedStaticMethodAdapter> staticMethods;
+
+  /// Adapters for static setters on the enum class.
+  final Map<String, BridgedStaticSetterAdapter> staticSetters;
+
   BridgedEnumDefinition({
     required this.name,
     required this.values,
     this.getters = const {},
     this.methods = const {},
+    this.staticGetters = const {},
+    this.staticMethods = const {},
+    this.staticSetters = const {},
   }) {
     // Validation: Ensure the value list is not empty
     if (values.isEmpty) {
@@ -95,6 +107,9 @@ class BridgedEnumDefinition<T extends Enum> {
     // Share instance adapters with all created values
     placeholderEnum.getters = getters;
     placeholderEnum.methods = methods;
+    placeholderEnum.staticGetters = staticGetters;
+    placeholderEnum.staticMethods = staticMethods;
+    placeholderEnum.staticSetters = staticSetters;
 
     for (final nativeValue in values) {
       final valueName = nativeValue.name; // Use the .name getter of Dart enums
@@ -120,6 +135,9 @@ class BridgedEnumDefinition<T extends Enum> {
     // Copy adapters into the final instance as well
     bridgedEnum.getters = getters;
     bridgedEnum.methods = methods;
+    bridgedEnum.staticGetters = staticGetters;
+    bridgedEnum.staticMethods = staticMethods;
+    bridgedEnum.staticSetters = staticSetters;
 
     final finalBridgedValues = <String, BridgedEnumValue>{};
     for (final nativeValue in values) {

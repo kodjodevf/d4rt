@@ -16,6 +16,8 @@ import 'package:d4rt/src/stdlib/stdlib.dart';
 import 'package:d4rt/src/bridge/registration.dart';
 import 'package:d4rt/src/security/permissions.dart';
 import 'package:d4rt/src/introspection.dart';
+import 'package:d4rt/src/bridge/bridge_registry_manager.dart';
+import 'package:d4rt/src/bridge/library_tracking.dart';
 
 /// The main D4rt interpreter class.
 ///
@@ -45,6 +47,9 @@ class D4rt {
   final Map<Type, BridgedClass> _bridgedDefLookupByType = {};
   final Set<Permission> _grantedPermissions = {};
 
+  /// Bridge registry manager for tracking and deduplication.
+  late final BridgeRegistryManager bridgeManager;
+
   /// Gets the current interpreter visitor instance.
   ///
   /// Returns null if no execution is currently in progress.
@@ -54,12 +59,33 @@ class D4rt {
   late ModuleLoader _moduleLoader;
   bool _hasExecutedOnce = false;
 
+  /// Creates a new D4rt interpreter instance.
+  ///
+  /// Initializes the bridge registry manager with optional custom registry.
+  /// By default, uses the global library registry for deduplication.
+  D4rt({LibraryRegistry? customRegistry}) {
+    bridgeManager = BridgeRegistryManager(customRegistry);
+  }
+
   /// Registers a bridged enum definition for use in interpreted code.
+  ///
+  /// Also tracks the registration in the bridge registry manager for
+  /// deduplication and source origin tracking.
   ///
   /// [definition] The enum definition containing the native enum type and its values.
   /// [library] The library identifier where this enum should be available.
-  void registerBridgedEnum(BridgedEnumDefinition definition, String library) {
+  /// [sourceUri] Optional canonical source URI for the enum. If not provided, it will be inferred.
+  void registerBridgedEnum(
+    BridgedEnumDefinition definition,
+    String library, {
+    String? sourceUri,
+  }) {
     _bridgedEnumDefinitions.add({library: definition});
+    bridgeManager.registerEnum(
+      definition,
+      library,
+      sourceUri: sourceUri,
+    );
   }
 
   /// Registers a bridged class definition for use in interpreted code.
@@ -68,19 +94,74 @@ class D4rt {
   /// from within interpreted code, enabling seamless integration between
   /// native and interpreted environments.
   ///
+  /// Also tracks the registration in the bridge registry manager for
+  /// deduplication and source origin tracking.
+  ///
   /// [definition] The class definition containing constructors, methods, and properties.
   /// [library] The library identifier where this class should be available.
-  void registerBridgedClass(BridgedClass definition, String library) {
+  /// [sourceUri] Optional canonical source URI for the class. If not provided, it will be inferred.
+  void registerBridgedClass(
+    BridgedClass definition,
+    String library, {
+    String? sourceUri,
+  }) {
     _bridgedClases.add({library: definition});
     _bridgedDefLookupByType[definition.nativeType] = definition;
+    bridgeManager.registerClass(
+      definition,
+      library,
+      sourceUri: sourceUri,
+    );
   }
 
   /// Registers a top-level native function for use in interpreted code.
   ///
+  /// Also tracks the registration in the bridge registry manager for
+  /// deduplication and source origin tracking.
+  ///
   /// [name] The name by which the function will be accessible in interpreted code.
   /// [function] The native function implementation to be called.
-  void registertopLevelFunction(String? name, NativeFunctionImpl function) {
+  /// [sourceUri] Optional canonical source URI for the function. If not provided, it will be inferred.
+  /// [signature] Optional function signature for documentation.
+  void registertopLevelFunction(
+    String? name,
+    NativeFunctionImpl function, {
+    String? sourceUri,
+    String? signature,
+  }) {
     _nativeFunctions.add(NativeFunction(function, name: name, arity: 0));
+    if (name != null) {
+      bridgeManager.registerFunction(
+        name,
+        function,
+        'native',
+        sourceUri: sourceUri,
+        signature: signature,
+      );
+    }
+  }
+
+  /// Gets the current registry statistics.
+  ///
+  /// Returns statistics about registered bridges, duplicates found, and deduplication efficiency.
+  RegistryStats get registryStats => bridgeManager.stats;
+
+  /// Gets all tracked bridged classes from the registry.
+  Iterable<TrackedBridgedClass> get trackedClasses => bridgeManager.classes;
+
+  /// Gets all tracked bridged enums from the registry.
+  Iterable<TrackedBridgedEnum> get trackedEnums => bridgeManager.enums;
+
+  /// Gets all tracked functions from the registry.
+  Iterable<TrackedFunction> get trackedFunctions => bridgeManager.functions;
+
+  /// Clears all bridge registrations and resets the registry.
+  void clearBridgeRegistry() {
+    _bridgedEnumDefinitions.clear();
+    _bridgedClases.clear();
+    _bridgedDefLookupByType.clear();
+    _nativeFunctions.clear();
+    bridgeManager.clear();
   }
 
   ModuleLoader _initModule(Map<String, String>? sources,

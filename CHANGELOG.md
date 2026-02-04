@@ -1,6 +1,10 @@
 ## 0.2.0
-- Update analyzer to version to 10.0.2
-- Refactor deprecated field
+- **misc**:
+  - Update analyzer to version 10.0.2.
+  - Refactor deprecated fields.
+  - Downgrade analyzer to version to 8.4.0
+- **feat: Bridge Code Generation Support**
+- **feat: Library Tracking & Deduplication** - Canonical source tracking for bridge deduplication
 
 ## 0.1.9
 - **feat:positionalArgs and namedArgs** - Pass arguments directly to functions via execute()

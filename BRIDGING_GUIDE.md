@@ -5,6 +5,11 @@ This guide provides a comprehensive overview of how to bridge your native Dart c
 ## Table of Contents
 
 - [Introduction to Bridging](#introduction-to-bridging)
+- [Automated Bridging with `@D4rtBridge`](#automated-bridging-with-d4rtbridge)
+  - [Getting Started](#getting-started)
+  - [Annotation Parameters](#annotation-parameters)
+  - [Automatic Registration](#automatic-registration)
+- [Library Tracking & Deduplication](#library-tracking--deduplication)
 - [Bridging Enums](#bridging-enums)
   - [Basic Enum Bridging](#basic-enum-bridging)
   - [Advanced Enum Bridging (with Getters and Methods)](#advanced-enum-bridging)
@@ -48,10 +53,89 @@ This guide provides a comprehensive overview of how to bridge your native Dart c
 
 Bridging in d4rt is the mechanism that exposes your application's native Dart code (classes, enums, functions) to the d4rt interpreter. This allows scripts running within the interpreter to create instances of your classes, call their methods, access their properties, and use your enums as if they were defined directly in the script.
 
-This is essential for:
--   Providing a controlled API to scripted parts of your application.
--   Allowing scripts to manipulate native application state.
--   Building powerful plugin systems or dynamic logic execution.
+There are two ways to create bridges:
+1.  **Automated (Recommended)**: Use the `@D4rtBridge` annotation and `build_runner`.
+2.  **Manual**: Manually define `BridgedClass` or `BridgedEnumDefinition` objects.
+
+---
+
+## Automated Bridging with `@D4rtBridge`
+
+d4rt includes a code generator that automates the tedious task of writing bridge definitions.
+
+### Getting Started
+
+1.  **Add dependencies** to your `pubspec.yaml`:
+    ```yaml
+    dependencies:
+      d4rt: ^0.2.0
+    dev_dependencies:
+      build_runner: ^2.4.0
+    ```
+
+2.  **Annotate your code**:
+    ```dart
+    import 'package:d4rt/d4rt.dart';
+
+    @D4rtBridge(libraryUri: 'package:myapp/models.dart')
+    class User {
+      final String name;
+      User(this.name);
+
+      void sayHello() => print('Hello, $name');
+    }
+    ```
+
+3.  **Run the generator**:
+    ```sh
+    dart run build_runner build
+    ```
+
+### Annotation Parameters
+
+The `@D4rtBridge` annotation accepts several parameters to customize generation:
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `libraryUri` | `String?` | The namespace for registration (e.g., `'dart:ui'`). |
+| `includePrivate` | `bool` | If `true`, private members (`_member`) are bridged. |
+| `bridgeName` | `String?` | Custom variable name for the generated bridge object. |
+
+### Automatic Registration
+
+The generator creates a helper function named `register<FileName>Bridges` in the `.g.dart` file. You should call this function to register everything in that file at once:
+
+```dart
+import 'user.g.dart';
+
+void setup(D4rt interpreter) {
+  registerUserBridges(interpreter);
+}
+```
+
+---
+
+## Library Tracking & Deduplication
+
+D4rt 0.2.0 introduced a robust library tracking system to prevent duplicate registrations.
+
+### How it works
+When you register a bridge, you can provide a `sourceUri` (the canonical URI where the class is defined). If multiple libraries (like barrel files) re-export the same class, D4rt uses the `sourceUri` to ensure it's only registered once.
+
+```dart
+interpreter.registerBridgedClass(
+  myBridge, 
+  'package:myapp/api.dart', // Import path
+  sourceUri: 'package:myapp/src/internal_class.dart' // Canonical source
+);
+```
+
+### Statistics
+You can check the health of your registry using `interpreter.registryStats`:
+```dart
+print('Classes: ${interpreter.registryStats.classesRegistered}');
+print('Duplicates skipped: ${interpreter.registryStats.duplicatesSkipped}');
+```
 
 ---
 
