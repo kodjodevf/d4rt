@@ -1,5 +1,4 @@
 import 'package:d4rt/d4rt.dart';
-import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/extensions/string.dart';
 
 /// Represents the execution environment for interpreted code.

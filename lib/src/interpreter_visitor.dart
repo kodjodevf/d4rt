@@ -4,7 +4,6 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:d4rt/d4rt.dart';
-import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/extensions/string.dart';
 import 'package:d4rt/src/module_loader.dart';
 
@@ -805,14 +804,35 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
     } else if (prefixValue is BridgedEnum) {
       Logger.debug(
-          "[PrefixedIdentifier] Accessing value on BridgedEnum: ${prefixValue.name}.$memberName");
+          "[PrefixedIdentifier] Accessing value/member on BridgedEnum: ${prefixValue.name}.$memberName");
+      // 1. Try to get enum value
       final enumValue = prefixValue.getValue(memberName);
       if (enumValue != null) {
         return enumValue; // Return the BridgedEnumValue
-      } else {
-        throw RuntimeError(
-            "Undefined enum value '$memberName' on bridged enum '${prefixValue.name}'.");
       }
+
+      // 2. Try static getter
+      final staticGetter = prefixValue.staticGetters[memberName];
+      if (staticGetter != null) {
+        try {
+          return staticGetter(this);
+        } catch (e, s) {
+          Logger.error(
+              "Native error during bridged enum static getter '$memberName': $e\n$s");
+          throw RuntimeError(
+              "Native error during bridged enum static getter '$memberName': $e");
+        }
+      }
+
+      // 3. Static methods as tear-offs
+      final staticMethod = prefixValue.staticMethods[memberName];
+      if (staticMethod != null) {
+        return BridgedEnumStaticMethodCallable(
+            prefixValue, staticMethod, memberName);
+      }
+
+      throw RuntimeError(
+          "Undefined member '$memberName' on bridged enum '${prefixValue.name}'.");
     } else if (prefixValue is BridgedEnumValue) {
       final bridgedEnumValue = prefixValue;
       Logger.debug(
@@ -1782,6 +1802,68 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                 "Native error during compound super assignment to bridged property '$propertyName': $e");
           }
         }
+      } else if (targetValue is BridgedEnum) {
+        if (operatorType == TokenType.EQ) {
+          // Simple assignment: Enum.property = rhsValue
+          final staticSetter = targetValue.staticSetters[propertyName];
+          if (staticSetter != null) {
+            staticSetter(this, rhsValue);
+            return rhsValue;
+          } else {
+            throw RuntimeError(
+                "Bridged enum '${targetValue.name}' has no static setter named '$propertyName'.");
+          }
+        } else {
+          // Compound assignment: Enum.property op= rhsValue
+          final staticGetter = targetValue.staticGetters[propertyName];
+          if (staticGetter == null) {
+            throw RuntimeError(
+                "Cannot perform compound assignment on bridged enum '${targetValue.name}.$propertyName': No static getter found.");
+          }
+          final currentValue = staticGetter(this);
+          Object? newValue =
+              computeCompoundValue(currentValue, rhsValue, operatorType);
+          final staticSetter = targetValue.staticSetters[propertyName];
+          if (staticSetter != null) {
+            staticSetter(this, newValue);
+            return newValue;
+          } else {
+            throw RuntimeError(
+                "Bridged enum '${targetValue.name}' has no static setter named '$propertyName'.");
+          }
+        }
+      } else if (targetValue is BridgedClass) {
+        // Static assignment on bridged class via PropertyAccess
+        if (operatorType == TokenType.EQ) {
+          final staticSetter =
+              targetValue.findStaticSetterAdapter(propertyName);
+          if (staticSetter != null) {
+            staticSetter(this, rhsValue);
+            return rhsValue;
+          } else {
+            throw RuntimeError(
+                "Bridged class '${targetValue.name}' has no static setter named '$propertyName'.");
+          }
+        } else {
+          final staticGetter =
+              targetValue.findStaticGetterAdapter(propertyName);
+          if (staticGetter == null) {
+            throw RuntimeError(
+                "Cannot perform compound assignment on static member '${targetValue.name}.$propertyName': No static getter found.");
+          }
+          final currentValue = staticGetter(this);
+          Object? newValue =
+              computeCompoundValue(currentValue, rhsValue, operatorType);
+          final staticSetter =
+              targetValue.findStaticSetterAdapter(propertyName);
+          if (staticSetter != null) {
+            staticSetter(this, newValue);
+            return newValue;
+          } else {
+            throw RuntimeError(
+                "Bridged class '${targetValue.name}' has no static setter named '$propertyName'.");
+          }
+        }
       } else {
         throw RuntimeError(
             "Assignment target must be an instance, class, or super property, got ${targetValue?.runtimeType}.");
@@ -1912,6 +1994,41 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
           Logger.debug(
               "[Assignment] Compound assigning to static bridged property '${bridgedClass.name}.$propertyName' via setter adapter.");
+          staticSetter(this, newValue);
+          return newValue; // Compound returns new value
+        }
+      } else if (target is BridgedEnum) {
+        if (operatorType == TokenType.EQ) {
+          // Simple assignment: BridgedEnum.property = rhsValue
+          final staticSetter = target.staticSetters[propertyName];
+          if (staticSetter == null) {
+            throw RuntimeError(
+                "Bridged enum '${target.name}' has no static setter named '$propertyName'.");
+          }
+          Logger.debug(
+              "[Assignment] Assigning to static bridged property '${target.name}.$propertyName' via setter adapter.");
+          staticSetter(this, rhsValue);
+          return rhsValue; // Simple Assignment returns RHS value
+        } else {
+          // Compound assignment: BridgedEnum.property op= rhsValue
+          // 1. Get current static value
+          final staticGetter = target.staticGetters[propertyName];
+          if (staticGetter == null) {
+            throw RuntimeError(
+                "Cannot perform compound assignment on static '${target.name}.$propertyName': No static getter found.");
+          }
+          final currentValue = staticGetter(this);
+          // 2. Calculate new value
+          Object? newValue =
+              computeCompoundValue(currentValue, rhsValue, operatorType);
+          // 3. Set new static value
+          final staticSetter = target.staticSetters[propertyName];
+          if (staticSetter == null) {
+            throw RuntimeError(
+                "Cannot perform compound assignment on static '${target.name}.$propertyName': No static setter found after getter.");
+          }
+          Logger.debug(
+              "[Assignment] Compound assigning to static bridged property '${target.name}.$propertyName' via setter adapter.");
           staticSetter(this, newValue);
           return newValue; // Compound returns new value
         }
@@ -2616,6 +2733,34 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           throw RuntimeError(
               "Native error during bridged enum method call '$methodName' on $targetValue: $e");
         }
+      } else if (targetValue is BridgedEnum) {
+        // Static method call on bridged enum
+        final bridgedEnum = targetValue;
+        final staticMethodAdapter = bridgedEnum.staticMethods[methodName];
+        if (staticMethodAdapter != null) {
+          final evaluationResult = _evaluateArgumentsAsync(node.argumentList);
+          if (evaluationResult is AsyncSuspensionRequest) {
+            return evaluationResult; // Propagate suspension
+          }
+          final (positionalArgs, namedArgs) =
+              evaluationResult as (List<Object?>, Map<String, Object?>);
+
+          try {
+            return staticMethodAdapter(this, positionalArgs, namedArgs);
+          } on ReturnException catch (e) {
+            return e.value;
+          } on RuntimeError {
+            rethrow;
+          } catch (e, s) {
+            Logger.error(
+                "[visitMethodInvocation] Native exception during static bridged enum method call '${bridgedEnum.name}.$methodName': $e\n$s");
+            throw RuntimeError(
+                "Native error during static bridged enum method call '$methodName' on ${bridgedEnum.name}: $e");
+          }
+        } else {
+          throw RuntimeError(
+              "Bridged enum '${bridgedEnum.name}' has no static method named '$methodName'.");
+        }
       } else if (targetValue is BridgedClass) {
         // This is a method call on a bridged class (bridged constructor or static method)
         final bridgedClass = targetValue;
@@ -3181,6 +3326,50 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // Not found in superclass hierarchy
       throw RuntimeError(
           "Undefined property '$propertyName' accessed via 'super' on instance of '${instance.klass.name}'.");
+    } else if (target is BridgedEnum) {
+      Logger.debug(
+          "[PropertyAccess] Accessing value/member on BridgedEnum: ${target.name}.$propertyName");
+      // 1. Try to get enum value
+      final enumValue = target.getValue(propertyName);
+      if (enumValue != null) return enumValue;
+
+      // 2. Try static getter
+      final staticGetter = target.staticGetters[propertyName];
+      if (staticGetter != null) {
+        try {
+          return staticGetter(this);
+        } catch (e, s) {
+          Logger.error(
+              "Native error during bridged enum static getter '$propertyName': $e\n$s");
+          throw RuntimeError(
+              "Native error during bridged enum static getter '$propertyName': $e");
+        }
+      }
+
+      // 3. Static methods as tear-offs
+      final staticMethod = target.staticMethods[propertyName];
+      if (staticMethod != null) {
+        return BridgedEnumStaticMethodCallable(
+            target, staticMethod, propertyName);
+      }
+
+      throw RuntimeError(
+          "Undefined member '$propertyName' on bridged enum '${target.name}'.");
+    } else if (target is BridgedEnumValue) {
+      Logger.debug(
+          "[PropertyAccess] Accessing property '$propertyName' on BridgedEnumValue: $target");
+      try {
+        return target.get(propertyName, this);
+      } on ReturnException catch (e) {
+        return e.value;
+      } on RuntimeError {
+        rethrow;
+      } catch (e, s) {
+        Logger.error(
+            "Native error during bridged enum property get '$target.$propertyName': $e\n$s");
+        throw RuntimeError(
+            "Native error during bridged enum property get '$propertyName' on $target: $e");
+      }
     } else if (target is BridgedClass) {
       final bridgedClass = target;
       Logger.debug(
@@ -3195,9 +3384,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       final staticMethod = bridgedClass.findStaticMethodAdapter(propertyName);
       if (staticMethod != null) {
         Logger.debug("[PropertyAccess]   Found static method adapter.");
-        throw UnimplementedError(
-            "Returning bridged static methods as values from PropertyAccess is not yet supported.");
-        // return BridgedStaticMethodCallable(bridgedClass, staticMethod, propertyName);
+        return BridgedStaticMethodCallable(
+            bridgedClass, staticMethod, propertyName);
       } else {
         throw RuntimeError(
             "Undefined static member '$propertyName' on bridged class '${bridgedClass.name}'.");
@@ -5637,7 +5825,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitClassDeclaration(ClassDeclaration node) {
-    final className = node.namePart.typeName.lexeme;
+    final className = node.name.lexeme;
     Logger.debug(
         "[Visitor.visitClassDeclaration] START for '$className' in env: ${environment.hashCode}");
 
@@ -5803,7 +5991,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     Logger.debug(
         "[Visitor.visitClassDeclaration] Processing members for '$className' (hash: ${klass.hashCode})");
 
-    for (final member in node.body.childEntities.whereType<ClassMember>()) {
+    for (final member in node.members) {
       if (member is MethodDeclaration) {
         final methodName = member.name.lexeme;
         // Pass the ALREADY RETRIEVED klass object
@@ -6028,7 +6216,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
     try {
       environment = declarationEnv;
-      for (final member in node.body.childEntities.whereType<ClassMember>()) {
+      for (final member in node.members) {
         if (member is MethodDeclaration) {
           final methodName = member.name.lexeme;
           // Methods capture the GLOBAL environment via the mixinClass
@@ -6079,7 +6267,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitEnumDeclaration(EnumDeclaration node) {
-    final enumName = node.namePart.typeName.lexeme;
+    final enumName = node.name.lexeme;
     Logger.debug(
         "[Visitor.visitEnumDeclaration] START (Pass 2) for '$enumName'");
 
@@ -6141,7 +6329,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     try {
       // Members are defined in the enum's declaration scope
       environment = enumObj.declarationEnvironment;
-      for (final member in node.body.members) {
+      for (final member in node.members) {
         if (member is MethodDeclaration) {
           final methodName = member.name.lexeme;
           // Methods capture the enum's declaration environment implicitly
@@ -6225,8 +6413,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     // Instantiate Enum Values
     Logger.debug(
         "[Visitor.visitEnumDeclaration]   Instantiating enum values...");
-    for (int i = 0; i < node.body.constants.length; i++) {
-      final constantDecl = node.body.constants[i];
+    for (int i = 0; i < node.constants.length; i++) {
+      final constantDecl = node.constants[i];
       final valueName = constantDecl.name.lexeme;
 
       if (enumObj.values.containsKey(valueName)) {
@@ -8428,7 +8616,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     final staticSetters = <String, Callable>{};
     final staticFields = <String, Object?>{};
 
-    for (final member in node.body.childEntities.whereType<ClassMember>()) {
+    for (final member in node.members) {
       if (member is MethodDeclaration) {
         final methodName = member
             .name.lexeme; // Operator names like '+', '[]' are also lexemes

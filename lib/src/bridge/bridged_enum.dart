@@ -17,6 +17,15 @@ class BridgedEnum implements RuntimeType {
   /// Instance method adapters (shared by all values).
   Map<String, BridgedMethodAdapter> methods = {};
 
+  /// Static getter adapters.
+  Map<String, BridgedStaticGetterAdapter> staticGetters = {};
+
+  /// Static method adapters.
+  Map<String, BridgedStaticMethodAdapter> staticMethods = {};
+
+  /// Static setter adapters.
+  Map<String, BridgedStaticSetterAdapter> staticSetters = {};
+
   /// Creates a definition for a bridged enum.
   BridgedEnum(this.name, this.values);
 
@@ -71,7 +80,7 @@ class BridgedEnumValue implements RuntimeValue {
   RuntimeType get valueType => enumType;
 
   @override
-  Object? get(String identifier) {
+  Object? get(String identifier, [InterpreterVisitor? visitor]) {
     // Access standard enum properties
     switch (identifier) {
       case 'index':
@@ -85,9 +94,7 @@ class BridgedEnumValue implements RuntimeValue {
             _getters[identifier] ?? enumType.getters[identifier];
         if (getterAdapter != null) {
           try {
-            // Note: The visitor is null here because get() has no visitor context.
-            // If the adapter needs the visitor, the interface will need to be revised.
-            return getterAdapter(null, nativeValue);
+            return getterAdapter(visitor, nativeValue);
           } catch (e) {
             throw RuntimeError(
                 'Error executing bridged getter "$identifier" on ${enumType.name}.$name: $e');

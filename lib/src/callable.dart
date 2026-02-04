@@ -4092,6 +4092,39 @@ class BridgedStaticMethodCallable implements Callable {
       '<bridged static method ${_bridgedClass.name}.$_methodName>';
 }
 
+class BridgedEnumStaticMethodCallable implements Callable {
+  final BridgedEnum _bridgedEnum;
+  final BridgedStaticMethodAdapter _adapter;
+  final String _methodName;
+
+  BridgedEnumStaticMethodCallable(
+      this._bridgedEnum, this._adapter, this._methodName);
+
+  @override
+  int get arity => 0;
+
+  @override
+  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
+      [Map<String, Object?> namedArguments = const {},
+      List<RuntimeType>? typeArguments]) {
+    try {
+      return _adapter(visitor, positionalArguments, namedArguments);
+    } on ArgumentError catch (e) {
+      throw RuntimeError(
+          "Invalid arguments for bridged enum static method '${_bridgedEnum.name}.$_methodName': ${e.message}");
+    } catch (e, s) {
+      Logger.error(
+          "Native exception during bridged enum static method '${_bridgedEnum.name}.$_methodName': $e\n$s");
+      throw RuntimeError(
+          "Native error during bridged enum static method '${_bridgedEnum.name}.$_methodName': $e");
+    }
+  }
+
+  @override
+  String toString() =>
+      '<bridged enum static method ${_bridgedEnum.name}.$_methodName>';
+}
+
 // Represents an extension method during interpretation.
 class InterpretedExtensionMethod implements Callable {
   final MethodDeclaration declaration; // The AST node for the method
