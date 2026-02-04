@@ -1,5 +1,8 @@
 # d4rt
 
+[![Pub package](https://img.shields.io/pub/v/d4rt.svg)](https://pub.dev/packages/d4rt)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 **d4rt** (pronounced "dart") is an interpreter and runtime for the Dart language, written in Dart.  
 It allows you to execute Dart code dynamically, bridge native classes, and build advanced scripting or plugin systems in your Dart/Flutter applications.
 
