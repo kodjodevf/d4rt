@@ -87,6 +87,9 @@ class BridgedEnumValue implements RuntimeValue {
         return index;
       case 'name':
         return name;
+      case 'values':
+        // Allow access to all enum values from an instance (convenience)
+        return enumType.enumValues;
       // 'toString' is handled below via adapters or the invoke method
       default:
         // 1. Check for custom instance getters

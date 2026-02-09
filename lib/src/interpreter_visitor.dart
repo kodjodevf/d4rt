@@ -805,6 +805,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     } else if (prefixValue is BridgedEnum) {
       Logger.debug(
           "[PrefixedIdentifier] Accessing value/member on BridgedEnum: ${prefixValue.name}.$memberName");
+
+      // Handle static 'values' getter for bridged enums
+      if (memberName == 'values') {
+        Logger.debug(
+            "[PrefixedIdentifier] Accessing static getter 'values' on bridged enum '${prefixValue.name}'.");
+        return prefixValue.enumValues;
+      }
+
       // 1. Try to get enum value
       final enumValue = prefixValue.getValue(memberName);
       if (enumValue != null) {
