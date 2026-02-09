@@ -7438,13 +7438,32 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   @override
   Object? visitInstanceCreationExpression(InstanceCreationExpression node) {
     final constructorNameNode = node.constructorName.type;
-    final constructorName =
-        constructorNameNode.name.lexeme; // Name of the class
-    final namedConstructorPart = node
-        .constructorName.name?.name; // Name of the named constructor (or null)
 
-    Logger.debug(
-        "[InstanceCreation] Creating instance of '$constructorName'${namedConstructorPart != null ? '.$namedConstructorPart' : ''}");
+    // Handle qualified types like `bool.fromEnvironment` where the analyzer creates a NamedType
+    // with importPrefix="bool" and name="fromEnvironment"
+    String constructorName;
+    String? namedConstructorPart;
+
+    // Check if this is a NamedType with an importPrefix (qualified name like bool.fromEnvironment)
+    if (constructorNameNode.importPrefix != null) {
+      // This is a case like `bool.fromEnvironment` where:
+      // - importPrefix.name = "bool"
+      // - name2 (or name) = "fromEnvironment"
+      // We treat this as: className="bool", namedConstructor="fromEnvironment"
+      constructorName = constructorNameNode.importPrefix!.name.lexeme;
+      namedConstructorPart = constructorNameNode.name.lexeme;
+
+      Logger.debug(
+          "[InstanceCreation] Qualified type detected: '$constructorName.$namedConstructorPart'");
+    } else {
+      // Normal case: simple type name
+      constructorName = constructorNameNode.name.lexeme;
+      namedConstructorPart = node.constructorName.name
+          ?.name; // Name of the named constructor (or null)
+
+      Logger.debug(
+          "[InstanceCreation] Creating instance of '$constructorName'${namedConstructorPart != null ? '.$namedConstructorPart' : ''}");
+    }
 
     // Resolve the type
     Object? typeValue;
@@ -7561,6 +7580,37 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       final bridgedClass = typeValue;
       Logger.debug(
           "[InstanceCreation]   Type resolved to BridgedClass: '$constructorName'");
+
+      // Check if this is actually a static method call disguised as a constructor call
+      // This happens with cases like `bool.fromEnvironment(...)` where fromEnvironment is a static method
+      if (namedConstructorPart != null) {
+        final staticMethodAdapter =
+            bridgedClass.findStaticMethodAdapter(namedConstructorPart);
+        if (staticMethodAdapter != null) {
+          Logger.debug(
+              "[InstanceCreation] Found static method '$namedConstructorPart' on bridged class '$constructorName'");
+
+          final (positionalArgs, namedArgs) =
+              _evaluateArguments(node.argumentList);
+
+          try {
+            // Call the static method adapter
+            final result = staticMethodAdapter(this, positionalArgs, namedArgs);
+
+            // Static methods return values directly (often native values like bool, String, etc.)
+            Logger.debug(
+                "[InstanceCreation] Static method returned: ${result?.runtimeType}");
+
+            // Return the result as-is. Static methods may return native values or BridgedInstances
+            return result;
+          } catch (e) {
+            Logger.error(
+                "[InstanceCreation] Error calling static method '$namedConstructorPart' on '$constructorName': $e");
+            throw RuntimeError(
+                "Error during static method call '$constructorName.$namedConstructorPart': $e");
+          }
+        }
+      }
 
       final (positionalArgs, namedArgs) = _evaluateArguments(node.argumentList);
 
