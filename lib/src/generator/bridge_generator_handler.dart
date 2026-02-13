@@ -90,6 +90,7 @@ class BridgeGeneratorHandler {
     buffer.writeln(
         '/// Register all $baseName bridges from this file with the interpreter.');
     buffer.writeln('void register${pascalName}Bridges(D4rt interpreter) {');
+    buffer.writeln("  // ignore: unused_local_variable");
     buffer.writeln("  const defaultUri = '$sourceFileName';");
     buffer.writeln();
 

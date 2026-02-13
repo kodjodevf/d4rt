@@ -1128,24 +1128,6 @@ class _CollectorVisitor extends RecursiveAstVisitor<void> {
       {bool isSuper = false}) {
     if (_currentClass == null) return currentType;
 
-    // Hardcoded common Flutter types
-    if (name == 'key') {
-      return const TypeMetadata(
-          name: 'Key', isNullable: true, fullName: 'Key?');
-    }
-    if (name == 'child') {
-      return const TypeMetadata(
-          name: 'Widget', isNullable: true, fullName: 'Widget?');
-    }
-    if (name == 'children') {
-      return const TypeMetadata(
-          name: 'List',
-          fullName: 'List<Widget>',
-          typeArguments: [
-            TypeMetadata(name: 'Widget'),
-          ]);
-    }
-
     if (!isSuper) {
       // Try to find a field with the same name in the current class
       for (final member in _currentClass!.members) {

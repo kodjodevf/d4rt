@@ -402,8 +402,10 @@ class TransformPipeline {
 
     _positionalIndex = 0;
 
-    final constructors =
-        meta.constructors.map((c) => _transformConstructor(c, meta)).toList();
+    final constructors = meta.constructors
+        .map((c) => _transformConstructor(c, meta))
+        .whereType<BridgeableConstructor>()
+        .toList();
 
     final methods = <BridgeableMethod>[];
 
@@ -494,8 +496,11 @@ class TransformPipeline {
     );
   }
 
-  BridgeableConstructor _transformConstructor(
+  BridgeableConstructor? _transformConstructor(
       ConstructorMetadata meta, ClassMetadata classMeta) {
+    if (classMeta.isAbstract && !meta.isFactory) {
+      return null;
+    }
     _positionalIndex = 0;
     final params = meta.parameters.map(_transformParameter).toList();
 
@@ -657,8 +662,12 @@ class TransformPipeline {
 
   /// Splits Map type arguments into key and value types.
   List<String> _splitMapTypes(String type) {
-    // type is "Map<K, V>"
-    final inner = type.substring(4, type.length - 1);
+    // type is "Map<K, V>" or "Map<K, V>?"
+    final start = type.indexOf('<');
+    final end = type.lastIndexOf('>');
+    if (start == -1 || end == -1) return ['dynamic', 'dynamic'];
+
+    final inner = type.substring(start + 1, end);
     int depth = 0;
     for (int i = 0; i < inner.length; i++) {
       if (inner[i] == '<') depth++;
@@ -671,6 +680,15 @@ class TransformPipeline {
       }
     }
     return ['dynamic', 'dynamic'];
+  }
+
+  /// Extracts the inner type from a generic collection (List, Set, etc.)
+  String _getInnerType(String type, int prefixLength) {
+    // type is "List<T>" or "List<T>?"
+    final start = type.indexOf('<');
+    final end = type.lastIndexOf('>');
+    if (start == -1 || end == -1) return 'dynamic';
+    return type.substring(start + 1, end);
   }
 
   BridgeableParameter _transformParameter(ParameterMetadata meta) {
@@ -703,17 +721,17 @@ class TransformPipeline {
         } else if (type == 'dynamic' || isGenericParam) {
           extractionExpr = "namedArgs.required<dynamic>('$paramName')";
         } else if (type.startsWith('List<')) {
-          final inner = type.substring(5, type.length - 1);
+          final inner = _getInnerType(type, 5);
           extractionExpr = "namedArgs.asList<$inner>('$paramName')";
         } else if (type.startsWith('Map<')) {
           final parts = _splitMapTypes(type);
           extractionExpr =
               "namedArgs.asMap<${parts[0]}, ${parts[1]}>('$paramName')";
         } else if (type.startsWith('Set<')) {
-          final inner = type.substring(4, type.length - 1);
+          final inner = _getInnerType(type, 4);
           extractionExpr = "namedArgs.asSet<$inner>('$paramName')";
         } else if (type.startsWith('Iterable<')) {
-          final inner = type.substring(9, type.length - 1);
+          final inner = _getInnerType(type, 9);
           extractionExpr = "namedArgs.asList<$inner>('$paramName')";
         } else {
           extractionExpr = "namedArgs.required<$type>('$paramName')";
@@ -732,21 +750,30 @@ class TransformPipeline {
                 "namedArgs.optional<dynamic>('$paramName', $defaultVal)";
           }
         } else if (type.startsWith('List<')) {
-          final inner = type.substring(5, type.length - 1);
-          extractionExpr =
-              "namedArgs.asListOrNull<$inner>('$paramName') ?? $defaultVal";
+          final inner = _getInnerType(type, 5);
+          extractionExpr = "namedArgs.asListOrNull<$inner>('$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else if (type.startsWith('Map<')) {
           final parts = _splitMapTypes(type);
           extractionExpr =
-              "namedArgs.asMapOrNull<${parts[0]}, ${parts[1]}>('$paramName') ?? $defaultVal";
+              "namedArgs.asMapOrNull<${parts[0]}, ${parts[1]}>('$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else if (type.startsWith('Set<')) {
-          final inner = type.substring(4, type.length - 1);
-          extractionExpr =
-              "namedArgs.asSetOrNull<$inner>('$paramName') ?? $defaultVal";
+          final inner = _getInnerType(type, 4);
+          extractionExpr = "namedArgs.asSetOrNull<$inner>('$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else if (type.startsWith('Iterable<')) {
-          final inner = type.substring(9, type.length - 1);
-          extractionExpr =
-              "namedArgs.asListOrNull<$inner>('$paramName') ?? $defaultVal";
+          final inner = _getInnerType(type, 9);
+          extractionExpr = "namedArgs.asListOrNull<$inner>('$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else {
           if (defaultVal == 'null') {
             extractionExpr = "namedArgs.optionalNullable<$type>('$paramName')";
@@ -765,7 +792,7 @@ class TransformPipeline {
           extractionExpr =
               "positionalArgs.required<dynamic>($index, '$paramName')";
         } else if (type.startsWith('List<')) {
-          final inner = type.substring(5, type.length - 1);
+          final inner = _getInnerType(type, 5);
           extractionExpr =
               "positionalArgs.asList<$inner>($index, '$paramName')";
         } else if (type.startsWith('Map<')) {
@@ -773,10 +800,10 @@ class TransformPipeline {
           extractionExpr =
               "positionalArgs.extractMap<${parts[0]}, ${parts[1]}>($index, '$paramName')";
         } else if (type.startsWith('Set<')) {
-          final inner = type.substring(4, type.length - 1);
+          final inner = _getInnerType(type, 4);
           extractionExpr = "positionalArgs.asSet<$inner>($index, '$paramName')";
         } else if (type.startsWith('Iterable<')) {
-          final inner = type.substring(9, type.length - 1);
+          final inner = _getInnerType(type, 9);
           extractionExpr =
               "positionalArgs.asList<$inner>($index, '$paramName')";
         } else {
@@ -800,21 +827,33 @@ class TransformPipeline {
                 "positionalArgs.optional<dynamic>($index, '$paramName', $defaultVal)";
           }
         } else if (type.startsWith('List<')) {
-          final inner = type.substring(5, type.length - 1);
+          final inner = _getInnerType(type, 5);
           extractionExpr =
-              "positionalArgs.asListOrNull<$inner>($index, '$paramName') ?? $defaultVal";
+              "positionalArgs.asListOrNull<$inner>($index, '$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else if (type.startsWith('Map<')) {
           final parts = _splitMapTypes(type);
           extractionExpr =
-              "positionalArgs.extractMapOrNull<${parts[0]}, ${parts[1]}>($index, '$paramName') ?? $defaultVal";
+              "positionalArgs.extractMapOrNull<${parts[0]}, ${parts[1]}>($index, '$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else if (type.startsWith('Set<')) {
-          final inner = type.substring(4, type.length - 1);
+          final inner = _getInnerType(type, 4);
           extractionExpr =
-              "positionalArgs.asSetOrNull<$inner>($index, '$paramName') ?? $defaultVal";
+              "positionalArgs.asSetOrNull<$inner>($index, '$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else if (type.startsWith('Iterable<')) {
-          final inner = type.substring(9, type.length - 1);
+          final inner = _getInnerType(type, 9);
           extractionExpr =
-              "positionalArgs.asListOrNull<$inner>($index, '$paramName') ?? $defaultVal";
+              "positionalArgs.asListOrNull<$inner>($index, '$paramName')";
+          if (defaultVal != 'null') {
+            extractionExpr += " ?? $defaultVal";
+          }
         } else {
           if (defaultVal == 'null') {
             extractionExpr =

@@ -1,3 +1,12 @@
+## 0.2.1
+- **feat: Enum Support Enhancement**
+  - Add native-like `values` access for both interpreted and bridged enums.
+- **fix: Bridge Generator Improvements**
+  - Fix generic collection extraction syntax (remove extra spaces/invalid tags).
+  - Prevent instantiation of abstract classes in generated bridges.
+  - Remove redundant `?? null` operators from generated code.
+  - Fix aggressive type inference for common parameter names like `key`.
+
 ## 0.2.0
 - **misc**:
   - Update analyzer to version 10.0.2.
