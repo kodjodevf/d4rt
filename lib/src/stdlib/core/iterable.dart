@@ -59,9 +59,12 @@ class IterableCore {
             return (target as Iterable).contains(positionalArgs[0]);
           },
           'forEach': (visitor, target, positionalArgs, namedArgs) {
-            final action = positionalArgs[0] as InterpretedFunction;
+            final action = positionalArgs[0];
+            if (action is! Callable) {
+              throw RuntimeError('Expected a Callable for forEach');
+            }
             for (var element in (target as Iterable)) {
-              action.call(visitor, [element]);
+              action.call(visitor, [element], {});
             }
             return null;
           },

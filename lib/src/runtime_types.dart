@@ -23,6 +23,8 @@ class InterpretedClass implements Callable, RuntimeType {
   final Map<String, InterpretedFunction> operators;
   final bool isAbstract;
   List<InterpretedClass> interfaces;
+  List<BridgedClass>
+      bridgedInterfaces; // Bridged classes that this class implements
   final bool isMixin;
   List<InterpretedClass> onClauseTypes;
   List<InterpretedClass> mixins;
@@ -127,6 +129,7 @@ class InterpretedClass implements Callable, RuntimeType {
     this.operators, {
     this.isAbstract = false,
     List<InterpretedClass>? interfaces,
+    List<BridgedClass>? bridgedInterfaces,
     this.isMixin = false,
     List<InterpretedClass>? onClauseTypes,
     List<InterpretedClass>? mixins,
@@ -142,6 +145,7 @@ class InterpretedClass implements Callable, RuntimeType {
     this.typeParameterNames = const [],
     this.typeParameterBounds = const {},
   })  : interfaces = interfaces ?? [],
+        bridgedInterfaces = bridgedInterfaces ?? [],
         onClauseTypes = onClauseTypes ?? [],
         mixins = mixins ?? [],
         bridgedMixins = bridgedMixins ?? [];
@@ -341,14 +345,16 @@ class InterpretedClass implements Callable, RuntimeType {
       return typeArg.name == 'String';
     }
 
-    if (bound.name == 'Comparable') {
-      // Check if the type implements Comparable
+    if (bound.name == 'Comparable' || bound.name.startsWith('Comparable<')) {
+      // Check if the type implements Comparable (including Comparable<T>)
       if (typeArg is BridgedClass) {
         try {
           // Basic check for common comparable types
+          // num is comparable since it's the base for int and double
           return typeArg.nativeType == String ||
               typeArg.nativeType == int ||
               typeArg.nativeType == double ||
+              typeArg.nativeType == num ||
               typeArg.nativeType == DateTime;
         } catch (e) {
           return false;
@@ -356,7 +362,8 @@ class InterpretedClass implements Callable, RuntimeType {
       }
       return typeArg.name == 'String' ||
           typeArg.name == 'int' ||
-          typeArg.name == 'double';
+          typeArg.name == 'double' ||
+          typeArg.name == 'num';
     }
 
     // Check if the type argument is a subtype of the bound
@@ -854,9 +861,18 @@ class InterpretedInstance implements RuntimeValue {
     // Check for exact type matches first
     if (expectedType is BridgedClass) {
       // For BridgedClass, check if the value's runtime type matches or is a subtype
-      return value.runtimeType == expectedType.nativeType ||
+      if (value.runtimeType == expectedType.nativeType ||
           expectedType.nativeType == Object ||
-          expectedType.nativeType == dynamic;
+          expectedType.nativeType == dynamic) {
+        return true;
+      }
+
+      // Check if value is an InterpretedInstance implementing this bridged interface
+      if (value is InterpretedInstance) {
+        return value.implementsInterface(expectedType.name);
+      }
+
+      return false;
     }
 
     if (expectedType is InterpretedClass) {
@@ -1291,6 +1307,44 @@ class InterpretedInstance implements RuntimeValue {
     // This method is primarily for the `super.` property access visitor to get the value.
     throw RuntimeError(
         "Internal Error: Field '$name' not found for super access on instance of ${klass.name}. This might indicate an issue with super property access implementation.");
+  }
+
+  /// Safely get a field value without throwing if not found
+  /// Used for pattern matching to gracefully handle missing fields
+  Object? tryGetField(String name) {
+    return _fields[name];
+  }
+
+  /// Check if a field exists on this instance
+  bool hasField(String name) {
+    return _fields.containsKey(name);
+  }
+
+  /// Check if this instance's class implements a specific bridged interface by name
+  /// Returns true if the class directly implements the interface or inherits it from superclass
+  bool implementsInterface(String interfaceName) {
+    // Check directly implemented bridged interfaces
+    if (klass.bridgedInterfaces.any((i) => i.name == interfaceName)) {
+      return true;
+    }
+
+    // Check bridged interfaces from superclass
+    InterpretedClass? current = klass.superclass;
+    while (current != null) {
+      if (current.bridgedInterfaces.any((i) => i.name == interfaceName)) {
+        return true;
+      }
+      current = current.superclass;
+    }
+
+    // Check bridged mixins
+    for (final mixin in klass.bridgedMixins) {
+      if (mixin.name == interfaceName) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // Implémentation de RuntimeValue.valueType (précédemment runtimeType)
@@ -1806,4 +1860,165 @@ class BridgedEnumMixinMethodCallable implements Callable {
   String toString() {
     return '<bridged enum mixin method $bridgedMixinName.$methodName>';
   }
+}
+
+/// Represents an extension type at runtime.
+/// Extension types are nominal wrappers around a single representation field.
+class InterpretedExtensionType implements Callable, RuntimeType {
+  @override
+  final String name;
+
+  /// The name of the single representation field
+  final String representationFieldName;
+
+  /// The type of the representation field
+  final RuntimeType representationType;
+
+  /// Environment where the extension type was declared
+  final Environment declarationEnvironment;
+
+  // Instance members (methods, getters, setters)
+  final Map<String, InterpretedFunction> methods;
+  final Map<String, InterpretedFunction> getters;
+  final Map<String, InterpretedFunction> setters;
+  final Map<String, InterpretedFunction> operators;
+
+  // Type parameter information
+  final List<String> typeParameterNames;
+  final Map<String, RuntimeType?> typeParameterBounds;
+
+  InterpretedExtensionType({
+    required this.name,
+    required this.representationFieldName,
+    required this.representationType,
+    required this.declarationEnvironment,
+    required this.methods,
+    required this.getters,
+    required this.setters,
+    required this.operators,
+    this.typeParameterNames = const [],
+    this.typeParameterBounds = const {},
+  });
+
+  @override
+  String toString() => '<extension type $name>';
+
+  @override
+  bool isSubtypeOf(RuntimeType other, {Object? value}) {
+    // Extension types are subtype of themselves
+    if (other is InterpretedExtensionType) {
+      return name == other.name;
+    }
+    // Extension types are also subtype of their representation type
+    if (representationType is InterpretedClass && other is InterpretedClass) {
+      return representationType.name == other.name;
+    }
+    return false;
+  }
+
+  /// Find an instance method by name
+  InterpretedFunction? findInstanceMethod(String name) {
+    return methods[name];
+  }
+
+  /// Find an instance getter by name
+  InterpretedFunction? findInstanceGetter(String name) {
+    return getters[name];
+  }
+
+  /// Find an instance setter by name
+  InterpretedFunction? findInstanceSetter(String name) {
+    return setters[name];
+  }
+
+  /// Find an operator by name
+  InterpretedFunction? findOperator(String name) {
+    return operators[name];
+  }
+
+  /// Find an instance operator by name (alias for findOperator)
+  InterpretedFunction? findInstanceOperator(String name) {
+    return operators[name];
+  }
+
+  /// The implicit constructor takes the representation value and wraps it
+  @override
+  int get arity => 1;
+
+  @override
+  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
+      [Map<String, Object?> namedArguments = const {},
+      List<RuntimeType>? typeArguments]) {
+    if (positionalArguments.length != 1) {
+      throw RuntimeError(
+          "Extension type '$name' constructor expects exactly 1 argument (the representation value), got ${positionalArguments.length}");
+    }
+
+    return InterpretedExtensionTypeInstance(
+      this,
+      representationFieldName,
+      positionalArguments[0],
+    );
+  }
+}
+
+/// Represents an instance of an extension type at runtime.
+class InterpretedExtensionTypeInstance implements RuntimeValue {
+  final InterpretedExtensionType extensionType;
+  final String representationFieldName;
+
+  /// The underlying wrapped value
+  final Object? representationValue;
+
+  InterpretedExtensionTypeInstance(
+    this.extensionType,
+    this.representationFieldName,
+    this.representationValue,
+  );
+
+  @override
+  RuntimeType get valueType => extensionType;
+
+  @override
+  Object? get(String name, {InterpreterVisitor? visitor}) {
+    // Check if it's the representation field
+    if (name == representationFieldName) {
+      return representationValue;
+    }
+
+    // Then check instance methods
+    final method = extensionType.findInstanceMethod(name);
+    if (method != null) {
+      return method.bind(this);
+    }
+
+    // Then check instance getters
+    final getter = extensionType.findInstanceGetter(name);
+    if (getter != null) {
+      // Return bound getter without calling it - caller will call if needed
+      return getter.bind(this);
+    }
+
+    throw RuntimeError(
+        "Undefined property '$name' on extension type '${extensionType.name}'");
+  }
+
+  @override
+  void set(String name, Object? value) {
+    // Extension type representation field is typically immutable,
+    // but setters defined on the extension type should be available
+    final setter = extensionType.findInstanceSetter(name);
+    if (setter != null) {
+      // We need a visitor to execute the setter, but it's not available here
+      // For now, throw an error - setters on extension types need special handling
+      throw RuntimeError(
+          "Setters on extension type '${extensionType.name}' require execution context. Use assignment syntax instead.");
+    } else {
+      throw RuntimeError(
+          "Cannot set property '$name' on extension type '${extensionType.name}'");
+    }
+  }
+
+  @override
+  String toString() => '<${extensionType.name} instance>';
 }

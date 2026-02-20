@@ -71,6 +71,29 @@ class DateTimeCore {
             return DateTime.tryParse(positionalArgs[0] as String);
           },
         },
+        staticGetters: {
+          'monday': (visitor) => DateTime.monday,
+          'tuesday': (visitor) => DateTime.tuesday,
+          'wednesday': (visitor) => DateTime.wednesday,
+          'thursday': (visitor) => DateTime.thursday,
+          'friday': (visitor) => DateTime.friday,
+          'saturday': (visitor) => DateTime.saturday,
+          'sunday': (visitor) => DateTime.sunday,
+          'january': (visitor) => DateTime.january,
+          'february': (visitor) => DateTime.february,
+          'march': (visitor) => DateTime.march,
+          'april': (visitor) => DateTime.april,
+          'may': (visitor) => DateTime.may,
+          'june': (visitor) => DateTime.june,
+          'july': (visitor) => DateTime.july,
+          'august': (visitor) => DateTime.august,
+          'september': (visitor) => DateTime.september,
+          'october': (visitor) => DateTime.october,
+          'november': (visitor) => DateTime.november,
+          'december': (visitor) => DateTime.december,
+          'daysPerWeek': (visitor) => DateTime.daysPerWeek,
+          'monthsPerYear': (visitor) => DateTime.monthsPerYear,
+        },
         methods: {
           'add': (visitor, target, positionalArgs, namedArgs) {
             return (target as DateTime).add(positionalArgs[0] as Duration);

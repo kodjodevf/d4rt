@@ -75,10 +75,10 @@ void main() {
         }
       ''';
 
-      // Object patterns with guards are not yet fully supported due to interpreter class limitations
-      // For now, this should return "no match" due to field access limitations
+      // Object patterns now work with interpreter classes
+      // This should match and return [10, 20] since px (10) > 5
       final result = execute(code);
-      expect(result, equals("no match"));
+      expect(result, equals([10, 20]));
     });
   });
 }

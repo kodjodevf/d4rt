@@ -151,8 +151,15 @@ class StreamAsync {
                 _runAction<void>(visitor, onData!, [data]);
             Function? onErrorWrapper = onError == null
                 ? null
-                : (Object error, [StackTrace? stackTrace]) =>
-                    _runAction<void>(visitor, onError, [error, stackTrace]);
+                : (Object error, [StackTrace? stackTrace]) {
+                    // Check arity of onError to decide whether to pass stackTrace
+                    if (onError.arity >= 2) {
+                      return _runAction<void>(
+                          visitor, onError, [error, stackTrace]);
+                    } else {
+                      return _runAction<void>(visitor, onError, [error]);
+                    }
+                  };
             void Function()? onDoneWrapper = onDone == null
                 ? null
                 : () => _runAction<void>(visitor, onDone, []);
@@ -384,11 +391,33 @@ class StreamAsync {
             final onError = positionalArgs[0] as InterpretedFunction;
             final test = namedArgs['test'] as InterpretedFunction?;
             return (target as Stream).handleError(
-              (error, stackTrace) =>
-                  _runAction<void>(visitor, onError, [error, stackTrace]),
+              (error, stackTrace) {
+                // Unwrap InternalInterpreterException to get the original error
+                Object? actualError = error;
+                if (error is InternalInterpreterException) {
+                  actualError = error.originalThrownValue;
+                }
+                // Check arity of onError to decide whether to pass stackTrace
+                // If arity >= 2, pass both error and stackTrace
+                // If arity < 2, pass only error
+                if (onError.arity >= 2) {
+                  return _runAction<void>(
+                      visitor, onError, [actualError, stackTrace]);
+                } else {
+                  return _runAction<void>(visitor, onError, [actualError]);
+                }
+              },
               test: test == null
                   ? null
-                  : (error) => _runAction<bool>(visitor, test, [error]) == true,
+                  : (error) {
+                      // Unwrap InternalInterpreterException for test function too
+                      Object? actualError = error;
+                      if (error is InternalInterpreterException) {
+                        actualError = error.originalThrownValue;
+                      }
+                      return _runAction<bool>(visitor, test, [actualError]) ==
+                          true;
+                    },
             );
           },
           'timeout': (visitor, target, positionalArgs, namedArgs) {
@@ -521,8 +550,15 @@ class StreamSubscriptionAsync {
             (target as StreamSubscription).onError(
               callback == null
                   ? null
-                  : (error, stackTrace) =>
-                      _runAction<void>(visitor!, callback, [error, stackTrace]),
+                  : (error, stackTrace) {
+                      // Check arity of callback to decide whether to pass stackTrace
+                      if (callback.arity >= 2) {
+                        return _runAction<void>(
+                            visitor!, callback, [error, stackTrace]);
+                      } else {
+                        return _runAction<void>(visitor!, callback, [error]);
+                      }
+                    },
             );
             return;
           },

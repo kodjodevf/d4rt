@@ -87,8 +87,17 @@ class FutureAsync {
               throw RuntimeError(
                   'Future.doWhile requires an Function for action.');
             }
-            return Future.doWhile(
-                () => action.call(visitor, []) as FutureOr<bool>);
+            // Handle both sync and async functions properly
+            return Future.doWhile(() {
+              final result = action.call(visitor, []);
+              if (result is Future) {
+                // Async function returns Future - ensure it resolves to bool
+                return result.then((value) => value as bool);
+              } else {
+                // Sync function returns bool directly
+                return result as bool;
+              }
+            });
           },
         },
         methods: {

@@ -1,6 +1,7 @@
 import 'package:d4rt/d4rt.dart';
 import 'package:d4rt/src/stdlib/core/comparable.dart';
 import 'package:d4rt/src/stdlib/core/double.dart';
+import 'package:d4rt/src/stdlib/core/errors.dart';
 import 'package:d4rt/src/stdlib/core/exceptions.dart';
 import 'package:d4rt/src/stdlib/core/int.dart';
 import 'package:d4rt/src/stdlib/core/iterable.dart';
@@ -21,6 +22,7 @@ import 'package:d4rt/src/stdlib/core/bool.dart';
 import 'package:d4rt/src/stdlib/core/iterator.dart';
 import 'package:d4rt/src/stdlib/core/date_time.dart';
 import 'package:d4rt/src/stdlib/core/duration.dart';
+import 'package:d4rt/src/stdlib/core/symbol.dart';
 import 'package:d4rt/src/stdlib/core/type.dart';
 import 'package:d4rt/src/stdlib/core/uri.dart';
 import 'package:d4rt/src/stdlib/core/stack_trace.dart';
@@ -85,15 +87,26 @@ class CoreStdlib {
     environment.defineBridge(TypeCore.definition);
     environment.defineBridge(NullCore.definition);
     environment.defineBridge(ComparableCore.definition);
+    environment.defineBridge(SymbolCore.definition);
+    environment.defineBridge(ErrorCore.definition);
+    environment.defineBridge(AssertionErrorCore.definition);
+    environment.defineBridge(TypeErrorCore.definition);
+    environment.defineBridge(ArgumentErrorCore.definition);
+    environment.defineBridge(RangeErrorCore.definition);
     environment.define(
         'dynamic',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
           return dynamic;
         }, arity: 0, name: 'dynamic'));
     environment.define(
+        'identical',
+        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+          return identical(arguments[0], arguments[1]);
+        }, arity: 2, name: 'identical'));
+    environment.define(
         'print',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          print(arguments[0]);
+          print(visitor.valueToString(arguments[0]));
           return null;
         }, arity: 1, name: 'print'));
   }

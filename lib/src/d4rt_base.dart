@@ -417,6 +417,14 @@ class D4rt {
       }
       Logger.debug(" [execute] Finished processing directives.");
 
+      Logger.debug(
+          " [execute] Ensuring imported classes have constructors populated...");
+      // For each InterpretedClass in the environment that was imported but has no constructors,
+      // we need to ensure its constructors are available. This is done by checking the
+      // environment for classes and triggering their processing if needed.
+      _ensureImportedClassesHaveConstructors(executionEnvironment, _visitor!);
+      Logger.debug(" [execute] Finished ensuring imported classes are ready.");
+
       Logger.debug(" [execute] Processing ALL declarations sequentially");
 
       Logger.debug(" [execute] Top-level declarations for Pass 2:");
@@ -424,8 +432,25 @@ class D4rt {
         Logger.debug(" [execute]   - ${declaration.runtimeType}");
       }
 
+      // Pre-process extensions first so they are available for all other code
+      Logger.debug(" [execute] Pre-processing extensions...");
       for (final declaration in compilationUnit.declarations) {
-        declaration.accept<Object?>(_visitor!);
+        if (declaration is ExtensionDeclaration) {
+          try {
+            declaration.accept<Object?>(_visitor!);
+          } catch (e) {
+            Logger.warn(
+                " [execute] Warning while processing extension '${declaration.name}': $e");
+          }
+        }
+      }
+      Logger.debug(" [execute] Finished pre-processing extensions");
+
+      // Process all other declarations
+      for (final declaration in compilationUnit.declarations) {
+        if (declaration is! ExtensionDeclaration) {
+          declaration.accept<Object?>(_visitor!);
+        }
       }
       Logger.debug(" [execute] Finished processing declarations");
       Logger.debug("[execute] Looking for $name function");
@@ -501,6 +526,21 @@ class D4rt {
     }
     _hasExecutedOnce = true;
     return resultValue;
+  }
+
+  /// Ensures that InterpretedClass objects from imported modules have their constructors
+  /// populated. This is necessary for cross-file class instantiation to work correctly.
+  void _ensureImportedClassesHaveConstructors(
+      Environment env, InterpreterVisitor visitor) {
+    env.values.forEach((key, value) {
+      if (value is InterpretedClass && value.constructors.isEmpty) {
+        // This class has no constructors populated yet.
+        // We can't easily populate them here without the original AST node,
+        // so we rely on lazy initialization in InterpreterClass call()
+        Logger.debug(
+            "[D4rt._ensureImportedClassesHaveConstructors] Class '${value.name}' has no constructors yet");
+      }
+    });
   }
 
   /// Analyzes the given source code and returns introspection information

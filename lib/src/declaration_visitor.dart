@@ -68,8 +68,7 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       <String, InterpretedFunction>{}, // operators
       // Named parameters
       isAbstract: node.abstractKeyword != null,
-      isMixin:
-          false, // Will potentially be corrected in pass 2 if 'class mixin'
+      isMixin: node.mixinKeyword != null,
       interfaces: [], // Initially empty
       onClauseTypes: [], // Initially empty
       mixins: [], // Initially empty

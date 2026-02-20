@@ -316,17 +316,26 @@ class Environment {
   Callable? findExtensionMember(Object? target, String name,
       {InterpreterVisitor? visitor}) {
     final targetType = getRuntimeType(target); // Helper to get RuntimeType
-    if (targetType == null) return null;
+    if (targetType == null) {
+      Logger.debug(
+          "[Environment.findExtensionMember] Could not determine type for target");
+      return null;
+    }
+
+    Logger.debug(
+        "[Environment.findExtensionMember] Looking for extension member '$name' on type ${targetType.name}");
     // Search current environment and enclosing ones
     Environment? current = this;
     while (current != null) {
       // Check unnamed extensions
       for (final ext in current._unnamedExtensions) {
+        Logger.debug(
+            "[Environment.findExtensionMember]   Checking unnamed extension on ${ext.onType.name}");
         if (targetType.isSubtypeOf(ext.onType)) {
           final member = ext.findMember(name);
           if (member != null) {
             Logger.debug(
-                " [Environment] Found extension member '$name' in unnamed ext on ${ext.onType.name}");
+                "[Environment] Found extension member '$name' in unnamed ext on ${ext.onType.name}");
             // Need to bind 'target' to the call somehow.
             // This will likely require returning a bound callable or modifying the call site.
             return member; // Return the raw callable for now
@@ -336,6 +345,8 @@ class Environment {
       // Check named extensions (stored as values)
       for (final value in current._values.values) {
         if (value is InterpretedExtension) {
+          Logger.debug(
+              "[Environment.findExtensionMember]   Checking named extension '${value.name}' on ${value.onType.name}");
           if (targetType.isSubtypeOf(value.onType)) {
             final member = value.findMember(name);
             if (member != null) {
@@ -360,6 +371,57 @@ class Environment {
       }
       current = current._enclosing;
     }
+
+    // FIX: If no extension found in the normal enclosing chain,
+    // also search the global environment (if available via visitor).
+    // This ensures extensions declared at module level are accessible
+    // to functions even if their closure doesn't directly include the global environment.
+    if (visitor != null) {
+      // Search global environment
+      current = visitor.globalEnvironment;
+
+      while (current != null) {
+        // Check unnamed extensions in global
+        for (final ext in current._unnamedExtensions) {
+          if (targetType.isSubtypeOf(ext.onType)) {
+            final member = ext.findMember(name);
+            if (member != null) {
+              Logger.debug(
+                  "[Environment] Found extension member '$name' in global unnamed ext on ${ext.onType.name}");
+              return member;
+            }
+          }
+        }
+        // Check named extensions in global
+        for (final value in current._values.values) {
+          if (value is InterpretedExtension) {
+            if (targetType.isSubtypeOf(value.onType)) {
+              final member = value.findMember(name);
+              if (member != null) {
+                Logger.debug(
+                    "[Environment] Found extension member '$name' in global named ext '${value.name}' on ${value.onType.name}");
+                return member;
+              }
+            } else if (targetType is NativeFunction &&
+                value.onType is NativeFunction) {
+              final valueType = value.onType as NativeFunction;
+              if (valueType.name == targetType.name) {
+                final member = value.findMember(name);
+                if (member != null) {
+                  Logger.debug(
+                      "[Environment] Found extension member '$name' in global named ext '${value.name}' on ${value.onType.name}");
+                  return member;
+                }
+              }
+            }
+          }
+        }
+        current = current._enclosing;
+      }
+    }
+
+    Logger.debug(
+        "[Environment.findExtensionMember] No extension found for '$name' on type ${targetType.name}");
     return null; // Not found
   }
 

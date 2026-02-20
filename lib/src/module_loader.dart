@@ -107,22 +107,54 @@ class ModuleLoader {
         "[ModuleLoader loadModule for $uri] Executing InterpreterVisitor pass for initializers...");
     for (final declaration in ast.declarations) {
       // We only care about the evaluation of TopLevelVariableDeclaration for their initializers.
-      // Functions and classes are already "declared" by DeclarationVisitor.
-      // The InterpreterVisitor also handles function/class declarations but
-      // here, we want to make sure that the `define` of variables are done with the correct values.
+      // Functions, classes, and mixins are already "declared" by DeclarationVisitor.
+      // We skip class/mixin/function declarations here to avoid complex dependency resolution issues.
+      // They will be properly populated when processed in the main execution context.
       if (declaration is TopLevelVariableDeclaration) {
         declaration.accept(moduleInterpreter);
       }
-      // We could also want to execute other types of declarations if they have global side effects at the time of the module initialization,
-      // but for variables, this is the most crucial.
-      // Functions and classes are already "declared" (as Callable/InterpretedClass objects)
-      // by the DeclarationVisitor in moduleEnvironment. InterpreterVisitor would redefine them
-      // with the same objects (or similar objects if the logic differs slightly).
-      // For now, let's focus on variables.
     }
     Logger.debug(
         "[ModuleLoader loadModule for $uri] Finished InterpreterVisitor pass for initializers.");
 
+    Logger.debug(
+        "[ModuleLoader loadModule for $uri] Post-processing: Processing class/mixin declarations to populate constructors...");
+    // First process all mixin declarations to ensure they're fully initialized
+    // before classes try to use them
+    for (final declaration in ast.declarations) {
+      if (declaration is MixinDeclaration) {
+        try {
+          declaration.accept(moduleInterpreter);
+        } catch (e) {
+          Logger.warn(
+              "[ModuleLoader loadModule for $uri] Warning while processing mixin '${declaration.name}': $e");
+        }
+      }
+    }
+    // Then process all class declarations now that mixins are ready
+    for (final declaration in ast.declarations) {
+      if (declaration is ClassDeclaration) {
+        try {
+          declaration.accept(moduleInterpreter);
+        } catch (e) {
+          Logger.warn(
+              "[ModuleLoader loadModule for $uri] Warning while processing class '${declaration.name}': $e");
+        }
+      }
+    }
+    // Finally process all extension declarations
+    for (final declaration in ast.declarations) {
+      if (declaration is ExtensionDeclaration) {
+        try {
+          declaration.accept(moduleInterpreter);
+        } catch (e) {
+          Logger.warn(
+              "[ModuleLoader loadModule for $uri] Warning while processing extension '${declaration.name}': $e");
+        }
+      }
+    }
+    Logger.debug(
+        "[ModuleLoader loadModule for $uri] Finished post-processing declarations.");
     // PREPARATION OF THE EXPORTED ENVIRONMENT
     Environment exportedEnvironment = Environment(
         enclosing: globalEnvironment); // Must also enclose globalEnvironment

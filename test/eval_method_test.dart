@@ -554,17 +554,15 @@ void main() {
       test('should handle division by zero', () {
         d4rt.execute(source: 'void init() {}', name: 'init');
 
-        // d4rt throws RuntimeError for division by zero (both int and double)
+        // Integer division by zero throws error
         expect(
           () => d4rt.eval('10 ~/ 0'),
           throwsA(anything),
         );
 
-        // d4rt also throws for double division by zero
-        expect(
-          () => d4rt.eval('10.0 / 0.0'),
-          throwsA(anything),
-        );
+        // Double division by zero returns Infinity (IEEE 754 behavior)
+        final result = d4rt.eval('10.0 / 0.0');
+        expect(result.isInfinite, isTrue);
       });
 
       test('should throw error for null pointer on non-nullable', () {

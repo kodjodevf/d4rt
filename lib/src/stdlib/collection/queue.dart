@@ -39,6 +39,23 @@ class QueueCollection {
             }
             throw RuntimeError("Invalid arguments for Queue.add");
           },
+          'addAll': (visitor, target, positionalArgs, namedArgs) {
+            if (target is Queue &&
+                positionalArgs.length == 1 &&
+                namedArgs.isEmpty) {
+              final elements = positionalArgs[0];
+              if (elements is Iterable) {
+                target.addAll(elements);
+                return null;
+              } else if (elements == null) {
+                throw RuntimeError(
+                    "The argument type 'Null' can't be assigned to the parameter type 'Iterable<dynamic>'.");
+              }
+              throw RuntimeError(
+                  "Argument to Queue.addAll must be an Iterable.");
+            }
+            throw RuntimeError("Invalid arguments for Queue.addAll");
+          },
           'removeFirst': (visitor, target, positionalArgs, namedArgs) {
             if (target is Queue &&
                 positionalArgs.isEmpty &&
@@ -67,6 +84,22 @@ class QueueCollection {
             }
             throw RuntimeError("Invalid arguments for Queue.contains");
           },
+          'toList': (visitor, target, positionalArgs, namedArgs) {
+            if (target is Queue &&
+                positionalArgs.isEmpty &&
+                namedArgs.isEmpty) {
+              return target.toList();
+            }
+            throw RuntimeError("Invalid arguments for Queue.toList");
+          },
+          'toSet': (visitor, target, positionalArgs, namedArgs) {
+            if (target is Queue &&
+                positionalArgs.isEmpty &&
+                namedArgs.isEmpty) {
+              return target.toSet();
+            }
+            throw RuntimeError("Invalid arguments for Queue.toSet");
+          }
         },
         getters: {
           'length': (visitor, target) {

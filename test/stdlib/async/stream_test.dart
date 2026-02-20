@@ -400,4 +400,121 @@ void main() {
       });
     });
   });
+  group('Stream Error Handling:', () {
+    test('handleError with single-argument callback works without error', () {
+      final code = '''
+        import 'dart:async';
+        
+        void main() async {
+          var stream = Stream.fromIterable([1, 2, 3]).map((n) {
+            if (n == 2) throw 'error at 2';
+            return n;
+          });
+          var handled = stream.handleError((e) {
+          });
+          try {
+            await for (var n in handled) {
+            }
+          } catch (e) {
+          }
+        }
+      ''';
+      // Should not throw an error about too many arguments
+      expect(() => execute(code), returnsNormally);
+    });
+
+    test('handleError with two-argument callback works without error', () {
+      final code = '''
+        import 'dart:async';
+        
+        void main() async {
+          var stream = Stream.fromIterable([1, 2, 3]).map((n) {
+            if (n == 2) throw 'error at 2';
+            return n;
+          });
+          var handled = stream.handleError((e, st) {
+          });
+          try {
+            await for (var n in handled) {
+            }
+          } catch (e) {
+          }
+        }
+      ''';
+      // Should not throw an error about too many arguments
+      expect(() => execute(code), returnsNormally);
+    });
+
+    test('Stream.listen with onError single-argument callback works', () {
+      final code = '''
+        import 'dart:async';
+        
+        void main() async {
+          var stream = Stream.fromIterable([1, 2, 3]).map((n) {
+            if (n == 2) throw 'error at 2';
+            return n;
+          });
+          var handled = false;
+          stream.listen(
+            (n) {},
+            onError: (e) {
+              handled = true;
+            },
+          );
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+      ''';
+      // Should not throw an error about too many arguments
+      expect(() => execute(code), returnsNormally);
+    });
+
+    test('Stream.listen with onError two-argument callback works', () {
+      final code = '''
+        import 'dart:async';
+        
+        void main() async {
+          var stream = Stream.fromIterable([1, 2, 3]).map((n) {
+            if (n == 2) throw 'error at 2';
+            return n;
+          });
+          var handled = false;
+          stream.listen(
+            (n) {},
+            onError: (e, st) {
+              handled = true;
+            },
+          );
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+      ''';
+      // Should not throw an error about too many arguments
+      expect(() => execute(code), returnsNormally);
+    });
+
+    test('handleError respects test parameter with single-argument callback',
+        () {
+      final code = '''
+        import 'dart:async';
+        
+        void main() async {
+          var stream = Stream.fromIterable([1, 2, 3]).map((n) {
+            if (n == 2) throw 'error at 2';
+            return n;
+          });
+          var handled = stream.handleError(
+            (e) {
+            },
+            test: (e) => e.contains('2'),
+          );
+          try {
+            await for (var n in handled) {
+            }
+          } catch (e) {
+          }
+        }
+      ''';
+      // Should not throw an error about too many arguments
+      expect(() => execute(code), returnsNormally);
+    });
+  });
 }

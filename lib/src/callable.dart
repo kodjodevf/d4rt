@@ -3,6 +3,30 @@ import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:d4rt/d4rt.dart';
 
+/// Represents an invocation for noSuchMethod support in interpreted code
+class InterpretedInvocation {
+  final Symbol memberName;
+  final List<Object?> positionalArguments;
+  final Map<Symbol, Object?> namedArguments;
+  final bool isMethod;
+  final bool isGetter;
+  final bool isSetter;
+
+  InterpretedInvocation({
+    required this.memberName,
+    required this.positionalArguments,
+    required this.namedArguments,
+    this.isMethod = true,
+    this.isGetter = false,
+    this.isSetter = false,
+  });
+
+  @override
+  String toString() {
+    return 'InterpretedInvocation(memberName: $memberName, positionalArguments: $positionalArguments, namedArguments: $namedArguments)';
+  }
+}
+
 /// Represents a yield operation in a generator function
 class YieldValue {
   final Object? value;
@@ -19,6 +43,28 @@ Object _unwrapExceptionForPropagation(Object? thrownValue) {
   }
   // Otherwise, return the value as-is or a default exception
   return thrownValue ?? Exception('Unknown error');
+}
+
+/// Encapsulates a getter and/or setter for a top-level property or method
+/// This allows getters and setters with the same name to coexist in the environment
+class PropertyAccessor {
+  final InterpretedFunction? getter;
+  final InterpretedFunction? setter;
+
+  PropertyAccessor({this.getter, this.setter}) {
+    if (getter == null && setter == null) {
+      throw ArgumentError(
+          'PropertyAccessor must have at least a getter or setter');
+    }
+  }
+
+  @override
+  String toString() {
+    final parts = <String>[];
+    if (getter != null) parts.add('getter');
+    if (setter != null) parts.add('setter');
+    return '<property: ${parts.join('/')}>';
+  }
 }
 
 // Interface or base class for all "callable" entities
@@ -39,7 +85,7 @@ class _ExecutionPreparationResult {
 // Represents a function or method defined by the user
 class InterpretedFunction implements Callable {
   final FormalParameterList? _parameters;
-  final FunctionBody _body;
+  final FunctionBody? _body;
   final Environment _closure;
   final String? _name;
   // Add isInitializer flag for constructors
@@ -60,6 +106,8 @@ class InterpretedFunction implements Callable {
   final bool isAsyncGenerator;
   // Factory flag for constructors
   final bool isFactory;
+  // Default constructor flag - set for classes without explicit constructors
+  final bool isDefaultConstructor;
 
   final RuntimeType? declaredReturnType; // Store the declared type
 
@@ -160,6 +208,7 @@ class InterpretedFunction implements Callable {
     this.isGenerator = false,
     this.isAsyncGenerator = false,
     this.isFactory = false,
+    this.isDefaultConstructor = false,
     this.declaredReturnType,
     this.isNullable = false,
     this.typeParameterNames = const [],
@@ -252,6 +301,25 @@ class InterpretedFunction implements Callable {
           typeParameterNames: const [],
           typeParameterBounds: const {},
         );
+
+  // Create a default no-arg constructor for classes without explicit constructors
+  factory InterpretedFunction.defaultConstructor(InterpretedClass owner) {
+    return InterpretedFunction._internal(
+      null, // No parameters
+      null, // No body (will be handled as a default constructor)
+      owner.classDefinitionEnvironment, // Use class environment
+      '', // Unnamed constructor
+      isInitializer: true, // Is a constructor initializer
+      constructorInitializers: const [], // No explicit initializers
+      ownerType: owner, // Owner is the class
+      isAbstract: false,
+      isAsync: false,
+      isFactory: false,
+      typeParameterNames: const [],
+      typeParameterBounds: const {},
+      isDefaultConstructor: true, // Mark as default constructor
+    );
+  }
 
   @override
   int get arity {
@@ -349,6 +417,15 @@ class InterpretedFunction implements Callable {
       }
     }
 
+    // Define representation field for extension type instances
+    if (instance is InterpretedExtensionTypeInstance &&
+        ownerType is InterpretedExtensionType) {
+      final extType = ownerType as InterpretedExtensionType;
+      // Make the representation field available with its declared name
+      boundEnvironment.define(
+          extType.representationFieldName, instance.representationValue);
+    }
+
     // Create a new function *instance* that uses the bound environment
     // Need to ensure all relevant properties (isGetter, isSetter, etc.) are copied.
     final boundFunction = InterpretedFunction._internal(
@@ -366,6 +443,8 @@ class InterpretedFunction implements Callable {
       isGenerator: isGenerator,
       isAsyncGenerator: isAsyncGenerator,
       isFactory: isFactory, // Copy the factory flag
+      isDefaultConstructor:
+          isDefaultConstructor, // Copy default constructor flag
       declaredReturnType: declaredReturnType,
       typeParameterNames: typeParameterNames, // Copy type parameter names
       typeParameterBounds: typeParameterBounds, // Copy type parameter bounds
@@ -473,6 +552,10 @@ class InterpretedFunction implements Callable {
     final providedNamedArgs = namedArguments;
     final processedParamNames = <String>{};
 
+    // Map to store super parameter values for parent constructor forwarding
+    // Key: parameter name (from parent), Value: argument value
+    final Map<String, Object?> superParameterValues = {};
+
     if (params != null) {
       for (final param in params) {
         String? paramName;
@@ -482,6 +565,7 @@ class InterpretedFunction implements Callable {
         bool isNamed = false;
         bool isRequiredNamed = false;
         bool isFieldInitializing = false; // NEW flag
+        bool isSuperParameter = false; // NEW flag for super parameters
 
         // Determine parameter info
         FormalParameter actualParam =
@@ -491,7 +575,18 @@ class InterpretedFunction implements Callable {
           actualParam = param.parameter;
         }
 
-        if (actualParam is NormalFormalParameter) {
+        if (actualParam is SuperFormalParameter) {
+          // Handle super parameter (Dart 2.17+): super.name
+          isSuperParameter = true;
+          paramName = actualParam.name
+              .lexeme; // The parameter name (automatically 'name' for 'super.name')
+          isRequired = actualParam.isRequiredPositional;
+          isOptionalPositional = actualParam.isOptionalPositional;
+          isNamed = actualParam.isNamed;
+          isRequiredNamed = actualParam.isRequiredNamed;
+          Logger.debug(
+              "[_prepareEnv] Found super parameter: '$paramName' (required=$isRequired, isNamed=$isNamed)");
+        } else if (actualParam is NormalFormalParameter) {
           paramName = actualParam.name?.lexeme;
           isRequired = actualParam.isRequiredPositional;
           isOptionalPositional = actualParam.isOptionalPositional;
@@ -549,6 +644,15 @@ class InterpretedFunction implements Callable {
           }
         }
 
+        // Store super parameter values for later forwarding to parent constructor
+        // BUT ONLY if the argument was actually provided
+        // This allows parent constructor to use its own defaults for optional super parameters
+        if (isSuperParameter && argumentProvided) {
+          superParameterValues[paramName] = valueToDefine;
+          Logger.debug(
+              "[_prepareEnv] Stored super parameter '$paramName' = $valueToDefine for forwarding");
+        }
+
         // Define variable in execution scope OR Initialize field
         if (isFieldInitializing) {
           // It's a `this.fieldName` parameter. Initialize the field directly.
@@ -559,10 +663,12 @@ class InterpretedFunction implements Callable {
           Logger.debug(
               "[_prepareEnv] Attempting to set this.$paramName = $valueToDefine for instance ${thisValue.hashCode}");
           thisValue.set(paramName, valueToDefine);
-        } else {
-          // It's a regular parameter. Define it in the execution environment.
+        } else if (!isSuperParameter) {
+          // It's a regular parameter (not super). Define it in the execution environment.
           executionEnvironment.define(paramName, valueToDefine);
         }
+        // Note: Super parameters are NOT defined in the execution environment
+        // They are only forwarded to the parent constructor
       }
 
       // Final Validation
@@ -770,6 +876,39 @@ class InterpretedFunction implements Callable {
 
               explicitSuperCalled = true;
               redirected = true; // Mark that redirection occurred
+            } else if (initializer is AssertInitializer) {
+              // Handles: assert(condition) or assert(condition, message)
+              final conditionValue =
+                  initializer.condition.accept<Object?>(visitor);
+              if (conditionValue is AsyncSuspensionRequest) {
+                throw RuntimeError(
+                    "Dart language does not allow 'await' expressions in assert initializers.");
+              }
+
+              final bridgedInstance = visitor.toBridgedInstance(conditionValue);
+              bool conditionResult;
+              if (conditionValue is bool) {
+                conditionResult = conditionValue;
+              } else if (bridgedInstance.$2 &&
+                  bridgedInstance.$1?.nativeObject is bool) {
+                conditionResult = bridgedInstance.$1!.nativeObject as bool;
+              } else {
+                throw RuntimeError(
+                  "Assert condition must be a boolean, but was ${conditionValue?.runtimeType}.",
+                );
+              }
+
+              if (!conditionResult) {
+                // Condition is false, evaluate the message and throw.
+                String assertionMessage = "Assertion failed";
+                if (initializer.message != null) {
+                  final messageValue =
+                      initializer.message!.accept<Object?>(visitor);
+                  assertionMessage =
+                      "Assertion failed: ${visitor.stringify(messageValue)}";
+                }
+                throw RuntimeError(assertionMessage);
+              }
             } else {
               throw StateError(
                   "Unknown constructor initializer type: ${initializer.runtimeType}");
@@ -782,7 +921,7 @@ class InterpretedFunction implements Callable {
       }
 
       // If no explicit super() or this() was called, and there IS a superclass,
-      // implicitly call the superclass's unnamed constructor with no arguments.
+      // implicitly call the superclass's unnamed constructor with arguments.
       if (!explicitSuperCalled && superClass != null) {
         final defaultSuperConstructor = superClass.findConstructor('');
         if (defaultSuperConstructor == null) {
@@ -791,8 +930,55 @@ class InterpretedFunction implements Callable {
         }
         // Call the default super constructor, bound to the *current* instance
         // NOTE: Default super constructor call CANNOT suspend
-        final defaultSuperResult =
-            defaultSuperConstructor.bind(thisValue).call(visitor, [], {});
+
+        // Convert super parameters to positional/named arguments for the parent constructor
+        final superPositionalArgs = <Object?>[];
+        final superNamedArgs = <String, Object?>{};
+
+        if (superParameterValues.isNotEmpty) {
+          // Get the parent constructor's parameters to determine parameter ordering
+          final parentParams = defaultSuperConstructor._parameters?.parameters;
+          if (parentParams != null) {
+            // Map super parameter values to parent constructor parameters by position/name
+            for (final parentParam in parentParams) {
+              FormalParameter actualParentParam = parentParam;
+              if (parentParam is DefaultFormalParameter) {
+                actualParentParam = parentParam.parameter;
+              }
+
+              String paramName = '';
+              if (actualParentParam is NormalFormalParameter) {
+                paramName = actualParentParam.name?.lexeme ?? '';
+              } else if (actualParentParam is SuperFormalParameter) {
+                paramName = actualParentParam.name.lexeme;
+              }
+
+              if (paramName.isNotEmpty &&
+                  superParameterValues.containsKey(paramName)) {
+                final value = superParameterValues[paramName];
+
+                if (actualParentParam is NormalFormalParameter) {
+                  if (actualParentParam.isPositional) {
+                    superPositionalArgs.add(value);
+                    Logger.debug(
+                        "[Implicit super()] Added super parameter '$paramName' = $value as positional arg");
+                  } else if (actualParentParam.isNamed) {
+                    superNamedArgs[paramName] = value;
+                    Logger.debug(
+                        "[Implicit super()] Added super parameter '$paramName' = $value as named arg");
+                  }
+                }
+              }
+            }
+          }
+
+          Logger.debug(
+              "[Implicit super()] Calling parent constructor with ${superPositionalArgs.length} positional and ${superNamedArgs.length} named super parameters");
+        }
+
+        final defaultSuperResult = defaultSuperConstructor
+            .bind(thisValue)
+            .call(visitor, superPositionalArgs, superNamedArgs);
         if (defaultSuperResult is AsyncSuspensionRequest) {
           // Should not happen as constructors are not async
           throw StateError(
@@ -898,14 +1084,16 @@ class InterpretedFunction implements Callable {
       return typeArg.name != 'void';
     }
 
-    if (bound.name == 'Comparable') {
-      // Check if the type implements Comparable
+    if (bound.name == 'Comparable' || bound.name.startsWith('Comparable<')) {
+      // Check if the type implements Comparable (including Comparable<T>)
       if (typeArg is BridgedClass) {
         try {
           // Basic check for common comparable types
+          // num is comparable since it's the base for int and double
           return typeArg.nativeType == String ||
               typeArg.nativeType == int ||
               typeArg.nativeType == double ||
+              typeArg.nativeType == num ||
               typeArg.nativeType == DateTime;
         } catch (e) {
           return false;
@@ -913,7 +1101,8 @@ class InterpretedFunction implements Callable {
       }
       return typeArg.name == 'String' ||
           typeArg.name == 'int' ||
-          typeArg.name == 'double';
+          typeArg.name == 'double' ||
+          typeArg.name == 'num';
     }
 
     // Check if the type argument is a subtype of the bound
@@ -1074,6 +1263,26 @@ class InterpretedFunction implements Callable {
                 if (!isInitializer && _name != null) {
                   throw RuntimeError(
                       "Cannot execute non-constructor function $_name' with empty body.");
+                }
+                syncResult = null;
+              } else if (bodyToExecute == null && isDefaultConstructor) {
+                // Default constructor: call super() if there's a superclass
+                if (ownerType is InterpretedClass) {
+                  final klass = ownerType as InterpretedClass;
+                  if (klass.superclass != null) {
+                    final superConstructor =
+                        klass.superclass!.findConstructor('');
+                    if (superConstructor != null) {
+                      final thisInstance = executionEnvironment.get('this');
+                      final superResult = superConstructor
+                          .bind(thisInstance)
+                          .call(visitor, [], {});
+                      if (superResult is AsyncSuspensionRequest) {
+                        throw StateError(
+                            "Super constructor call returned suspension.");
+                      }
+                    }
+                  }
                 }
                 syncResult = null;
               } else {
@@ -2206,7 +2415,7 @@ class InterpretedFunction implements Callable {
           currentState.currentError = error; // Utiliser currentState
           currentState.currentStackTrace = stackTrace;
           _handleAsyncError(visitor, currentState,
-              currentNode ?? currentState.function._body); // Use currentState
+              currentNode ?? currentState.function._body!); // Use currentState
           return; // Exit, _handleAsyncError will take care of the rest
         }
       } finally {
@@ -3848,47 +4057,76 @@ class _SyncGeneratorIterable extends Iterable<Object?> {
       function, visitor, executionEnvironment, redirected);
 }
 
-// Iterator implementation for sync* generators
+// Iterator implementation for sync* generators - LAZY evaluation
 class _SyncGeneratorIterator implements Iterator<Object?> {
   final InterpretedFunction function;
   final InterpreterVisitor visitor;
   final Environment executionEnvironment;
   final bool redirected;
 
-  List<Object?>? _values;
-  int _currentIndex = -1;
+  Object? _currentValue;
+  bool _done = false;
+  late List<Object?> _buffer;
+  int _bufferIndex = 0;
   bool _initialized = false;
+  bool _executionCompleted = false;
+  static const int _chunkSize = 5;
 
   _SyncGeneratorIterator(
       this.function, this.visitor, this.executionEnvironment, this.redirected);
 
   @override
-  Object? get current =>
-      (_currentIndex >= 0 && _values != null && _currentIndex < _values!.length)
-          ? _values![_currentIndex]
-          : null;
+  Object? get current => _currentValue;
 
   @override
   bool moveNext() {
-    if (!_initialized) {
-      _initialized = true;
-      _values = _collectAllValues();
-    }
-
-    if (_values == null || _values!.isEmpty) {
+    if (_done) {
       return false;
     }
 
-    _currentIndex++;
-    return _currentIndex < _values!.length;
+    if (!_initialized) {
+      _initialized = true;
+      _buffer = [];
+      _bufferIndex = 0;
+    }
+
+    // Try to get next from current buffer
+    if (_bufferIndex < _buffer.length) {
+      _currentValue = _buffer[_bufferIndex++];
+      return true;
+    }
+
+    // Buffer exhausted
+    if (_executionCompleted) {
+      // Generator has already finished executing
+      _done = true;
+      return false;
+    }
+
+    // Try to collect next chunk
+    _buffer = [];
+    _bufferIndex = 0;
+
+    _collectNextChunk();
+
+    // If we got any values, consume first one
+    if (_bufferIndex < _buffer.length) {
+      _currentValue = _buffer[_bufferIndex++];
+      return true;
+    }
+
+    _done = true;
+    return false;
   }
 
-  List<Object?> _collectAllValues() {
-    final values = <Object?>[];
+  void _collectNextChunk() {
     final previousVisitorEnv = visitor.environment;
     final previousCurrentFunction = visitor.currentFunction;
+    final previousYieldsList = visitor.currentSyncGeneratorYields;
 
     try {
+      // Set up yields collection
+      visitor.currentSyncGeneratorYields = [];
       visitor.environment = executionEnvironment;
       visitor.currentFunction = function;
 
@@ -3900,60 +4138,59 @@ class _SyncGeneratorIterator implements Iterator<Object?> {
       final bodyToExecute = function._body;
       if (!redirected) {
         if (bodyToExecute is BlockFunctionBody) {
-          _executeGeneratorBlockSync(bodyToExecute.block.statements, values);
+          _executeBlockAndCollectYields(bodyToExecute.block.statements);
         } else if (bodyToExecute is ExpressionFunctionBody) {
-          final result = bodyToExecute.expression.accept<Object?>(visitor);
-          if (result is YieldValue) {
-            if (result.isYieldStar) {
-              _handleYieldStarSync(result.value, values);
-            } else {
-              values.add(result.value);
-            }
-          }
-        } else if (bodyToExecute is EmptyFunctionBody) {
-          // Empty generator - no yields
+          bodyToExecute.expression.accept<Object?>(visitor);
         }
       }
-    } on ReturnException catch (_) {
+
+      // Collect the yields that were accumulated
+      if (visitor.currentSyncGeneratorYields != null) {
+        _buffer.addAll(visitor.currentSyncGeneratorYields!);
+      }
+
+      // If we collected fewer yields than the chunk size, execution is complete
+      if (_buffer.length < _chunkSize) {
+        _executionCompleted = true;
+      }
+    } on SyncGeneratorYieldLimitReached {
+      // Yield limit reached - generator execution stopped mid-loop
+      // Collect the yields that were accumulated before the limit
+      if (visitor.currentSyncGeneratorYields != null) {
+        _buffer.addAll(visitor.currentSyncGeneratorYields!);
+      }
+      // Don't mark as completed - there may be more yields after this chunk
+    } on ReturnException {
       // Generator completed with return
+      _executionCompleted = true;
     } finally {
       visitor.environment = previousVisitorEnv;
       visitor.currentFunction = previousCurrentFunction;
+      visitor.currentSyncGeneratorYields = previousYieldsList;
     }
 
-    return values;
+    // If we didn't collect anything, generator is done
+    if (_buffer.isEmpty && !_executionCompleted) {
+      _executionCompleted = true;
+    }
   }
 
-  void _executeGeneratorBlockSync(
-      List<Statement> statements, List<Object?> values) {
+  void _executeBlockAndCollectYields(List<Statement> statements) {
     for (final statement in statements) {
       try {
-        final result = statement.accept<Object?>(visitor);
-        if (result is YieldValue) {
-          if (result.isYieldStar) {
-            _handleYieldStarSync(result.value, values);
-          } else {
-            values.add(result.value);
-          }
+        statement.accept<Object?>(visitor);
+        // Yields are automatically collected in visitor.currentSyncGeneratorYields
+        // Check if we've collected enough yields
+        if (visitor.currentSyncGeneratorYields != null &&
+            visitor.currentSyncGeneratorYields!.length >= _chunkSize) {
+          // Stop collecting after chunk size
+          return;
         }
       } on ReturnException catch (_) {
-        break; // Exit generator
+        throw ReturnException(null); // Exit generator
       } on BreakException catch (_) {
-        break; // Exit generator
-      } on ContinueException catch (_) {
-        continue; // Continue to next iteration
+        throw BreakException(null); // Exit generator
       }
-    }
-  }
-
-  void _handleYieldStarSync(Object? value, List<Object?> values) {
-    if (value is Iterable) {
-      values.addAll(value);
-    } else if (value is Stream) {
-      throw RuntimeError("Cannot yield* a Stream in a sync* generator");
-    } else {
-      throw RuntimeError(
-          "yield* expression must be an Iterable, got ${value.runtimeType}");
     }
   }
 }

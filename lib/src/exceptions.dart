@@ -108,3 +108,13 @@ class PatternMatchException implements Exception {
   @override
   String toString() => "PatternMatchException: $message";
 }
+
+/// Internal exception to stop sync* generator execution after yielding enough values.
+///
+/// This exception is thrown by the yield statement handler when collecting yields
+/// for a sync* generator and the chunk limit has been reached. It's used to
+/// interrupt execution (e.g., break out of infinite loops) without losing the
+/// yielded values that have already been collected.
+class SyncGeneratorYieldLimitReached implements Exception {
+  const SyncGeneratorYieldLimitReached();
+}

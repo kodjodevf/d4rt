@@ -16,7 +16,8 @@ class ListCore {
             );
           },
           'empty': (visitor, positionalArgs, namedArgs) {
-            return List<dynamic>.empty();
+            bool growable = namedArgs['growable'] as bool? ?? false;
+            return List<dynamic>.empty(growable: growable);
           },
           'generate': (visitor, positionalArgs, namedArgs) {
             final generator = positionalArgs[1];
@@ -113,11 +114,11 @@ class ListCore {
           },
           'forEach': (visitor, target, positionalArgs, namedArgs) {
             final callback = positionalArgs[0];
-            if (callback is! InterpretedFunction) {
-              throw RuntimeError('Expected a InterpretedFunction for forEach');
+            if (callback is! Callable) {
+              throw RuntimeError('Expected a Callable for forEach');
             }
             for (final element in target as List) {
-              callback.call(visitor, [element]);
+              callback.call(visitor, [element], {});
             }
             return null;
           },
@@ -135,6 +136,18 @@ class ListCore {
             final toElement = positionalArgs[0] as Callable;
             return (target as List)
                 .map((element) => toElement.call(visitor, [element], {}));
+          },
+          'indexWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as Callable;
+            return (target as List).indexWhere(
+                (element) => test.call(visitor, [element], {}) as bool,
+                positionalArgs.optional<int>(1, 'start', 0));
+          },
+          'lastIndexWhere': (visitor, target, positionalArgs, namedArgs) {
+            final test = positionalArgs[0] as Callable;
+            return (target as List).lastIndexWhere(
+                (element) => test.call(visitor, [element], {}) as bool,
+                positionalArgs.optional<int?>(1, 'start', null));
           },
           'where': (visitor, target, positionalArgs, namedArgs) {
             final test = positionalArgs[0] as Callable;

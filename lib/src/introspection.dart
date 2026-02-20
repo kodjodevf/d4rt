@@ -379,6 +379,7 @@ class IntrospectionBuilder {
     // List of common builtin/stdlib names to filter out
     const builtins = {
       'print',
+      'identical',
       'Object',
       'String',
       'int',

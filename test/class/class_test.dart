@@ -1053,4 +1053,217 @@ void main() {
       });
     });
   });
+  group('Super Parameters (Dart 2.17+):', () {
+    test('Simple super parameter forwarding', () {
+      final code = '''
+        class Parent {
+          final String name;
+          Parent(this.name);
+        }
+
+        class Child extends Parent {
+          Child(super.name);
+        }
+
+        main() {
+          return Child('test').name;
+        }
+      ''';
+      expect(execute(code), equals('test'));
+    });
+
+    test('Multiple super parameters', () {
+      final code = '''
+        class Parent {
+          final String name;
+          final int age;
+          Parent(this.name, this.age);
+        }
+
+        class Child extends Parent {
+          Child(super.name, super.age);
+        }
+
+        main() {
+          var c = Child('Alice', 30);
+          return [c.name, c.age];
+        }
+      ''';
+      expect(execute(code), equals(['Alice', 30]));
+    });
+
+    test('Super parameter with named parameter', () {
+      final code = '''
+        class Parent {
+          final String name;
+          final String id;
+          Parent(this.name, {required this.id});
+        }
+
+        class Child extends Parent {
+          Child(super.name, {required super.id});
+        }
+
+        main() {
+          var c = Child('Bob', id: 'xyz');
+          return [c.name, c.id];
+        }
+      ''';
+      expect(execute(code), equals(['Bob', 'xyz']));
+    });
+
+    test('Super parameter with optional positional', () {
+      final code = '''
+        class Parent {
+          final String name;
+          final int value;
+          Parent(this.name, [this.value = 0]);
+        }
+
+        class Child extends Parent {
+          Child(super.name, [super.value]);
+        }
+
+        main() {
+          var c1 = Child('test');
+          var c2 = Child('test2', 42);
+          return [c1.name, c1.value, c2.name, c2.value];
+        }
+      ''';
+      expect(execute(code), equals(['test', 0, 'test2', 42]));
+    });
+
+    test('Super parameter with child constructor body', () {
+      final code = '''
+        class Parent {
+          final String value;
+          Parent(this.value);
+        }
+
+        class Child extends Parent {
+          bool initialized = false;
+          
+          Child(super.value) {
+            initialized = true;
+          }
+        }
+
+        main() {
+          var c = Child('hello');
+          return [c.value, c.initialized];
+        }
+      ''';
+      expect(execute(code), equals(['hello', true]));
+    });
+
+    test('Super parameter with field initializer', () {
+      final code = '''
+        class Parent {
+          final String parentValue;
+          Parent(this.parentValue);
+        }
+
+        class Child extends Parent {
+          final String childValue;
+          
+          Child(super.parentValue, this.childValue);
+        }
+
+        main() {
+          var c = Child('parent', 'child');
+          return [c.parentValue, c.childValue];
+        }
+      ''';
+      expect(execute(code), equals(['parent', 'child']));
+    });
+
+    test('Super parameter in named constructor', () {
+      final code = '''
+        class Parent {
+          final String data;
+          Parent(this.data);
+        }
+
+        class Child extends Parent {
+          final String type;
+          
+          Child(super.data) : type = 'default';
+          
+          Child.custom(super.data, this.type);
+        }
+
+        main() {
+          var c1 = Child('test1');
+          var c2 = Child.custom('test2', 'custom');
+          return [c1.data, c1.type, c2.data, c2.type];
+        }
+      ''';
+      expect(execute(code), equals(['test1', 'default', 'test2', 'custom']));
+    });
+
+    test('Super parameter with mixed positional and named', () {
+      final code = '''
+        class Parent {
+          final String a;
+          final String b;
+          final String c;
+          Parent(this.a, this.b, {required this.c});
+        }
+
+        class Child extends Parent {
+          Child(super.a, super.b, {required super.c});
+        }
+
+        main() {
+          var c = Child('x', 'y', c: 'z');
+          return [c.a, c.b, c.c];
+        }
+      ''';
+      expect(execute(code), equals(['x', 'y', 'z']));
+    });
+
+    test('Super parameter with default value in parent', () {
+      final code = '''
+        class Parent {
+          final String name;
+          final int count;
+          Parent(this.name, [this.count = 5]);
+        }
+
+        class Child extends Parent {
+          Child(super.name, [super.count]);
+        }
+
+        main() {
+          var c1 = Child('test');
+          var c2 = Child('test', 10);
+          return [c1.name, c1.count, c2.name, c2.count];
+        }
+      ''';
+      expect(execute(code), equals(['test', 5, 'test', 10]));
+    });
+
+    test('Chained super parameters', () {
+      final code = '''
+        class GrandParent {
+          final String value;
+          GrandParent(this.value);
+        }
+
+        class Parent extends GrandParent {
+          Parent(super.value);
+        }
+
+        class Child extends Parent {
+          Child(super.value);
+        }
+
+        main() {
+          var c = Child('chained');
+          return c.value;
+        }
+      ''';
+      expect(execute(code), equals('chained'));
+    });
+  });
 }
