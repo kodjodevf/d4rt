@@ -1,3 +1,7 @@
+## 0.2.2
+- **feat: Extension Type Support**
+- **New additional features & Bug fixes**
+
 ## 0.2.1
 - **feat: Enum Support Enhancement**
   - Add native-like `values` access for both interpreted and bridged enums.
