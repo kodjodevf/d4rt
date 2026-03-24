@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/d4rt.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
@@ -25,6 +27,8 @@ class LoadedModule {
 class ModuleLoader {
   final Environment globalEnvironment;
   final Map<String, String> sources;
+  final String? basePath;
+  final bool allowFileSystemImports;
   final Map<Uri, LoadedModule> _moduleCache = {};
   final Set<Uri> _loadingModules = {};
   final List<Uri> _moduleLoadStack = [];
@@ -36,7 +40,7 @@ class ModuleLoader {
 
   ModuleLoader(this.globalEnvironment, this.sources,
       this.bridgedEnumDefinitions, this.bridgedClases,
-      {this.d4rt}) {
+      {this.d4rt, this.basePath, this.allowFileSystemImports = false}) {
     Logger.debug(
         "[ModuleLoader] Initialized with ${sources.length} preloaded sources.");
   }
@@ -72,6 +76,36 @@ class ModuleLoader {
         cycle.map((entry) => entry.toString()).join(' -> ');
     return SourceCodeException(
         'Circular module dependency detected: $cycleDescription');
+  }
+
+  Uri? _resolveFileSystemUri(Uri uri) {
+    if (uri.scheme == 'file') {
+      return uri;
+    }
+
+    if (uri.scheme.isNotEmpty) {
+      return null;
+    }
+
+    if (basePath == null) {
+      return null;
+    }
+
+    return Directory(basePath!).absolute.uri.resolveUri(uri);
+  }
+
+  void _checkFileSystemSourceReadPermission(Uri fileUri) {
+    if (d4rt == null) return;
+
+    final filePath = File.fromUri(fileUri).absolute.path;
+    if (!d4rt!.checkPermission({
+      'type': 'filesystem',
+      'path': filePath,
+      'read': true,
+    })) {
+      throw RuntimeError(
+          'Reading module source from "$filePath" requires FilesystemPermission.');
+    }
   }
 
   LoadedModule loadModule(Uri uri) {
@@ -345,6 +379,22 @@ class ModuleLoader {
     if (sources.containsKey(uriString)) {
       Logger.debug("[ModuleLoader] Source found for $uriString in sources.");
       return sources[uriString]!;
+    }
+
+    if (allowFileSystemImports) {
+      final fileUri = _resolveFileSystemUri(uri);
+      if (fileUri != null) {
+        final file = File.fromUri(fileUri);
+        final filePath = file.absolute.path;
+        if (file.existsSync()) {
+          _checkFileSystemSourceReadPermission(fileUri);
+          Logger.debug(
+              "[ModuleLoader] Source loaded from filesystem for ${fileUri.toString()}.");
+          return file.readAsStringSync();
+        }
+        Logger.debug(
+            "[ModuleLoader] Filesystem import enabled, but no file found at $filePath.");
+      }
     }
 
     // Then handle the known Dart libraries provided by Stdlib

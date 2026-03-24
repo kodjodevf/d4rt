@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/error/error.dart';
@@ -172,6 +174,8 @@ class D4rt {
       _bridgedEnumDefinitions,
       _bridgedClases,
       d4rt: this,
+      basePath: basePath,
+      allowFileSystemImports: allowFileSystemImports,
     );
     _visitor = InterpreterVisitor(
         globalEnvironment: moduleLoader.globalEnvironment,
@@ -330,7 +334,8 @@ class D4rt {
       Logger.debug(
           "[D4rt.execute] Attempting to load the $name source via ModuleLoader for URI: $library");
 
-      if (!_moduleLoader.sources.containsKey(library.toString())) {
+      if (!_moduleLoader.sources.containsKey(library.toString()) &&
+          !allowFileSystemImports) {
         final errorMessage =
             "[D4rt.execute] The $name source URI '$library' was not found in sources.";
         Logger.error(errorMessage);
@@ -366,6 +371,9 @@ class D4rt {
       final result = parseString(
         content: source,
         throwIfDiagnostics: false,
+        path: basePath != null
+            ? Directory(basePath).absolute.uri.resolve('main.dart').toFilePath()
+            : null,
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
@@ -399,7 +407,11 @@ class D4rt {
     _visitor = InterpreterVisitor(
         globalEnvironment: executionEnvironment,
         moduleLoader: _moduleLoader,
-        initiallibrary: library != null ? Uri.parse(library) : null);
+        initiallibrary: library != null
+            ? Uri.parse(library)
+            : (allowFileSystemImports && basePath != null
+                ? Directory(basePath).absolute.uri
+                : null));
     Object? functionResult;
     try {
       Logger.debug(" [execute] Starting Pass 2: Interpretation");

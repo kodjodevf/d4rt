@@ -1,7 +1,19 @@
+import 'dart:io' as io;
+
 import 'package:test/test.dart';
 import 'package:d4rt/d4rt.dart';
 
 void main() {
+  tearDown(() {
+    final directories = ['test_fs_imports'];
+    for (final directoryName in directories) {
+      final directory = io.Directory(directoryName);
+      if (directory.existsSync()) {
+        directory.deleteSync(recursive: true);
+      }
+    }
+  });
+
   group('Import Tests', () {
     final Map<String, String> sources = {
       "d4rt-mem:/lib_common.dart": '''
@@ -402,6 +414,93 @@ void main() {
                   'message',
                   contains('d4rt-mem:/export_cycle_b.dart'),
                 ),
+          ),
+        );
+      });
+
+      test('Direct source can import relative filesystem module', () {
+        io.Directory('test_fs_imports/lib').createSync(recursive: true);
+        io.File('test_fs_imports/lib/utils.dart').writeAsStringSync('''
+String greetFromUtils() {
+  return "hello from fs";
+}
+''');
+
+        final d4rt = D4rt();
+        d4rt.grant(FilesystemPermission.readPath('test_fs_imports/lib'));
+
+        final result = d4rt.execute(
+          source: '''
+import './utils.dart';
+
+String main() {
+  return greetFromUtils();
+}
+''',
+          basePath: 'test_fs_imports/lib',
+          allowFileSystemImports: true,
+        );
+
+        expect(result, equals('hello from fs'));
+      });
+
+      test('Filesystem root library can be loaded when enabled', () {
+        io.Directory('test_fs_imports/app').createSync(recursive: true);
+        io.File('test_fs_imports/app/helpers.dart').writeAsStringSync('''
+String helperValue() {
+  return "from helper";
+}
+''');
+        io.File('test_fs_imports/app/main.dart').writeAsStringSync('''
+import './helpers.dart';
+
+String main() {
+  return helperValue();
+}
+''');
+
+        final d4rt = D4rt();
+        d4rt.grant(FilesystemPermission.readPath('test_fs_imports/app'));
+
+        final result = d4rt.execute(
+          library:
+              io.File('test_fs_imports/app/main.dart').absolute.uri.toString(),
+          allowFileSystemImports: true,
+          basePath: 'test_fs_imports/app',
+        );
+
+        expect(result, equals('from helper'));
+      });
+
+      test('Filesystem imports fail without matching filesystem permission',
+          () {
+        io.Directory('test_fs_imports/lib').createSync(recursive: true);
+        io.File('test_fs_imports/lib/utils.dart').writeAsStringSync('''
+String greetFromUtils() {
+  return "hello from fs";
+}
+''');
+
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            source: '''
+import './utils.dart';
+
+String main() {
+  return greetFromUtils();
+}
+''',
+            basePath: 'test_fs_imports/lib',
+            allowFileSystemImports: true,
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('requires FilesystemPermission'),
+            ),
           ),
         );
       });
