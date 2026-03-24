@@ -507,7 +507,7 @@ class D4rt {
         throw e.originalThrownValue!;
       }
     } catch (e) {
-      if (e is RuntimeError) {
+      if (e is RuntimeError || e is SourceCodeException) {
         rethrow;
       } else {
         throw RuntimeError('Unexpected error: $e');

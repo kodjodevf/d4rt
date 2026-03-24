@@ -101,6 +101,30 @@ class ModuleLoader {
     return File.fromUri(fileUri).absolute.uri;
   }
 
+  Never _throwMissingModuleSource(Uri uri, {Uri? attemptedFileUri}) {
+    final uriString = uri.toString();
+
+    if (attemptedFileUri != null) {
+      final resolvedPath = File.fromUri(attemptedFileUri).absolute.path;
+
+      if (!allowFileSystemImports) {
+        throw SourceCodeException(
+            'Module source not preloaded for URI: $uriString. Filesystem imports are disabled; enable allowFileSystemImports or preload the module source.');
+      }
+
+      throw SourceCodeException(
+          'Module source not found on filesystem for URI: $uriString (resolved path: $resolvedPath).');
+    }
+
+    if (uri.scheme == 'package') {
+      throw SourceCodeException(
+          'Package module source not preloaded for URI: $uriString. Provide it in sources or register a bridge for that package library.');
+    }
+
+    throw SourceCodeException(
+        'Module source not preloaded for URI: $uriString, and not a recognized Dart standard library.');
+  }
+
   void _checkFileSystemSourceReadPermission(Uri fileUri) {
     if (d4rt == null) return;
 
@@ -391,8 +415,10 @@ class ModuleLoader {
       return sources[uriString]!;
     }
 
+    final attemptedFileUri = _resolveFileSystemUri(uri);
+
     if (allowFileSystemImports) {
-      final fileUri = _resolveFileSystemUri(uri);
+      final fileUri = attemptedFileUri;
       if (fileUri != null) {
         final file = File.fromUri(fileUri);
         final filePath = file.absolute.path;
@@ -491,8 +517,7 @@ class ModuleLoader {
     // If it's neither explicitly preloaded nor a known Dart library, it's an error.
     Logger.error(
         "[ModuleLoader] Source not preloaded and not a recognized Dart standard library for URI: $uriString");
-    throw SourceCodeException(
-        "Module source not preloaded for URI: $uriString, and not a recognized Dart standard library.");
+    _throwMissingModuleSource(uri, attemptedFileUri: attemptedFileUri);
   }
 
   CompilationUnit _parseSource(Uri uri, String sourceCode) {

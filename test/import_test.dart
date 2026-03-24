@@ -592,6 +592,67 @@ String main() => helperMessage();
 
         expect(result, equals('canonical-ok'));
       });
+
+      test('Missing filesystem imports fail with a resolved path in the error',
+          () {
+        final rootDirectory = io.Directory('test_fs_imports/missing_fs');
+        rootDirectory.createSync(recursive: true);
+
+        final d4rt = D4rt();
+        d4rt.grant(FilesystemPermission.readPath(rootDirectory.absolute.path));
+
+        expect(
+          () => d4rt.execute(
+            source: '''
+import './missing.dart';
+
+String main() => 'never';
+''',
+            basePath: rootDirectory.absolute.path,
+            allowFileSystemImports: true,
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Module source not found on filesystem'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('missing.dart'),
+                ),
+          ),
+        );
+      });
+
+      test('Missing package imports fail with a package-specific error', () {
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            source: '''
+import 'package:missing_pkg/feature.dart';
+
+String main() => 'never';
+''',
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Package module source not preloaded'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('package:missing_pkg/feature.dart'),
+                ),
+          ),
+        );
+      });
     });
   });
 }
