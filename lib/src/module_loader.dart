@@ -92,6 +92,15 @@ class ModuleLoader {
     return Directory(basePath!).absolute.uri.resolveUri(uri);
   }
 
+  Uri _canonicalizeModuleUri(Uri uri) {
+    final fileUri = _resolveFileSystemUri(uri);
+    if (fileUri == null) {
+      return uri;
+    }
+
+    return File.fromUri(fileUri).absolute.uri;
+  }
+
   void _checkFileSystemSourceReadPermission(Uri fileUri) {
     if (d4rt == null) return;
 
@@ -114,12 +123,12 @@ class ModuleLoader {
     }
 
     if (from != null) {
-      return from.resolveUri(importUri);
+      return _canonicalizeModuleUri(from.resolveUri(importUri));
     }
 
     final fileSystemUri = _resolveFileSystemUri(importUri);
     if (fileSystemUri != null) {
-      return fileSystemUri;
+      return _canonicalizeModuleUri(fileSystemUri);
     }
 
     throw RuntimeError(
@@ -127,6 +136,8 @@ class ModuleLoader {
   }
 
   LoadedModule loadModule(Uri uri) {
+    uri = _canonicalizeModuleUri(uri);
+
     // Check permissions for dangerous modules
     _checkModulePermissions(uri);
 

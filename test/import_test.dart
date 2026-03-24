@@ -556,6 +556,42 @@ String main() => entryMessage();
 
         expect(result, equals('nested-ok'));
       });
+
+      test('Filesystem imports reuse one module identity across URI forms', () {
+        final rootDirectory = io.Directory('test_fs_imports/canonical');
+        final helperFile = io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/helper.dart'
+              : '${rootDirectory.path}\\helper.dart',
+        );
+        rootDirectory.createSync(recursive: true);
+
+        helperFile.writeAsStringSync('''
+String helperMessage() => 'canonical-ok';
+''');
+
+        io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/main.dart'
+              : '${rootDirectory.path}\\main.dart',
+        ).writeAsStringSync('''
+import './helper.dart';
+import '${helperFile.absolute.uri}';
+
+String main() => helperMessage();
+''');
+
+        final d4rt = D4rt();
+        d4rt.grant(FilesystemPermission.readPath(rootDirectory.absolute.path));
+
+        final result = d4rt.execute(
+          library: 'main.dart',
+          basePath: rootDirectory.absolute.path,
+          allowFileSystemImports: true,
+        );
+
+        expect(result, equals('canonical-ok'));
+      });
     });
   });
 }
