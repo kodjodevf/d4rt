@@ -126,6 +126,37 @@ void main() {
       return getMessage() + " | " + getNumber().toString() + " | " + getExtraMessage();
     }
     ''',
+      "d4rt-mem:/cycle_a.dart": '''
+    import 'cycle_b.dart';
+
+    String fromA() => 'A';
+
+    String main() {
+      return fromB();
+    }
+    ''',
+      "d4rt-mem:/cycle_b.dart": '''
+    import 'cycle_a.dart';
+
+    String fromB() => fromA();
+    ''',
+      "d4rt-mem:/export_cycle_a.dart": '''
+    export 'export_cycle_b.dart';
+
+    String fromExportA() => 'A';
+    ''',
+      "d4rt-mem:/export_cycle_b.dart": '''
+    export 'export_cycle_a.dart';
+
+    String fromExportB() => 'B';
+    ''',
+      "d4rt-mem:/main_export_cycle.dart": '''
+    import 'export_cycle_a.dart';
+
+    String main() {
+      return fromExportA();
+    }
+    ''',
     };
 
     test(
@@ -316,6 +347,64 @@ void main() {
               equals("Local getMessage | 42 | Extra message from lib_common!"));
         },
       );
+
+      test('Circular imports fail with a clear error', () {
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            library: 'd4rt-mem:/cycle_a.dart',
+            sources: sources,
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Circular module dependency detected'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('d4rt-mem:/cycle_a.dart'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('d4rt-mem:/cycle_b.dart'),
+                ),
+          ),
+        );
+      });
+
+      test('Circular exports fail with a clear error', () {
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            library: 'd4rt-mem:/main_export_cycle.dart',
+            sources: sources,
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Circular module dependency detected'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('d4rt-mem:/export_cycle_a.dart'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('d4rt-mem:/export_cycle_b.dart'),
+                ),
+          ),
+        );
+      });
     });
   });
 }
