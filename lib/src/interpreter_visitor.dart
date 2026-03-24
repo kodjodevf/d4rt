@@ -14,6 +14,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   Environment environment;
   final Environment globalEnvironment;
   final ModuleLoader moduleLoader; // Field for ModuleLoader
+  final Uri? currentLibrary;
   InterpretedFunction? currentFunction; // Track the function being executed
   AsyncExecutionState? currentAsyncState;
   List<Object?>?
@@ -27,13 +28,11 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     required this.globalEnvironment,
     required this.moduleLoader, // Accept ModuleLoader in the constructor
     Uri? initiallibrary, // New: Optional URI for the initial source
-  }) : environment = globalEnvironment {
+  })  : currentLibrary = initiallibrary,
+        environment = globalEnvironment {
     if (initiallibrary != null) {
-      // Sets the base URI in the ModuleLoader for the initial source code.
-      // This is crucial for resolving relative imports in this initial source code.
-      moduleLoader.currentlibrary = initiallibrary;
       Logger.debug(
-          "[InterpreterVisitor] Initial source URI set in ModuleLoader to: $initiallibrary");
+          "[InterpreterVisitor] Initial source URI set to: $initiallibrary");
     }
     // Initialize currentAsyncState if it's null and we are in an async context implicitly
     // This might be more complex depending on how top-level async calls are handled
@@ -10529,28 +10528,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     Logger.debug(
         "[InterpreterVisitor.visitImportDirective] START processing import: $importUriString");
 
-    Uri resolvedUri;
-    final importUri = Uri.parse(importUriString);
-
-    if (importUri.isScheme('dart') || importUri.isScheme('package')) {
-      resolvedUri = importUri;
-      Logger.debug(
-          "[visitImportDirective] Using absolute/unresolvable URI: $resolvedUri");
-    } else {
-      final baseUri = moduleLoader.currentlibrary;
-
-      if (baseUri != null) {
-        Logger.debug(
-            "[visitImportDirective] Attempting to resolve relative URI '$importUriString' relative to '$baseUri'");
-        resolvedUri = baseUri.resolveUri(importUri);
-        Logger.debug(
-            "[visitImportDirective] Resolved relative URI: $resolvedUri");
-      } else {
-        throw RuntimeError(
-            "Unable to resolve relative import '$importUriString': Base URI not defined in ModuleLoader. "
-            "Either provide a basePath parameter or use absolute URIs.");
-      }
-    }
+    final resolvedUri =
+        moduleLoader.resolveModuleUri(importUriString, from: currentLibrary);
+    Logger.debug(
+        "[visitImportDirective] Resolved URI '$importUriString' to: $resolvedUri");
 
     final prefixIdentifier = node.prefix; // Get the prefix identifier
     final prefixName = prefixIdentifier?.name;

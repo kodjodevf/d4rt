@@ -504,6 +504,58 @@ String main() {
           ),
         );
       });
+
+      test('Filesystem imports resolve nested relatives without shared state',
+          () {
+        final rootDirectory = io.Directory('test_fs_imports/nested');
+        final featuresDirectory = io.Directory(io.Platform.pathSeparator == '/'
+            ? '${rootDirectory.path}/features/messages'
+            : '${rootDirectory.path}\\features\\messages');
+        featuresDirectory.createSync(recursive: true);
+
+        io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/main.dart'
+              : '${rootDirectory.path}\\main.dart',
+        ).writeAsStringSync('''
+import 'features/feature.dart';
+
+      String entryMessage() => loadMessage();
+''');
+
+        io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/features/feature.dart'
+              : '${rootDirectory.path}\\features\\feature.dart',
+        ).writeAsStringSync('''
+import 'messages/value.dart';
+
+String loadMessage() => featureValue();
+''');
+
+        io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/features/messages/value.dart'
+              : '${rootDirectory.path}\\features\\messages\\value.dart',
+        ).writeAsStringSync('''
+String featureValue() => 'nested-ok';
+''');
+
+        final d4rt = D4rt();
+        d4rt.grant(FilesystemPermission.readPath(rootDirectory.absolute.path));
+
+        final result = d4rt.execute(
+          source: '''
+import 'main.dart';
+
+String main() => entryMessage();
+''',
+          basePath: rootDirectory.absolute.path,
+          allowFileSystemImports: true,
+        );
+
+        expect(result, equals('nested-ok'));
+      });
     });
   });
 }
