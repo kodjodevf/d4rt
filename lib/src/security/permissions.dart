@@ -27,7 +27,7 @@
 /// ```
 library;
 
-import 'dart:io';
+import 'package:d4rt/src/utils/platform/filesystem.dart';
 
 /// Base class for all permissions in the d4rt security system.
 abstract class Permission {
@@ -89,7 +89,7 @@ class FilesystemPermission extends Permission {
       FilesystemPermission._(path, true, true, true);
 
   static String _canonicalizePath(String path) {
-    final absolutePath = File(path).absolute.path.replaceAll('\\', '/');
+    final absolutePath = normalizeFilesystemPath(path);
     final driveMatch = RegExp(r'^[A-Za-z]:').firstMatch(absolutePath);
 
     String prefix = '';

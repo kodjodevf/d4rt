@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/d4rt.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
@@ -12,6 +10,7 @@ import 'package:d4rt/src/stdlib/typed_data.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/stdlib/stdlib_io.dart'
     if (dart.library.html) 'package:d4rt/src/stdlib/stdlib_web.dart';
+import 'package:d4rt/src/utils/platform/filesystem.dart';
 
 // Represent an module of source code loaded and parsed.
 class LoadedModule {
@@ -89,7 +88,7 @@ class ModuleLoader {
       return null;
     }
 
-    return Directory(basePath!).absolute.uri.resolveUri(uri);
+    return resolveBasePathUri(basePath!, uri);
   }
 
   Uri _canonicalizeModuleUri(Uri uri) {
@@ -98,23 +97,19 @@ class ModuleLoader {
       return uri;
     }
 
-    final absoluteFile = File.fromUri(fileUri).absolute;
-    if (!absoluteFile.existsSync()) {
-      return absoluteFile.uri;
-    }
-
-    try {
-      return File(absoluteFile.resolveSymbolicLinksSync()).absolute.uri;
-    } on FileSystemException {
-      return absoluteFile.uri;
-    }
+    return canonicalizeFileUri(fileUri);
   }
 
   Never _throwMissingModuleSource(Uri uri, {Uri? attemptedFileUri}) {
     final uriString = uri.toString();
 
     if (attemptedFileUri != null) {
-      final resolvedPath = File.fromUri(attemptedFileUri).absolute.path;
+      final resolvedPath = absolutePathFromFileUri(attemptedFileUri);
+
+      if (allowFileSystemImports && !localFileSystemSupported) {
+        throw SourceCodeException(
+            'Filesystem module imports are not supported on this platform for URI: $uriString.');
+      }
 
       if (!allowFileSystemImports) {
         throw SourceCodeException(
@@ -204,7 +199,7 @@ class ModuleLoader {
   void _checkFileSystemSourceReadPermission(Uri fileUri) {
     if (d4rt == null) return;
 
-    final filePath = File.fromUri(fileUri).absolute.path;
+    final filePath = absolutePathFromFileUri(fileUri);
     if (!d4rt!.checkPermission({
       'type': 'filesystem',
       'path': filePath,
@@ -468,13 +463,12 @@ class ModuleLoader {
     if (allowFileSystemImports) {
       final fileUri = attemptedFileUri;
       if (fileUri != null) {
-        final file = File.fromUri(fileUri);
-        final filePath = file.absolute.path;
-        if (file.existsSync()) {
+        final filePath = absolutePathFromFileUri(fileUri);
+        if (fileUriExistsSync(fileUri)) {
           _checkFileSystemSourceReadPermission(fileUri);
           Logger.debug(
               "[ModuleLoader] Source loaded from filesystem for ${fileUri.toString()}.");
-          return file.readAsStringSync();
+          return readFileUriAsStringSync(fileUri);
         }
         Logger.debug(
             "[ModuleLoader] Filesystem import enabled, but no file found at $filePath.");

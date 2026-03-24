@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/error/error.dart';
@@ -20,6 +18,7 @@ import 'package:d4rt/src/security/permissions.dart';
 import 'package:d4rt/src/introspection.dart';
 import 'package:d4rt/src/bridge/bridge_registry_manager.dart';
 import 'package:d4rt/src/bridge/library_tracking.dart';
+import 'package:d4rt/src/utils/platform/filesystem.dart';
 
 /// The main D4rt interpreter class.
 ///
@@ -373,9 +372,7 @@ class D4rt {
       final result = parseString(
         content: source,
         throwIfDiagnostics: false,
-        path: basePath != null
-            ? Directory(basePath).absolute.uri.resolve('main.dart').toFilePath()
-            : null,
+        path: basePath != null ? basePathEntryFilePath(basePath) : null,
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
@@ -412,7 +409,7 @@ class D4rt {
         initiallibrary: library != null
             ? Uri.parse(library)
             : (allowFileSystemImports && basePath != null
-                ? Directory(basePath).absolute.uri
+                ? basePathDirectoryUri(basePath)
                 : null));
     Object? functionResult;
     try {
