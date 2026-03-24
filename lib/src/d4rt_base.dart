@@ -259,10 +259,12 @@ class D4rt {
   /// [basePath] Base directory path for resolving relative imports from the filesystem.
   /// When provided, relative imports (e.g., './utils.dart', '../models/user.dart')
   /// will be resolved against this path.
+  /// Relative filesystem imports require this value to be set.
   ///
   /// [allowFileSystemImports] Whether to allow loading modules from the filesystem.
   /// When true, relative imports and file:// URIs will be resolved and loaded from disk.
   /// Requires FilesystemPermission when using D4rt's permission system.
+  /// When false, only preloaded [sources], standard libraries, and registered bridges are available.
   ///
   /// ## Example:
   /// ```dart

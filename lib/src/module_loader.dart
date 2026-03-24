@@ -98,7 +98,16 @@ class ModuleLoader {
       return uri;
     }
 
-    return File.fromUri(fileUri).absolute.uri;
+    final absoluteFile = File.fromUri(fileUri).absolute;
+    if (!absoluteFile.existsSync()) {
+      return absoluteFile.uri;
+    }
+
+    try {
+      return File(absoluteFile.resolveSymbolicLinksSync()).absolute.uri;
+    } on FileSystemException {
+      return absoluteFile.uri;
+    }
   }
 
   Never _throwMissingModuleSource(Uri uri, {Uri? attemptedFileUri}) {
@@ -123,6 +132,73 @@ class ModuleLoader {
 
     throw SourceCodeException(
         'Module source not preloaded for URI: $uriString, and not a recognized Dart standard library.');
+  }
+
+  SourceCodeException wrapDirectiveSourceError(
+    String directiveType,
+    Uri ownerUri,
+    String targetUri,
+    Object error,
+  ) {
+    final message =
+        error is SourceCodeException ? error.message : error.toString();
+    return SourceCodeException(
+        'Failed to load $directiveType "$targetUri" from module "$ownerUri": $message');
+  }
+
+  ({Set<String>? showNames, Set<String>? hideNames}) _extractCombinators(
+    NamespaceDirective directive, {
+    required String directiveType,
+    required Uri ownerUri,
+  }) {
+    Set<String>? showNames;
+    Set<String>? hideNames;
+
+    for (final combinator in directive.combinators) {
+      if (combinator is ShowCombinator) {
+        showNames ??= {};
+        showNames.addAll(combinator.shownNames.map((id) => id.name));
+        Logger.debug(
+            "[ModuleLoader loadModule for $ownerUri]   $directiveType combinator: show ${combinator.shownNames.map((id) => id.name).join(', ')}");
+      } else if (combinator is HideCombinator) {
+        hideNames ??= {};
+        hideNames.addAll(combinator.hiddenNames.map((id) => id.name));
+        Logger.debug(
+            "[ModuleLoader loadModule for $ownerUri]   $directiveType combinator: hide ${combinator.hiddenNames.map((id) => id.name).join(', ')}");
+      }
+    }
+
+    return (showNames: showNames, hideNames: hideNames);
+  }
+
+  void _applyImportedEnvironment(
+    Environment targetEnvironment,
+    LoadedModule importedModule, {
+    required Uri ownerUri,
+    required Uri resolvedImportUri,
+    Set<String>? showNames,
+    Set<String>? hideNames,
+    String? prefix,
+  }) {
+    if (prefix != null) {
+      final prefixedEnv =
+          importedModule.exportedEnvironment.shallowCopyFiltered(
+        showNames: showNames,
+        hideNames: hideNames,
+      );
+      targetEnvironment.definePrefixedImport(prefix, prefixedEnv);
+      Logger.debug(
+          "[ModuleLoader loadModule for $ownerUri]   Successfully defined prefixed import '$prefix' from ${resolvedImportUri.toString()} into ${ownerUri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
+      return;
+    }
+
+    targetEnvironment.importEnvironment(
+      importedModule.exportedEnvironment,
+      show: showNames,
+      hide: hideNames,
+    );
+    Logger.debug(
+        "[ModuleLoader loadModule for $ownerUri]   Successfully imported environment from ${resolvedImportUri.toString()} into ${ownerUri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
   }
 
   void _checkFileSystemSourceReadPermission(Uri fileUri) {
@@ -284,35 +360,27 @@ class ModuleLoader {
                 "[ModuleLoader loadModule for $uri]   Exporting from ${uri.toString()}: URI '$exportedUriString', resolved to '${resolvedExportUri.toString()}'");
             LoadedModule subModule = loadModule(resolvedExportUri);
 
-            // Get the show/hide combinators
-            Set<String>? showNames;
-            Set<String>? hideNames;
-
-            for (final combinator in directive.combinators) {
-              if (combinator is ShowCombinator) {
-                showNames ??= {};
-                showNames.addAll(combinator.shownNames.map((id) => id.name));
-                Logger.debug(
-                    "[ModuleLoader loadModule for $uri]   Export combinator: show ${combinator.shownNames.map((id) => id.name).join(', ')}");
-              } else if (combinator is HideCombinator) {
-                hideNames ??= {};
-                hideNames.addAll(combinator.hiddenNames.map((id) => id.name));
-                Logger.debug(
-                    "[ModuleLoader loadModule for $uri]   Export combinator: hide ${combinator.hiddenNames.map((id) => id.name).join(', ')}");
-              }
-            }
+            final combinators = _extractCombinators(
+              directive,
+              directiveType: 'Export',
+              ownerUri: uri,
+            );
 
             // Import the environment of the sub-module by applying the show/hide filters
             exportedEnvironment.importEnvironment(
               subModule.exportedEnvironment,
-              show: showNames,
-              hide: hideNames,
+              show: combinators.showNames,
+              hide: combinators.hideNames,
             );
             Logger.debug(
-                "[ModuleLoader loadModule for $uri]   Successfully merged exported environment from ${resolvedExportUri.toString()} into ${uri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
+                "[ModuleLoader loadModule for $uri]   Successfully merged exported environment from ${resolvedExportUri.toString()} into ${uri.toString()} (show: ${combinators.showNames?.join(", ")}, hide: ${combinators.hideNames?.join(", ")}).");
           } catch (e, s) {
             Logger.error(
                 "[ModuleLoader loadModule for $uri] Error processing export directive for '$exportedUriString' from ${uri.toString()}: $e\nStackTrace: $s");
+            if (e is SourceCodeException) {
+              throw wrapDirectiveSourceError(
+                  'export', uri, exportedUriString, e);
+            }
             rethrow;
           }
         } else if (directive is ImportDirective) {
@@ -329,50 +397,30 @@ class ModuleLoader {
                 "[ModuleLoader loadModule for $uri]   Importing from ${uri.toString()}: URI '$importedUriString', resolved to '${resolvedImportUri.toString()}'");
             LoadedModule importedModule = loadModule(
                 resolvedImportUri); // Recursive call - this will check permissions
-
-            // Get the show/hide combinators and prefix
-            Set<String>? showNames;
-            Set<String>? hideNames;
             String? prefix = directive.prefix?.name;
 
-            for (final combinator in directive.combinators) {
-              if (combinator is ShowCombinator) {
-                showNames ??= {};
-                showNames.addAll(combinator.shownNames.map((id) => id.name));
-                Logger.debug(
-                    "[ModuleLoader loadModule for $uri]   Import combinator: show ${combinator.shownNames.map((id) => id.name).join(', ')}");
-              } else if (combinator is HideCombinator) {
-                hideNames ??= {};
-                hideNames.addAll(combinator.hiddenNames.map((id) => id.name));
-                Logger.debug(
-                    "[ModuleLoader loadModule for $uri]   Import combinator: hide ${combinator.hiddenNames.map((id) => id.name).join(', ')}");
-              }
-            }
+            final combinators = _extractCombinators(
+              directive,
+              directiveType: 'Import',
+              ownerUri: uri,
+            );
 
-            // Import the environment of the imported module into the current module environment
-            if (prefix != null) {
-              // For prefixed imports, create a filtered environment and define it with the prefix
-              Environment prefixedEnv =
-                  importedModule.exportedEnvironment.shallowCopyFiltered(
-                showNames: showNames,
-                hideNames: hideNames,
-              );
-              moduleEnvironment.definePrefixedImport(prefix, prefixedEnv);
-              Logger.debug(
-                  "[ModuleLoader loadModule for $uri]   Successfully defined prefixed import '$prefix' from ${resolvedImportUri.toString()} into ${uri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
-            } else {
-              // For regular imports, import directly into the module environment
-              moduleEnvironment.importEnvironment(
-                importedModule.exportedEnvironment,
-                show: showNames,
-                hide: hideNames,
-              );
-              Logger.debug(
-                  "[ModuleLoader loadModule for $uri]   Successfully imported environment from ${resolvedImportUri.toString()} into ${uri.toString()} (show: ${showNames?.join(", ")}, hide: ${hideNames?.join(", ")}).");
-            }
+            _applyImportedEnvironment(
+              moduleEnvironment,
+              importedModule,
+              ownerUri: uri,
+              resolvedImportUri: resolvedImportUri,
+              showNames: combinators.showNames,
+              hideNames: combinators.hideNames,
+              prefix: prefix,
+            );
           } catch (e, s) {
             Logger.error(
                 "[ModuleLoader loadModule for $uri] Error processing import directive for '$importedUriString' from ${uri.toString()}: $e\nStackTrace: $s");
+            if (e is SourceCodeException) {
+              throw wrapDirectiveSourceError(
+                  'import', uri, importedUriString, e);
+            }
             rethrow;
           }
         }

@@ -10538,7 +10538,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     Logger.debug(
         "[visitImportDirective] Loading module for resolved URI: $resolvedUri (prefix: $prefixName)");
 
-    LoadedModule loadedModule = moduleLoader.loadModule(resolvedUri);
+    LoadedModule loadedModule;
+    try {
+      loadedModule = moduleLoader.loadModule(resolvedUri);
+    } on SourceCodeException catch (error) {
+      final ownerUri = currentLibrary ?? Uri.parse('d4rt:direct-source');
+      throw moduleLoader.wrapDirectiveSourceError(
+          'import', ownerUri, importUriString, error);
+    }
 
     // Extract the show/hide combinators from the import directive
     Set<String>? showNames;

@@ -169,6 +169,20 @@ void main() {
       return fromExportA();
     }
     ''',
+      "d4rt-mem:/missing_import_root.dart": '''
+    import 'missing_import_target.dart';
+
+    String main() {
+      return 'never';
+    }
+    ''',
+      "d4rt-mem:/missing_export_root.dart": '''
+    export 'missing_export_target.dart';
+
+    String main() {
+      return 'never';
+    }
+    ''',
     };
 
     test(
@@ -418,6 +432,66 @@ void main() {
         );
       });
 
+      test('Missing exports fail with module and target context', () {
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            library: 'd4rt-mem:/missing_export_root.dart',
+            sources: sources,
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains(
+                      'Failed to load export "missing_export_target.dart"'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('d4rt-mem:/missing_export_root.dart'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Module source not preloaded for URI'),
+                ),
+          ),
+        );
+      });
+
+      test('Missing imports fail with module and target context', () {
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            library: 'd4rt-mem:/missing_import_root.dart',
+            sources: sources,
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains(
+                      'Failed to load import "missing_import_target.dart"'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('d4rt-mem:/missing_import_root.dart'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Module source not preloaded for URI'),
+                ),
+          ),
+        );
+      });
+
       test('Direct source can import relative filesystem module', () {
         io.Directory('test_fs_imports/lib').createSync(recursive: true);
         io.File('test_fs_imports/lib/utils.dart').writeAsStringSync('''
@@ -593,6 +667,51 @@ String main() => helperMessage();
         expect(result, equals('canonical-ok'));
       });
 
+      test('Filesystem imports reuse one module identity across symlinks', () {
+        if (io.Platform.isWindows) {
+          return;
+        }
+
+        final rootDirectory = io.Directory('test_fs_imports/symlink_canonical');
+        rootDirectory.createSync(recursive: true);
+
+        final realHelperFile = io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/real_helper.dart'
+              : '${rootDirectory.path}\\real_helper.dart',
+        );
+        final linkedHelperPath = io.Platform.pathSeparator == '/'
+            ? '${rootDirectory.path}/linked_helper.dart'
+            : '${rootDirectory.path}\\linked_helper.dart';
+
+        realHelperFile.writeAsStringSync('''
+String symlinkedMessage() => 'symlink-ok';
+''');
+        io.Link(linkedHelperPath).createSync(realHelperFile.absolute.path);
+
+        io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/main.dart'
+              : '${rootDirectory.path}\\main.dart',
+        ).writeAsStringSync('''
+import './real_helper.dart';
+import './linked_helper.dart';
+
+String main() => symlinkedMessage();
+''');
+
+        final d4rt = D4rt();
+        d4rt.grant(FilesystemPermission.readPath(rootDirectory.absolute.path));
+
+        final result = d4rt.execute(
+          library: 'main.dart',
+          basePath: rootDirectory.absolute.path,
+          allowFileSystemImports: true,
+        );
+
+        expect(result, equals('symlink-ok'));
+      });
+
       test('Missing filesystem imports fail with a resolved path in the error',
           () {
         final rootDirectory = io.Directory('test_fs_imports/missing_fs');
@@ -613,6 +732,11 @@ String main() => 'never';
           ),
           throwsA(
             isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('Failed to load import "./missing.dart"'),
+                )
                 .having(
                   (e) => e.message,
                   'message',
@@ -640,6 +764,12 @@ String main() => 'never';
           ),
           throwsA(
             isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains(
+                      'Failed to load import "package:missing_pkg/feature.dart"'),
+                )
                 .having(
                   (e) => e.message,
                   'message',
