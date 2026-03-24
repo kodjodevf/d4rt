@@ -21,6 +21,19 @@ void main() {
         file.deleteSync();
       }
     }
+
+    final testDirectories = [
+      'allowed_dir',
+      'allowed_dir_nested',
+      'allowed_dir_sneaky',
+      'blocked_dir',
+    ];
+    for (final directoryName in testDirectories) {
+      final directory = io.Directory(directoryName);
+      if (directory.existsSync()) {
+        directory.deleteSync(recursive: true);
+      }
+    }
   });
 
   group('Real File Operations - No Permission', () {
@@ -136,6 +149,65 @@ void main() {
       ''');
 
       expect(result, equals('LINE 1\nLINE 2\nLINE 3'));
+    });
+
+    test('readPath restricts access to the configured subtree only', () {
+      io.Directory('allowed_dir').createSync();
+      io.Directory('allowed_dir_sneaky').createSync();
+      io.File('allowed_dir/inside.txt').writeAsStringSync('inside');
+      io.File('allowed_dir_sneaky/outside.txt').writeAsStringSync('outside');
+
+      final interpreter = D4rt();
+      interpreter.grant(FilesystemPermission.readPath('allowed_dir'));
+
+      final allowedResult = interpreter.execute(source: '''
+        import 'dart:io';
+        String main() {
+          return File('allowed_dir/inside.txt').readAsStringSync();
+        }
+      ''');
+
+      expect(allowedResult, equals('inside'));
+
+      expect(
+        () => interpreter.execute(source: '''
+          import 'dart:io';
+          void main() {
+            File('allowed_dir_sneaky/outside.txt').readAsStringSync();
+          }
+        '''),
+        throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
+            contains('Filesystem permission denied'))),
+      );
+    });
+
+    test('writePath restricts writes to the configured subtree only', () {
+      io.Directory('allowed_dir').createSync();
+      io.Directory('blocked_dir').createSync();
+
+      final interpreter = D4rt();
+      interpreter.grant(FilesystemPermission.writePath('allowed_dir'));
+
+      interpreter.execute(source: '''
+        import 'dart:io';
+        void main() {
+          File('allowed_dir/output.txt').writeAsStringSync('ok');
+        }
+      ''');
+
+      expect(
+          io.File('allowed_dir/output.txt').readAsStringSync(), equals('ok'));
+
+      expect(
+        () => interpreter.execute(source: '''
+          import 'dart:io';
+          void main() {
+            File('blocked_dir/output.txt').writeAsStringSync('nope');
+          }
+        '''),
+        throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
+            contains('Filesystem permission denied'))),
+      );
     });
   });
 

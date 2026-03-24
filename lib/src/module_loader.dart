@@ -49,7 +49,8 @@ class ModuleLoader {
 
     // Define dangerous modules that require permissions
     if (uriString == 'dart:io') {
-      if (!d4rt!.checkPermission({'type': 'filesystem'})) {
+      if (!d4rt!
+          .checkPermission({'type': 'filesystem', 'pathAgnostic': true})) {
         throw RuntimeError('Access to dart:io requires FilesystemPermission. '
             'Use d4rt.grant(FilesystemPermission.any) to allow filesystem access.');
       }

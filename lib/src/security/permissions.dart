@@ -27,6 +27,8 @@
 /// ```
 library;
 
+import 'dart:io';
+
 /// Base class for all permissions in the d4rt security system.
 abstract class Permission {
   /// The type of permission (e.g., 'filesystem', 'network', 'process').
@@ -86,6 +88,47 @@ class FilesystemPermission extends Permission {
   factory FilesystemPermission.path(String path) =>
       FilesystemPermission._(path, true, true, true);
 
+  static String _canonicalizePath(String path) {
+    final absolutePath = File(path).absolute.path.replaceAll('\\', '/');
+    final driveMatch = RegExp(r'^[A-Za-z]:').firstMatch(absolutePath);
+
+    String prefix = '';
+    String remainder = absolutePath;
+    if (driveMatch != null) {
+      prefix = driveMatch.group(0)!.toLowerCase();
+      remainder = absolutePath.substring(2);
+    }
+
+    final isAbsolute = remainder.startsWith('/');
+    final normalizedSegments = <String>[];
+
+    for (final rawSegment in remainder.split('/')) {
+      if (rawSegment.isEmpty || rawSegment == '.') {
+        continue;
+      }
+      if (rawSegment == '..') {
+        if (normalizedSegments.isNotEmpty) {
+          normalizedSegments.removeLast();
+        }
+        continue;
+      }
+      normalizedSegments.add(rawSegment);
+    }
+
+    final normalizedPath = normalizedSegments.join('/');
+    final leading = isAbsolute ? '/' : '';
+    return prefix.isNotEmpty
+        ? '$prefix$leading$normalizedPath'
+        : '$leading$normalizedPath';
+  }
+
+  static bool _isPathWithinScope(String allowedPath, String requestedPath) {
+    final canonicalAllowed = _canonicalizePath(allowedPath);
+    final canonicalRequested = _canonicalizePath(requestedPath);
+    return canonicalRequested == canonicalAllowed ||
+        canonicalRequested.startsWith('$canonicalAllowed/');
+  }
+
   @override
   String get description {
     final operations = [];
@@ -119,9 +162,11 @@ class FilesystemPermission extends Permission {
     }
 
     // Check path restrictions
-    if (_path != null && opPath != null) {
-      // Simple path prefix check (could be made more sophisticated)
-      if (!opPath.startsWith(_path)) {
+    if (_path != null) {
+      if (operation['pathAgnostic'] == true) {
+        return true;
+      }
+      if (opPath is! String || !_isPathWithinScope(_path, opPath)) {
         return false;
       }
     }

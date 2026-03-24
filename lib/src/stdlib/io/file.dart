@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:d4rt/d4rt.dart';
 
+import 'filesystem_permission_helper.dart';
+
 /// File mode for opening files
 class FileModeIo {
   static BridgedClass get definition => BridgedClass(
@@ -417,32 +419,69 @@ class FileIo {
           },
         },
         methods: {
-          'exists': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).exists(),
-          'existsSync': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).existsSync(),
-          'readAsString': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).readAsString(
-                  encoding: namedArgs['encoding'] as Encoding? ?? utf8),
+          'exists': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'check existence');
+                return file.exists();
+              })(),
+          'existsSync': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'check existence');
+                return file.existsSync();
+              })(),
+          'readAsString': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'read file');
+                return file.readAsString(
+                    encoding: namedArgs['encoding'] as Encoding? ?? utf8);
+              })(),
           'readAsStringSync': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).readAsStringSync(
-                  encoding: namedArgs['encoding'] as Encoding? ?? utf8),
-          'readAsBytes': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).readAsBytes(),
+              (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'read file');
+                return file.readAsStringSync(
+                    encoding: namedArgs['encoding'] as Encoding? ?? utf8);
+              })(),
+          'readAsBytes': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'read file');
+                return file.readAsBytes();
+              })(),
           'readAsBytesSync': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).readAsBytesSync(),
-          'readAsLines': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).readAsLines(
-                  encoding: namedArgs['encoding'] as Encoding? ?? utf8),
+              (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'read file');
+                return file.readAsBytesSync();
+              })(),
+          'readAsLines': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'read file');
+                return file.readAsLines(
+                    encoding: namedArgs['encoding'] as Encoding? ?? utf8);
+              })(),
           'readAsLinesSync': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).readAsLinesSync(
-                  encoding: namedArgs['encoding'] as Encoding? ?? utf8),
+              (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'read file');
+                return file.readAsLinesSync(
+                    encoding: namedArgs['encoding'] as Encoding? ?? utf8);
+              })(),
           'writeAsString': (visitor, target, positionalArgs, namedArgs) {
             final file = target as File;
             if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
               throw RuntimeError(
                   'File.writeAsString requires one String argument (contents).');
             }
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'write file');
             return file.writeAsString(
               positionalArgs[0] as String,
               mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
@@ -456,6 +495,8 @@ class FileIo {
               throw RuntimeError(
                   'File.writeAsStringSync requires one String argument (contents).');
             }
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'write file');
             file.writeAsStringSync(
               positionalArgs[0] as String,
               mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
@@ -470,6 +511,8 @@ class FileIo {
               throw RuntimeError(
                   'File.writeAsBytes requires one List<int> argument (bytes).');
             }
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'write file');
             return file.writeAsBytes(
               (positionalArgs[0] as List).cast(),
               mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
@@ -482,6 +525,8 @@ class FileIo {
               throw RuntimeError(
                   'File.writeAsBytesSync requires one List<int> argument (bytes).');
             }
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'write file');
             file.writeAsBytesSync(
               (positionalArgs[0] as List).cast(),
               mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
@@ -489,11 +534,18 @@ class FileIo {
             );
             return null;
           },
-          'delete': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File)
-                  .delete(recursive: namedArgs['recursive'] as bool? ?? false),
+          'delete': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemWritePermission(visitor, file.path,
+                    operation: 'delete file');
+                return file.delete(
+                    recursive: namedArgs['recursive'] as bool? ?? false);
+              })(),
           'deleteSync': (visitor, target, positionalArgs, namedArgs) {
-            (target as File).deleteSync(
+            final file = target as File;
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'delete file');
+            file.deleteSync(
                 recursive: namedArgs['recursive'] as bool? ?? false);
             return null;
           },
@@ -503,6 +555,10 @@ class FileIo {
               throw RuntimeError(
                   'File.rename requires one String argument (newPath).');
             }
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'rename file');
+            checkFilesystemWritePermission(visitor, positionalArgs[0] as String,
+                operation: 'rename file');
             return file.rename(positionalArgs[0] as String);
           },
           'renameSync': (visitor, target, positionalArgs, namedArgs) {
@@ -511,6 +567,10 @@ class FileIo {
               throw RuntimeError(
                   'File.renameSync requires one String argument (newPath).');
             }
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'rename file');
+            checkFilesystemWritePermission(visitor, positionalArgs[0] as String,
+                operation: 'rename file');
             return file.renameSync(positionalArgs[0] as String);
           },
           'copy': (visitor, target, positionalArgs, namedArgs) {
@@ -519,6 +579,10 @@ class FileIo {
               throw RuntimeError(
                   'File.copy requires one String argument (newPath).');
             }
+            checkFilesystemReadPermission(visitor, file.path,
+                operation: 'copy file');
+            checkFilesystemWritePermission(visitor, positionalArgs[0] as String,
+                operation: 'copy file');
             return file.copy(positionalArgs[0] as String);
           },
           'copySync': (visitor, target, positionalArgs, namedArgs) {
@@ -527,6 +591,10 @@ class FileIo {
               throw RuntimeError(
                   'File.copySync requires one String argument (newPath).');
             }
+            checkFilesystemReadPermission(visitor, file.path,
+                operation: 'copy file');
+            checkFilesystemWritePermission(visitor, positionalArgs[0] as String,
+                operation: 'copy file');
             return file.copySync(positionalArgs[0] as String);
           },
           'length': (visitor, target, positionalArgs, namedArgs) =>
@@ -575,45 +643,94 @@ class FileIo {
             file.setLastModifiedSync(positionalArgs[0] as DateTime);
             return null;
           },
-          'open': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File)
-                  .open(mode: namedArgs['mode'] as FileMode? ?? FileMode.read),
-          'openSync': (visitor, target, positionalArgs, namedArgs) => (target
-                  as File)
-              .openSync(mode: namedArgs['mode'] as FileMode? ?? FileMode.read),
-          'openRead': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).openRead(
-                  positionalArgs.isNotEmpty ? positionalArgs[0] as int? : null,
-                  positionalArgs.length > 1 ? positionalArgs[1] as int? : null),
-          'openWrite': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).openWrite(
-                mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
-                encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-              ),
-          'stat': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).stat(),
-          'statSync': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).statSync(),
+          'open': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                final mode = namedArgs['mode'] as FileMode? ?? FileMode.read;
+                if (mode == FileMode.read) {
+                  checkFilesystemReadPermission(visitor, file.path,
+                      operation: 'open file');
+                } else {
+                  checkFilesystemWritePermission(visitor, file.path,
+                      operation: 'open file');
+                }
+                return file.open(mode: mode);
+              })(),
+          'openSync': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                final mode = namedArgs['mode'] as FileMode? ?? FileMode.read;
+                if (mode == FileMode.read) {
+                  checkFilesystemReadPermission(visitor, file.path,
+                      operation: 'open file');
+                } else {
+                  checkFilesystemWritePermission(visitor, file.path,
+                      operation: 'open file');
+                }
+                return file.openSync(mode: mode);
+              })(),
+          'openRead': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'open file');
+                return file.openRead(
+                    positionalArgs.isNotEmpty
+                        ? positionalArgs[0] as int?
+                        : null,
+                    positionalArgs.length > 1
+                        ? positionalArgs[1] as int?
+                        : null);
+              })(),
+          'openWrite': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemWritePermission(visitor, file.path,
+                    operation: 'open file');
+                return file.openWrite(
+                  mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
+                  encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+                );
+              })(),
+          'stat': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'stat file');
+                return file.stat();
+              })(),
+          'statSync': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'stat file');
+                return file.statSync();
+              })(),
           'resolveSymbolicLinks':
               (visitor, target, positionalArgs, namedArgs) =>
                   (target as File).resolveSymbolicLinks(),
           'resolveSymbolicLinksSync':
               (visitor, target, positionalArgs, namedArgs) =>
                   (target as File).resolveSymbolicLinksSync(),
-          'create': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).create(
-                  recursive: namedArgs['recursive'] as bool? ?? false,
-                  exclusive: namedArgs['exclusive'] as bool? ?? false),
+          'create': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemWritePermission(visitor, file.path,
+                    operation: 'create file');
+                return file.create(
+                    recursive: namedArgs['recursive'] as bool? ?? false,
+                    exclusive: namedArgs['exclusive'] as bool? ?? false);
+              })(),
           'createSync': (visitor, target, positionalArgs, namedArgs) {
-            (target as File).createSync(
+            final file = target as File;
+            checkFilesystemWritePermission(visitor, file.path,
+                operation: 'create file');
+            file.createSync(
                 recursive: namedArgs['recursive'] as bool? ?? false,
                 exclusive: namedArgs['exclusive'] as bool? ?? false);
             return null;
           },
-          'watch': (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).watch(
-                  events: namedArgs['events'] as int? ?? FileSystemEvent.all,
-                  recursive: namedArgs['recursive'] as bool? ?? false),
+          'watch': (visitor, target, positionalArgs, namedArgs) => (() {
+                final file = target as File;
+                checkFilesystemReadPermission(visitor, file.path,
+                    operation: 'watch file');
+                return file.watch(
+                    events: namedArgs['events'] as int? ?? FileSystemEvent.all,
+                    recursive: namedArgs['recursive'] as bool? ?? false);
+              })(),
           'toString': (visitor, target, positionalArgs, namedArgs) =>
               (target as File).toString(),
         },
