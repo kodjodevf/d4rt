@@ -51,6 +51,13 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
     final typeParameterBounds = InterpretedClass.extractTypeParameterBounds(
         typeParameters, resolveEnvironment);
 
+    if (tempEnvironment != null) {
+      for (final paramName in typeParameterNames) {
+        tempEnvironment.assign(paramName,
+            TypeParameter(paramName, bound: typeParameterBounds[paramName]));
+      }
+    }
+
     // Create a placeholder for the class with the required positional arguments
     final placeholder = InterpretedClass(
       className, // name
@@ -179,31 +186,67 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
     // Use the temp environment (if any) for type resolution, otherwise use the normal environment
     final resolveEnvironment = tempEnvironment ?? environment;
 
+    final typeParameterNames = typeParameters?.typeParameters
+            .map((param) => param.name.lexeme)
+            .toList() ??
+        const <String>[];
+    final typeParameterBounds = <String, RuntimeType?>{};
+
+    if (typeParameters != null) {
+      for (final typeParam in typeParameters.typeParameters) {
+        final paramName = typeParam.name.lexeme;
+        RuntimeType? bound;
+
+        if (typeParam.bound != null) {
+          final resolvedBound = resolveEnvironment.get(paramName);
+          if (resolvedBound is TypeParameter && resolvedBound.bound != null) {
+            bound = resolvedBound.bound;
+          } else {
+            bound = InterpretedClass.resolveTypeAnnotationDynamic(
+                typeParam.bound!, resolveEnvironment);
+          }
+        }
+
+        typeParameterBounds[paramName] = bound;
+      }
+    }
+
+    if (tempEnvironment != null) {
+      for (final paramName in typeParameterNames) {
+        tempEnvironment.assign(paramName,
+            TypeParameter(paramName, bound: typeParameterBounds[paramName]));
+      }
+    }
+
     // Now resolve the return type (which might reference type parameters)
     final returnTypeNode = node.returnType;
     RuntimeType declaredReturnType;
+    final isAsync = node.functionExpression.body.isAsynchronous;
 
     if (returnTypeNode is NamedType) {
-      final typeName = returnTypeNode.name.lexeme;
+      final typeSource = returnTypeNode.toSource();
       Logger.debug(
-          "[DeclarationVisitor.visitFunctionDeclaration]   Return type node name: $typeName");
+          "[DeclarationVisitor.visitFunctionDeclaration]   Return type node: $typeSource");
 
       try {
-        final resolvedType = resolveEnvironment.get(typeName);
-        Logger.debug(
-            "[DeclarationVisitor.visitFunctionDeclaration]     environment.get('$typeName') resolved to: ${resolvedType?.runtimeType} with name: ${(resolvedType is RuntimeType ? resolvedType.name : 'N/A')}");
-
-        if (resolvedType is RuntimeType) {
-          declaredReturnType = resolvedType;
+        if (isAsync && returnTypeNode.name.lexeme == 'Future') {
+          final futureTypeArguments = returnTypeNode.typeArguments?.arguments;
+          if (futureTypeArguments != null && futureTypeArguments.isNotEmpty) {
+            declaredReturnType = InterpretedClass.resolveTypeAnnotationDynamic(
+                futureTypeArguments.first, resolveEnvironment);
+          } else {
+            declaredReturnType =
+                BridgedClass(nativeType: Object, name: 'dynamic');
+          }
         } else {
-          Logger.warn(
-              "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeName' resolved to non-RuntimeType: $resolvedType. Using placeholder.");
-          declaredReturnType = BridgedClass(nativeType: Object, name: typeName);
+          declaredReturnType = InterpretedClass.resolveTypeAnnotationDynamic(
+              returnTypeNode, resolveEnvironment);
         }
       } on RuntimeError catch (e) {
         Logger.warn(
-            "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeName' not found in environment (RuntimeError: ${e.message}). Using placeholder.");
-        declaredReturnType = BridgedClass(nativeType: Object, name: typeName);
+            "[DeclarationVisitor.visitFunctionDeclaration]     Type '$typeSource' not found in environment (RuntimeError: ${e.message}). Using placeholder.");
+        declaredReturnType =
+            BridgedClass(nativeType: Object, name: returnTypeNode.name.lexeme);
       }
     } else if (returnTypeNode == null) {
       declaredReturnType = BridgedClass(nativeType: Object, name: 'dynamic');

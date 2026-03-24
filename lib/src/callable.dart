@@ -181,6 +181,13 @@ class InterpretedFunction implements Callable {
       if (resolved is RuntimeType) {
         Logger.debug(
             "[InterpretedFunction._resolveTypeAnnotationDynamic] Resolved from environment to RuntimeType: ${resolved.name}");
+        if (typeNode.typeArguments != null &&
+            typeNode.typeArguments!.arguments.isNotEmpty) {
+          final resolvedTypeArguments = typeNode.typeArguments!.arguments
+              .map((argument) => _resolveTypeAnnotationDynamic(argument, env))
+              .toList();
+          return AppliedRuntimeType(resolved, resolvedTypeArguments);
+        }
         return resolved;
       } else {
         throw RuntimeError(
@@ -412,7 +419,8 @@ class InterpretedFunction implements Callable {
         final paramName = klass.typeParameterNames[i];
         final typeArg = i < instTypeArgs.length
             ? instTypeArgs[i]
-            : TypeParameter(paramName);
+            : TypeParameter(paramName,
+                bound: klass.typeParameterBounds[paramName]);
         boundEnvironment.define(paramName, typeArg);
       }
     }
@@ -538,7 +546,8 @@ class InterpretedFunction implements Callable {
         // Only define if not already defined by type arguments above
         if (!executionEnvironment.isDefinedLocally(paramName)) {
           // Create a placeholder TypeParameter
-          final typeParam = TypeParameter(paramName);
+          final typeParam =
+              TypeParameter(paramName, bound: typeParameterBounds[paramName]);
           executionEnvironment.define(paramName, typeParam);
 
           Logger.debug(
@@ -1111,9 +1120,8 @@ class InterpretedFunction implements Callable {
     } catch (e) {
       Logger.debug(
           "[InterpretedFunction._checkTypeSatisfiesBound] Error checking subtype relationship: $e");
-      // If we can't determine the relationship, default to allowing it
-      // In a stricter implementation, this might default to false
-      return true;
+      // If we can't determine the relationship, reject the type argument.
+      return false;
     }
   }
 

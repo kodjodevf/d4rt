@@ -104,17 +104,21 @@ class BridgedClass implements RuntimeType {
       if (isSubtypeOfFunc != null) {
         return isSubtypeOfFunc!.call(other, value: value);
       }
-      if (name == 'num') {
-        final isSubtype = switch (other.name) {
-          'num' => true,
-          'int' => true,
-          'double' => true,
-          _ => false,
-        };
-        return isSubtype;
+      if (nativeType == other.nativeType || name == other.name) {
+        return true;
       }
 
-      return nativeType == other.nativeType;
+      final isNumericSubtype = nativeType == int ||
+          nativeType == double ||
+          name == 'int' ||
+          name == 'double';
+      final isNumType = other.nativeType == num || other.name == 'num';
+
+      if (isNumericSubtype && isNumType) {
+        return true;
+      }
+
+      return false;
     }
 
     return false;
@@ -164,7 +168,9 @@ class BridgedInstance<T extends Object> implements RuntimeValue {
       {this.typeArguments = const []}); // Removed local initialization
 
   @override
-  RuntimeType get valueType => bridgedClass;
+  RuntimeType get valueType => typeArguments.isEmpty
+      ? bridgedClass
+      : AppliedRuntimeType(bridgedClass, typeArguments);
 
   @override
   Object? get(String name) {
@@ -214,10 +220,23 @@ class TypeParameter implements RuntimeType {
 
   @override
   bool isSubtypeOf(RuntimeType other, {Object? value}) {
-    // For now, type parameters accept any type as a subtype
-    // This is because we don't have full generic type inference yet
-    // In a real type system, this would be more sophisticated
-    return true;
+    if (identical(this, other) || name == other.name) {
+      return true;
+    }
+
+    if (other.name == 'dynamic' || other.name == 'Object') {
+      return true;
+    }
+
+    if (bound == null) {
+      return false;
+    }
+
+    if (identical(bound, other) || bound!.name == other.name) {
+      return true;
+    }
+
+    return bound!.isSubtypeOf(other, value: value);
   }
 
   @override

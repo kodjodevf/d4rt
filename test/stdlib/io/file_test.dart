@@ -8,7 +8,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var exists1 = file.existsSync();
         file.deleteSync();
@@ -23,7 +23,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var content = file.readAsStringSync();
         file.deleteSync();
@@ -37,7 +37,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         file.deleteSync();
         return file.existsSync();
@@ -50,7 +50,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         File renamedFile = file.renameSync(file.path + "_renamed");
         var exists = renamedFile.existsSync();
@@ -65,7 +65,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         File copiedFile = file.copySync(file.path + "_copy");
         var exists = copiedFile.existsSync();
@@ -81,7 +81,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var length = file.lengthSync();
         file.deleteSync();
@@ -95,7 +95,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var lastModified = file.lastModifiedSync();
         file.deleteSync();
@@ -109,7 +109,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var path = file.resolveSymbolicLinksSync();
         file.deleteSync();
@@ -123,7 +123,7 @@ void main() {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var path = file.absolute.path;
         file.deleteSync();
@@ -131,14 +131,14 @@ void main() {
       }
       ''';
       expect(execute(source), isA<String>());
-      expect((execute(source) as String).contains('/test.txt'), isTrue);
+      expect((execute(source) as String).contains('/test_'), isTrue);
     });
 
     test('parent', () {
       const source = '''
      import 'dart:io';
      main() {
-        File file = File(Directory.systemTemp.path + "/test.txt");
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
         file.writeAsStringSync("Hello, world!");
         var path = file.parent.path;
         file.deleteSync();

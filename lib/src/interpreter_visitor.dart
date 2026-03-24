@@ -248,6 +248,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
   @override
   Object? visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
+    final declaredType = node.variables.type == null
+        ? null
+        : _resolveTypeAnnotation(node.variables.type);
+
     for (final variable in node.variables.variables) {
       if (variable.name.lexeme == '_') {
         // Evaluate initializer for potential side effects, but don't define
@@ -257,6 +261,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (variable.initializer != null) {
           value = variable.initializer!.accept<Object?>(this);
         }
+        _annotateCollectionRuntimeType(value, declaredType);
         environment.define(variable.name.lexeme, value);
       }
     }
@@ -4783,6 +4788,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   // Add handler for VariableDeclarationList used in ForPartsWithDeclarations
   @override
   Object? visitVariableDeclarationList(VariableDeclarationList node) {
+    final declaredType =
+        node.type == null ? null : _resolveTypeAnnotation(node.type);
+
     // We need to ensure variables are defined in the current environment.
     // visitVariableDeclaration is NOT automatically called for node.variables
     // by the generalizing visitor when visiting the list itself.
@@ -4831,6 +4839,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             } else {
               // Sync initializer: Use the computed value
               initValue = result;
+              _annotateCollectionRuntimeType(initValue, declaredType);
               Logger.debug(
                   "[VariableDeclList] Sync init for '$variableName'. Defined as $initValue.");
               environment.define(variableName, initValue);
@@ -4951,10 +4960,33 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       _processCollectionElement(element, list, isMap: false);
     }
 
+    RuntimeType? listRuntimeType;
+    final explicitTypeArguments = node.typeArguments?.arguments;
+    if (explicitTypeArguments != null && explicitTypeArguments.isNotEmpty) {
+      final listType = environment.get('List');
+      if (listType is RuntimeType) {
+        listRuntimeType = AppliedRuntimeType(
+            listType,
+            explicitTypeArguments
+                .map((typeNode) => _resolveTypeAnnotation(typeNode))
+                .toList());
+      }
+    } else {
+      final inferredElementType = _inferCollectionElementRuntimeType(list);
+      final listType = environment.get('List');
+      if (inferredElementType != null && listType is RuntimeType) {
+        listRuntimeType = AppliedRuntimeType(listType, [inferredElementType]);
+      }
+    }
+
     // If this is a const list, return an unmodifiable version
     if (node.constKeyword != null) {
-      return List.unmodifiable(list);
+      final constList = List.unmodifiable(list);
+      environment.annotateRuntimeType(constList, listRuntimeType);
+      return constList;
     }
+
+    environment.annotateRuntimeType(list, listRuntimeType);
 
     return list;
   }
@@ -5617,6 +5649,38 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     // Use the temp environment (if any) for type resolution, otherwise use the normal environment
     final resolveEnvironment = tempEnvironment ?? environment;
 
+    final typeParameterNames = typeParameters?.typeParameters
+            .map((param) => param.name.lexeme)
+            .toList() ??
+        const <String>[];
+    final typeParameterBounds = <String, RuntimeType?>{};
+
+    if (typeParameters != null) {
+      for (final typeParam in typeParameters.typeParameters) {
+        final paramName = typeParam.name.lexeme;
+        RuntimeType? bound;
+
+        if (typeParam.bound != null) {
+          final resolvedBound = resolveEnvironment.get(paramName);
+          if (resolvedBound is TypeParameter && resolvedBound.bound != null) {
+            bound = resolvedBound.bound;
+          } else {
+            bound = InterpretedClass.resolveTypeAnnotationDynamic(
+                typeParam.bound!, resolveEnvironment);
+          }
+        }
+
+        typeParameterBounds[paramName] = bound;
+      }
+    }
+
+    if (tempEnvironment != null) {
+      for (final paramName in typeParameterNames) {
+        tempEnvironment.assign(paramName,
+            TypeParameter(paramName, bound: typeParameterBounds[paramName]));
+      }
+    }
+
     final declaredReturnType = tempEnvironment != null
         ? _resolveTypeAnnotationWithEnvironment(
             node.returnType, resolveEnvironment,
@@ -5731,6 +5795,24 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           declaredType = currentCallable.declaredReturnType;
           isNullable = currentCallable.isNullable;
 
+          if (eDecl.functionExpression.body.isAsynchronous &&
+              eDecl.returnType is NamedType) {
+            final returnTypeNode = eDecl.returnType as NamedType;
+            if (returnTypeNode.name.lexeme == 'Future') {
+              final futureTypeArguments =
+                  returnTypeNode.typeArguments?.arguments;
+              if (futureTypeArguments != null &&
+                  futureTypeArguments.isNotEmpty) {
+                declaredType = _resolveTypeAnnotationWithEnvironment(
+                    futureTypeArguments.first, environment,
+                    isAsync: false);
+              } else {
+                declaredType =
+                    BridgedClass(nativeType: Object, name: 'dynamic');
+              }
+            }
+          }
+
           // Special handling for async* generators: return without value should be allowed
           if (currentCallable.isAsyncGenerator && returnValue == null) {
             throw ReturnException(returnValue); // Exit generator cleanly
@@ -5787,8 +5869,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             }
 
             if (!shouldSkipTypeCheck) {
-              final isValidReturn = valueRuntimeType.isSubtypeOf(declaredType,
-                  value: returnValue);
+              final isValidReturn =
+                  _isValueCompatibleWithRuntimeType(returnValue, declaredType);
 
               // Special handling for primitive type relationships
               // In Dart: int and double are subtypes of num
@@ -7958,15 +8040,11 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         return value !=
             null; // Everything matches Object/dynamic (except null for Object)
       default:
-        // For user-defined types, try to resolve from environment
         try {
-          final targetType = environment.get(typeName);
-          if (targetType is InterpretedClass) {
-            return value is InterpretedInstance &&
-                value.klass.isSubtypeOf(targetType);
-          } else if (targetType is BridgedClass) {
-            return value is BridgedInstance &&
-                value.bridgedClass.isSubtypeOf(targetType);
+          final targetType = _resolveTypeAnnotation(typeNode);
+          final runtimeType = environment.getRuntimeType(value);
+          if (runtimeType != null) {
+            return runtimeType.isSubtypeOf(targetType, value: value);
           }
         } catch (_) {
           // If type not found, assume it matches (lenient approach)
@@ -7974,6 +8052,74 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
         return true;
     }
+  }
+
+  bool _isValueCompatibleWithRuntimeType(
+      Object? value, RuntimeType expectedType) {
+    if (expectedType.name == 'dynamic') {
+      return true;
+    }
+
+    if (expectedType is AppliedRuntimeType &&
+        expectedType.baseType.name == 'Future' &&
+        expectedType.typeArguments.isNotEmpty) {
+      return _isValueCompatibleWithRuntimeType(
+          value, expectedType.typeArguments.first);
+    }
+
+    if (expectedType.name == 'Object') {
+      return value != null;
+    }
+
+    if (expectedType is TypeParameter) {
+      if (expectedType.bound != null) {
+        return _isValueCompatibleWithRuntimeType(value, expectedType.bound!);
+      }
+      return true;
+    }
+
+    final actualType = environment.getRuntimeType(value);
+    if (actualType == null) {
+      return value == null;
+    }
+
+    if (expectedType is AppliedRuntimeType) {
+      final baseMatches = actualType is AppliedRuntimeType
+          ? actualType.baseType.isSubtypeOf(expectedType.baseType, value: value)
+          : actualType.isSubtypeOf(expectedType.baseType, value: value);
+
+      if (!baseMatches) {
+        return false;
+      }
+
+      if (actualType is AppliedRuntimeType) {
+        if (actualType.typeArguments.length !=
+            expectedType.typeArguments.length) {
+          return false;
+        }
+
+        for (int index = 0; index < actualType.typeArguments.length; index++) {
+          final actualArgument = actualType.typeArguments[index];
+          final expectedArgument = expectedType.typeArguments[index];
+
+          if (actualArgument.name == 'dynamic' ||
+              expectedArgument.name == 'dynamic' ||
+              expectedArgument.name == 'Object') {
+            continue;
+          }
+
+          if (!actualArgument.isSubtypeOf(expectedArgument, value: value)) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      return true;
+    }
+
+    return actualType.isSubtypeOf(expectedType, value: value);
   }
 
   @override
@@ -8393,30 +8539,20 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           break;
         default:
           try {
-            final targetType = environment.get(typeName);
+            final targetType = _resolveTypeAnnotation(typeNode);
+            final runtimeType = environment.getRuntimeType(expressionValue);
 
-            if (targetType is BridgedClass) {
-              if (expressionValue is BridgedInstance) {
-                // Use the new helper method
-                result = expressionValue.bridgedClass.isSubtypeOf(targetType);
-              } else {
-                // A non-instance value cannot be a subtype of a user-defined class
-                result = false;
-              }
-            } else if (targetType is InterpretedClass) {
-              if (expressionValue is InterpretedInstance) {
-                // Use the new helper method
-                result = expressionValue.klass.isSubtypeOf(targetType);
-              } else {
-                // A non-instance value cannot be a subtype of a user-defined class
-                result = false;
-              }
-            } else if (targetType is NativeFunction &&
-                targetType.call(this, []) is Type) {
-              final object = targetType.call(this, []);
-
-              return expressionValue.runtimeType == object;
+            if (runtimeType != null) {
+              result =
+                  runtimeType.isSubtypeOf(targetType, value: expressionValue);
             } else {
+              final rawTarget = environment.get(typeName);
+              if (rawTarget is NativeFunction &&
+                  rawTarget.call(this, []) is Type) {
+                final object = rawTarget.call(this, []);
+                return expressionValue.runtimeType == object;
+              }
+
               throw RuntimeError(
                   "Type '$typeName' not found or is not a ${expressionValue.runtimeType}.");
             }
@@ -8550,16 +8686,134 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
     }
 
-    // If this is a const collection, return an unmodifiable version
-    if (node.constKeyword != null) {
-      if (isMap) {
-        return Map.unmodifiable(collection as Map<Object?, Object?>);
-      } else {
-        return Set.unmodifiable(collection as Set<Object?>);
+    RuntimeType? collectionRuntimeType;
+    if (node.typeArguments != null &&
+        node.typeArguments!.arguments.isNotEmpty) {
+      final baseType = environment.get(isMap ? 'Map' : 'Set');
+      if (baseType is RuntimeType) {
+        collectionRuntimeType = AppliedRuntimeType(
+            baseType,
+            node.typeArguments!.arguments
+                .map((typeNode) => _resolveTypeAnnotation(typeNode))
+                .toList());
+      }
+    } else if (isMap && collection is Map) {
+      final inferredKeyType =
+          _inferCollectionElementRuntimeType(collection.keys.toList());
+      final inferredValueType =
+          _inferCollectionElementRuntimeType(collection.values.toList());
+      final mapType = environment.get('Map');
+      if (mapType is RuntimeType &&
+          inferredKeyType != null &&
+          inferredValueType != null) {
+        collectionRuntimeType =
+            AppliedRuntimeType(mapType, [inferredKeyType, inferredValueType]);
+      }
+    } else if (!isMap && collection is Set) {
+      final inferredElementType =
+          _inferCollectionElementRuntimeType(collection.toList());
+      final setType = environment.get('Set');
+      if (setType is RuntimeType && inferredElementType != null) {
+        collectionRuntimeType =
+            AppliedRuntimeType(setType, [inferredElementType]);
       }
     }
 
+    // If this is a const collection, return an unmodifiable version
+    if (node.constKeyword != null) {
+      if (isMap) {
+        final constMap = Map.unmodifiable(collection as Map<Object?, Object?>);
+        environment.annotateRuntimeType(constMap, collectionRuntimeType);
+        return constMap;
+      } else {
+        final constSet = Set.unmodifiable(collection as Set<Object?>);
+        environment.annotateRuntimeType(constSet, collectionRuntimeType);
+        return constSet;
+      }
+    }
+
+    environment.annotateRuntimeType(collection, collectionRuntimeType);
+
     return collection;
+  }
+
+  RuntimeType? _inferCollectionElementRuntimeType(Iterable<Object?> values) {
+    RuntimeType? inferredType;
+
+    for (final value in values) {
+      final runtimeType = environment.getRuntimeType(value);
+      if (runtimeType == null) {
+        return null;
+      }
+
+      if (runtimeType is AppliedRuntimeType &&
+          (runtimeType.baseType.name == 'List' ||
+              runtimeType.baseType.name == 'Map' ||
+              runtimeType.baseType.name == 'Set')) {
+        return null;
+      }
+
+      if (runtimeType.name == 'List' ||
+          runtimeType.name == 'Map' ||
+          runtimeType.name == 'Set') {
+        return null;
+      }
+
+      if (inferredType == null) {
+        inferredType = runtimeType;
+        continue;
+      }
+
+      if (runtimeType.name == inferredType.name ||
+          runtimeType.isSubtypeOf(inferredType, value: value)) {
+        continue;
+      }
+
+      if (inferredType.isSubtypeOf(runtimeType, value: value)) {
+        inferredType = runtimeType;
+        continue;
+      }
+
+      if ((runtimeType.name == 'int' || runtimeType.name == 'double') &&
+          (inferredType.name == 'int' || inferredType.name == 'double')) {
+        final numType = environment.get('num');
+        if (numType is RuntimeType) {
+          inferredType = numType;
+          continue;
+        }
+      }
+
+      return null;
+    }
+
+    return inferredType;
+  }
+
+  void _annotateCollectionRuntimeType(
+      Object? value, RuntimeType? declaredType) {
+    if (declaredType == null) {
+      return;
+    }
+
+    if (value is! List && value is! Map && value is! Set) {
+      return;
+    }
+
+    if (declaredType is AppliedRuntimeType) {
+      final baseName = declaredType.baseType.name;
+      final matchesCollection = (value is List && baseName == 'List') ||
+          (value is Map && baseName == 'Map') ||
+          (value is Set && baseName == 'Set');
+      if (!matchesCollection) {
+        return;
+      }
+    } else if ((value is List && declaredType.name != 'List') ||
+        (value is Map && declaredType.name != 'Map') ||
+        (value is Set && declaredType.name != 'Set')) {
+      return;
+    }
+
+    environment.annotateRuntimeType(value, declaredType);
   }
 
   // Helper method to check if a collection element body contains a MapLiteralEntry
@@ -8603,6 +8857,16 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       return BridgedClass(nativeType: dynamic, name: 'dynamic');
     }
     if (typeNode is NamedType) {
+      if (isAsync && typeNode.name.lexeme == 'Future') {
+        final futureTypeArguments = typeNode.typeArguments?.arguments;
+        if (futureTypeArguments != null && futureTypeArguments.isNotEmpty) {
+          return _resolveTypeAnnotationWithEnvironment(
+              futureTypeArguments.first, env,
+              isAsync: false);
+        }
+        return BridgedClass(nativeType: dynamic, name: 'dynamic');
+      }
+
       String typeName = isAsync
           ? typeNode
               .toSource()
@@ -8625,6 +8889,14 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         if (resolved is RuntimeType) {
           Logger.debug(
               "[ResolveType]   Resolved to RuntimeType: ${resolved.name}");
+          if (typeNode.typeArguments != null &&
+              typeNode.typeArguments!.arguments.isNotEmpty) {
+            final resolvedTypeArguments = typeNode.typeArguments!.arguments
+                .map((argument) =>
+                    _resolveTypeAnnotationWithEnvironment(argument, env))
+                .toList();
+            return AppliedRuntimeType(resolved, resolvedTypeArguments);
+          }
           return resolved;
         } else {
           throw RuntimeError(
@@ -8775,24 +9047,6 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           // The constructor call returns the instance
           return instance;
         }
-      } on ReturnException catch (e) {
-        // Handle return exceptions (applies to both factory and regular constructors)
-        if (constructor.isFactory) {
-          // For factory constructors, the return value is the actual result
-          return e.value;
-        } else {
-          // For regular constructors, check if returned value is valid
-          if (e.value != null && e.value is InterpretedInstance) {
-            final instance = e.value as InterpretedInstance; // Explicit cast
-            if (instance.klass == klass) {
-              // Check on the casted instance
-              return instance;
-            }
-          }
-          // If the condition fails (null, not InterpretedInstance, or wrong class)
-          throw RuntimeError(
-              "Constructor return value error for '$constructorName'.");
-        }
       } on RuntimeError catch (e) {
         // Simplified error message
         throw RuntimeError(
@@ -8827,58 +9081,52 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             // Return the result as-is. Static methods may return native values or BridgedInstances
             return result;
           } catch (e) {
-            Logger.error(
-                "[InstanceCreation] Error calling static method '$namedConstructorPart' on '$constructorName': $e");
             throw RuntimeError(
-                "Error during static method call '$constructorName.$namedConstructorPart': $e");
+                "Error during static method '$namedConstructorPart' on class '$constructorName': $e");
           }
         }
       }
 
-      final (positionalArgs, namedArgs) = _evaluateArguments(node.argumentList);
-
-      // Find the constructor adapter (bridged)
-      final constructorLookupName =
-          namedConstructorPart ?? ''; // Use '' if null
+      final constructorLookupName = namedConstructorPart ?? '';
       final constructorAdapter =
           bridgedClass.findConstructorAdapter(constructorLookupName);
 
       if (constructorAdapter == null) {
         throw RuntimeError(
-            "Bridged class '$constructorName' does not have a registered constructor named '$constructorLookupName'. Check bridge definition.");
+            "Bridged class '$constructorName' does not have a constructor named '$constructorLookupName'.");
       }
 
-      // Call the constructor adapter
+      final (positionalArgs, namedArgs) = _evaluateArguments(node.argumentList);
+      List<RuntimeType>? evaluatedTypeArguments;
+      final typeArgsNode = node.constructorName.type.typeArguments;
+      if (typeArgsNode != null) {
+        evaluatedTypeArguments = typeArgsNode.arguments
+            .map((typeNode) => _resolveTypeAnnotation(typeNode))
+            .toList();
+      }
+
       try {
-        // The adapter is responsible for:
-        // 1. Converting the interpreted positionalArgs/namedArgs to native types.
-        // 2. Calling the actual native constructor.
-        // 3. Returning the created native object.
         final nativeObject =
             constructorAdapter(this, positionalArgs, namedArgs);
 
-        // Check if the adapter returned a value (it should)
         if (nativeObject == null) {
           throw RuntimeError(
-              "Bridged constructor adapter for '\$constructorName.$constructorLookupName' returned null unexpectedly.");
+              "Bridged constructor adapter for '$constructorName.$constructorLookupName' returned null unexpectedly.");
         }
 
-        // Wrap the native object in BridgedInstance
-        final bridgedInstance = BridgedInstance(bridgedClass, nativeObject);
+        final bridgedInstance = BridgedInstance(bridgedClass, nativeObject,
+            typeArguments: evaluatedTypeArguments ?? const []);
         Logger.debug(
-            "[InstanceCreation]   Successfully created BridgedInstance wrapping native object: \${nativeObject.runtimeType}");
+            "[InstanceCreation]   Successfully created BridgedInstance wrapping native object: ${nativeObject.runtimeType}");
         return bridgedInstance;
       } on RuntimeError catch (e) {
-        // If the adapter itself raises a RuntimeError (e.g. conversion failure)
         throw RuntimeError(
             "Error during bridged constructor '$constructorLookupName' for class '$constructorName': ${e.message}");
-      } catch (e) {
-        // Catch potential native exceptions raised by the adapter or the native constructor
+      } catch (e, s) {
         Logger.error(
-            "[InstanceCreation] Native exception during bridged constructor '$constructorName.$constructorLookupName': \$e\\n\$s");
-        // Encapsulate the native error in a RuntimeError for propagation
+            "[InstanceCreation] Native exception during bridged constructor '$constructorName.$constructorLookupName': $e\n$s");
         throw RuntimeError(
-            "Native error during bridged constructor '$constructorLookupName' for class '$constructorName': \$e");
+            "Native error during bridged constructor '$constructorLookupName' for class '$constructorName': $e");
       }
     } else {
       // CASE 3: The resolved type is neither InterpretedClass nor BridgedClass

@@ -100,6 +100,13 @@ class InterpretedClass implements Callable, RuntimeType {
       if (resolved is RuntimeType) {
         Logger.debug(
             "[InterpretedClass._resolveTypeAnnotationDynamic] Resolved from environment to RuntimeType: ${resolved.name}");
+        if (typeNode.typeArguments != null &&
+            typeNode.typeArguments!.arguments.isNotEmpty) {
+          final resolvedTypeArguments = typeNode.typeArguments!.arguments
+              .map((argument) => resolveTypeAnnotationDynamic(argument, env))
+              .toList();
+          return AppliedRuntimeType(resolved, resolvedTypeArguments);
+        }
         return resolved;
       } else {
         throw RuntimeError(
@@ -883,8 +890,10 @@ class InterpretedInstance implements RuntimeValue {
     }
 
     if (expectedType is bridge.TypeParameter) {
-      // Type parameters accept any value for now
-      // Later we can implement bounds checking
+      if (expectedType.bound != null) {
+        return _isValueCompatibleWithType(value, expectedType.bound!);
+      }
+
       return true;
     }
 
@@ -1349,7 +1358,9 @@ class InterpretedInstance implements RuntimeValue {
 
   // Implémentation de RuntimeValue.valueType (précédemment runtimeType)
   @override
-  RuntimeType get valueType => klass;
+  RuntimeType get valueType => typeArguments == null || typeArguments!.isEmpty
+      ? klass
+      : AppliedRuntimeType(klass, typeArguments!);
 }
 
 // which pairs an InterpretedFunction with an InterpretedInstance ('this').

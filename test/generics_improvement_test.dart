@@ -158,5 +158,119 @@ void main() {
         )),
       );
     });
+
+    test('Applied generic runtime type is preserved for user-defined classes',
+        () {
+      final code = '''
+        class Box<T> {
+          T value;
+          Box(this.value);
+        }
+
+        main() {
+          var box = Box<int>(42);
+          return [box is Box<int>, box is Box<num>, box is Box<String>];
+        }
+      ''';
+
+      expect(execute(code), equals([true, true, false]));
+    });
+
+    test('Generic return type validation uses applied runtime types', () {
+      final validCode = '''
+        class Box<T> {
+          T value;
+          Box(this.value);
+        }
+
+        Box<int> makeBox() {
+          return Box<int>(42);
+        }
+
+        main() {
+          return makeBox() is Box<int>;
+        }
+      ''';
+
+      expect(execute(validCode), isTrue);
+
+      final invalidCode = '''
+        class Box<T> {
+          T value;
+          Box(this.value);
+        }
+
+        Box<String> makeBox() {
+          return Box<int>(42);
+        }
+
+        main() {
+          return makeBox();
+        }
+      ''';
+
+      expect(
+        () => execute(invalidCode),
+        throwsA(isA<RuntimeError>().having(
+          (e) => e.message,
+          'message',
+          contains("can't be returned"),
+        )),
+      );
+    });
+
+    test('Typed native collection returns preserve applied runtime types', () {
+      final validCode = '''
+        List<int> numbers() {
+          return [1, 2, 3];
+        }
+
+        Map<String, int> scores() {
+          return {'a': 1, 'b': 2};
+        }
+
+        main() {
+          return [numbers() is List<int>, scores() is Map<String, int>];
+        }
+      ''';
+
+      expect(execute(validCode), equals([true, true]));
+
+      final invalidCode = '''
+        List<String> numbers() {
+          return [1, 2, 3];
+        }
+
+        main() {
+          return numbers();
+        }
+      ''';
+
+      expect(
+        () => execute(invalidCode),
+        throwsA(isA<RuntimeError>().having(
+          (e) => e.message,
+          'message',
+          contains("can't be returned"),
+        )),
+      );
+    });
+
+    test('Typed variable declarations annotate empty collections', () {
+      final code = '''
+        List<int> build() {
+          List<int> result = [];
+          result.add(1);
+          result.add(2);
+          return result;
+        }
+
+        main() {
+          return build() is List<int>;
+        }
+      ''';
+
+      expect(execute(code), isTrue);
+    });
   });
 }

@@ -26,6 +26,9 @@ import 'package:d4rt/src/utils/extensions/string.dart';
 /// final value = functionEnv.get('globalVar');
 /// ```
 class Environment {
+  static final Expando<RuntimeType> _annotatedRuntimeTypes =
+      Expando<RuntimeType>('d4rt.runtimeType');
+
   final Environment? _enclosing;
   final Map<String, Object?> _values = {};
   final Map<String, BridgedClass> _bridgedClasses = {};
@@ -39,6 +42,26 @@ class Environment {
   ///
   /// [enclosing] The parent environment for lexical scoping. If null, this becomes a root environment.
   Environment({Environment? enclosing}) : _enclosing = enclosing;
+
+  void annotateRuntimeType(Object? value, RuntimeType? runtimeType) {
+    if (value == null || runtimeType == null) {
+      return;
+    }
+
+    if (value is num || value is String || value is bool) {
+      return;
+    }
+
+    _annotatedRuntimeTypes[value] = runtimeType;
+  }
+
+  RuntimeType? getAnnotatedRuntimeType(Object? value) {
+    if (value == null || value is num || value is String || value is bool) {
+      return null;
+    }
+
+    return _annotatedRuntimeTypes[value];
+  }
 
   /// Gets the enclosing (parent) environment, if any.
   Environment? get enclosing => _enclosing;
@@ -427,11 +450,13 @@ class Environment {
 
   // Placeholder helper to get RuntimeType - needs actual implementation
   RuntimeType? getRuntimeType(Object? value) {
-    if (value is InterpretedInstance) {
-      return value.klass; // InterpretedClass is a RuntimeType
+    final annotatedRuntimeType = getAnnotatedRuntimeType(value);
+    if (annotatedRuntimeType != null) {
+      return annotatedRuntimeType;
     }
-    if (value is BridgedInstance) {
-      return value.bridgedClass; // BridgedClass is a RuntimeType
+
+    if (value is RuntimeValue) {
+      return value.valueType;
     }
     // Handle Dart primitive/core types by looking them up in the environment
     // Assumes core types (String, int, bool, List, Map, etc.) are registered as BridgedClass
