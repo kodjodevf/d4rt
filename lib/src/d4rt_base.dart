@@ -337,7 +337,7 @@ class D4rt {
       if (!_moduleLoader.sources.containsKey(library.toString()) &&
           !allowFileSystemImports) {
         final errorMessage =
-            "[D4rt.execute] The $name source URI '$library' was not found in sources.";
+            "[D4rt.execute] The $name source URI '$library' was not found in sources. If this module should be loaded from the filesystem, provide basePath and enable allowFileSystemImports.";
         Logger.error(errorMessage);
         throw SourceCodeException(errorMessage);
       }

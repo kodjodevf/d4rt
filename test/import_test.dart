@@ -653,6 +653,64 @@ String main() => 'never';
           ),
         );
       });
+
+      test('Relative filesystem imports require a basePath', () {
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            source: '''
+import './utils.dart';
+
+String main() => 'never';
+''',
+            allowFileSystemImports: true,
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('Base URI not defined'),
+            ),
+          ),
+        );
+      });
+
+      test(
+          'Root filesystem libraries fail clearly when filesystem imports are disabled',
+          () {
+        final rootDirectory = io.Directory('test_fs_imports/disabled_root');
+        rootDirectory.createSync(recursive: true);
+        io.File(
+          io.Platform.pathSeparator == '/'
+              ? '${rootDirectory.path}/main.dart'
+              : '${rootDirectory.path}\\main.dart',
+        ).writeAsStringSync('''
+String main() => 'disabled';
+''');
+
+        final d4rt = D4rt();
+
+        expect(
+          () => d4rt.execute(
+            library: 'main.dart',
+            basePath: rootDirectory.absolute.path,
+          ),
+          throwsA(
+            isA<SourceCodeException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('was not found in sources'),
+                )
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('enable allowFileSystemImports'),
+                ),
+          ),
+        );
+      });
     });
   });
 }

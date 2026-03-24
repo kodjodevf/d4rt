@@ -192,6 +192,31 @@ if (interpreter.hasPermission(FilesystemPermission.any)) {
 interpreter.revoke(FilesystemPermission.any);
 ```
 
+### Filesystem Module Imports
+
+Use `basePath` together with `allowFileSystemImports: true` when interpreted code imports local files from disk.
+
+```dart
+final interpreter = D4rt();
+interpreter.grant(FilesystemPermission.readPath('/path/to/project/lib'));
+
+final result = interpreter.execute(
+  source: '''
+    import './utils.dart';
+    String main() => greetFromUtils();
+  ''',
+  basePath: '/path/to/project/lib',
+  allowFileSystemImports: true,
+);
+```
+
+Rules:
+
+- Relative filesystem imports require `basePath`.
+- Filesystem modules are blocked unless `allowFileSystemImports` is enabled.
+- Reading modules from disk also requires a matching `FilesystemPermission`.
+- Missing local files raise a `SourceCodeException` with the resolved filesystem path.
+
 ## Bridging Native Classes & Enums
 
 d4rt provides a powerful bridging system that allows you to automate the process of exposing your Dart and Flutter classes, enums, and functions to the interpreter using `build_runner`.
