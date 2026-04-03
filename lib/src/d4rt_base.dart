@@ -868,7 +868,11 @@ class D4rt {
         }, "Error invoking interpreted Method or getter '$name' on '${klass.name}'");
       }
 
-      final bridgedSuperclass = klass.bridgedSuperclass;
+      final bridgedSuperclass =
+          klass.findBridgedSuperclassDefiningInstanceMethod(name) ??
+              klass.findBridgedSuperclassDefiningInstanceGetter(name) ??
+              klass.findBridgedSuperclassDefiningInstanceSetter(name) ??
+              klass.bridgedSuperclass;
       final nativeSuperObject = instance.bridgedSuperObject;
 
       if (bridgedSuperclass != null) {

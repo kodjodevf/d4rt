@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/d4rt.dart';
 import 'bridge/bridged_types.dart' as bridge;
+import 'type_annotation_utils.dart';
 
 /// Represents a class definition at runtime.
 class InterpretedClass implements Callable, RuntimeType {
@@ -90,32 +91,7 @@ class InterpretedClass implements Callable, RuntimeType {
   // Helper method for dynamic type resolution
   static RuntimeType resolveTypeAnnotationDynamic(
       TypeAnnotation typeNode, Environment env) {
-    if (typeNode is NamedType) {
-      final typeName = typeNode.name.lexeme;
-
-      Logger.debug(
-          "[InterpretedClass._resolveTypeAnnotationDynamic] Resolving NamedType: $typeName");
-
-      final resolved = env.get(typeName);
-      if (resolved is RuntimeType) {
-        Logger.debug(
-            "[InterpretedClass._resolveTypeAnnotationDynamic] Resolved from environment to RuntimeType: ${resolved.name}");
-        if (typeNode.typeArguments != null &&
-            typeNode.typeArguments!.arguments.isNotEmpty) {
-          final resolvedTypeArguments = typeNode.typeArguments!.arguments
-              .map((argument) => resolveTypeAnnotationDynamic(argument, env))
-              .toList();
-          return AppliedRuntimeType(resolved, resolvedTypeArguments);
-        }
-        return resolved;
-      } else {
-        throw RuntimeError(
-            "Symbol '$typeName' resolved to non-type value: $resolved");
-      }
-    } else {
-      throw RuntimeError(
-          "Unsupported type annotation for constraint: ${typeNode.runtimeType}");
-    }
+    return resolveRuntimeTypeAnnotation(typeNode, env);
   }
 
   // Corrected constructor signature and initialization
@@ -161,6 +137,9 @@ class InterpretedClass implements Callable, RuntimeType {
   String toString() {
     return '<class $name>';
   }
+
+  @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
 
   // Finders for different member types
   InterpretedFunction? findInstanceMethod(String name) {
@@ -252,6 +231,48 @@ class InterpretedClass implements Callable, RuntimeType {
       }
     }
 
+    return null;
+  }
+
+  bridge.BridgedClass? findBridgedSuperclassDefiningInstanceMethod(
+      String name) {
+    InterpretedClass? current = this;
+    while (current != null) {
+      final bridgedSuper = current.bridgedSuperclass;
+      if (bridgedSuper != null &&
+          bridgedSuper.findInstanceMethodAdapter(name) != null) {
+        return bridgedSuper;
+      }
+      current = current.superclass;
+    }
+    return null;
+  }
+
+  bridge.BridgedClass? findBridgedSuperclassDefiningInstanceGetter(
+      String name) {
+    InterpretedClass? current = this;
+    while (current != null) {
+      final bridgedSuper = current.bridgedSuperclass;
+      if (bridgedSuper != null &&
+          bridgedSuper.findInstanceGetterAdapter(name) != null) {
+        return bridgedSuper;
+      }
+      current = current.superclass;
+    }
+    return null;
+  }
+
+  bridge.BridgedClass? findBridgedSuperclassDefiningInstanceSetter(
+      String name) {
+    InterpretedClass? current = this;
+    while (current != null) {
+      final bridgedSuper = current.bridgedSuperclass;
+      if (bridgedSuper != null &&
+          bridgedSuper.findInstanceSetterAdapter(name) != null) {
+        return bridgedSuper;
+      }
+      current = current.superclass;
+    }
     return null;
   }
 
@@ -1777,6 +1798,9 @@ class BridgedSuperMethodCallable implements Callable {
       this.superObject, this.adapter, this.methodName, this.bridgedClassName);
 
   @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
+
+  @override
   int get arity => 0; // Arity validation is done by the adapter
 
   @override
@@ -1811,6 +1835,9 @@ class BridgedMixinMethodCallable implements Callable {
 
   BridgedMixinMethodCallable(
       this.instance, this.adapter, this.methodName, this.bridgedMixinName);
+
+  @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
 
   @override
   int get arity => 0; // Arity validation is done by the adapter
@@ -1848,6 +1875,9 @@ class BridgedEnumMixinMethodCallable implements Callable {
 
   BridgedEnumMixinMethodCallable(
       this.enumValue, this.adapter, this.methodName, this.bridgedMixinName);
+
+  @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
 
   @override
   int get arity => 0; // Arity validation is done by the adapter
@@ -1897,6 +1927,9 @@ class InterpretedExtensionType implements Callable, RuntimeType {
   // Type parameter information
   final List<String> typeParameterNames;
   final Map<String, RuntimeType?> typeParameterBounds;
+
+  @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
 
   InterpretedExtensionType({
     required this.name,

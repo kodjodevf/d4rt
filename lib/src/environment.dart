@@ -458,6 +458,21 @@ class Environment {
     if (value is RuntimeValue) {
       return value.valueType;
     }
+    if (value is InterpretedRecord) {
+      return RecordRuntimeType(
+        value.positionalFields
+            .map((field) =>
+                getRuntimeType(field) ?? const NamedRuntimeType('dynamic'))
+            .toList(),
+        value.namedFields.map(
+          (key, field) => MapEntry(
+              key, getRuntimeType(field) ?? const NamedRuntimeType('dynamic')),
+        ),
+      );
+    }
+    if (value is Callable && value is! RuntimeType) {
+      return value.callableRuntimeType;
+    }
     // Handle Dart primitive/core types by looking them up in the environment
     // Assumes core types (String, int, bool, List, Map, etc.) are registered as BridgedClass
     String? typeName;
@@ -468,6 +483,7 @@ class Environment {
     if (value is bool) typeName = 'bool';
     if (value is List) typeName = 'List';
     if (value is Map) typeName = 'Map';
+    if (value is Set) typeName = 'Set';
 
     if (typeName != null) {
       try {

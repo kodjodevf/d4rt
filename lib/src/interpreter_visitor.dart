@@ -2,9 +2,8 @@ import 'dart:async';
 import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
-import 'package:analyzer/dart/element/type.dart';
 import 'package:d4rt/d4rt.dart';
-import 'package:d4rt/src/utils/extensions/string.dart';
+import 'package:d4rt/src/type_annotation_utils.dart';
 import 'package:d4rt/src/module_loader.dart';
 import 'package:d4rt/src/stdlib/core/list.dart';
 
@@ -8564,9 +8563,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
       }
     } else {
-      // Handle FunctionType, etc., later if needed
-      throw UnimplementedError(
-          'Type check for ${typeNode.runtimeType} not implemented.');
+      try {
+        final targetType = _resolveTypeAnnotation(typeNode);
+        result = _isValueCompatibleWithRuntimeType(expressionValue, targetType);
+      } on RuntimeError catch (e) {
+        throw InternalInterpreterException(
+            RuntimeError("Type check failed: ${e.message}"));
+      }
     }
 
     // Handle negation (is!)
@@ -8853,81 +8856,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   RuntimeType _resolveTypeAnnotationWithEnvironment(
       TypeAnnotation? typeNode, Environment env,
       {bool isAsync = false}) {
-    if (typeNode == null) {
-      return BridgedClass(nativeType: dynamic, name: 'dynamic');
-    }
-    if (typeNode is NamedType) {
-      if (isAsync && typeNode.name.lexeme == 'Future') {
-        final futureTypeArguments = typeNode.typeArguments?.arguments;
-        if (futureTypeArguments != null && futureTypeArguments.isNotEmpty) {
-          return _resolveTypeAnnotationWithEnvironment(
-              futureTypeArguments.first, env,
-              isAsync: false);
-        }
-        return BridgedClass(nativeType: dynamic, name: 'dynamic');
-      }
-
-      String typeName = isAsync
-          ? typeNode
-              .toSource()
-              .replaceAll('?', '')
-              .substringAfter('<')
-              .substringBeforeLast('>')
-          : typeNode.name.lexeme;
-      if (typeName.contains('<') && typeName.contains('>')) {
-        typeName = typeName.substring(0, typeName.indexOf('<'));
-      }
-      if (typeName == "void") {
-        return BridgedClass(nativeType: VoidType, name: 'void');
-      }
-      if (typeName == "Never") {
-        return BridgedClass(nativeType: Never, name: 'Never');
-      }
-      Logger.debug("[ResolveType] Resolving NamedType: $typeName");
-      try {
-        final resolved = env.get(typeName);
-        if (resolved is RuntimeType) {
-          Logger.debug(
-              "[ResolveType]   Resolved to RuntimeType: ${resolved.name}");
-          if (typeNode.typeArguments != null &&
-              typeNode.typeArguments!.arguments.isNotEmpty) {
-            final resolvedTypeArguments = typeNode.typeArguments!.arguments
-                .map((argument) =>
-                    _resolveTypeAnnotationWithEnvironment(argument, env))
-                .toList();
-            return AppliedRuntimeType(resolved, resolvedTypeArguments);
-          }
-          return resolved;
-        } else {
-          throw RuntimeError(
-              "Symbol '$typeName' resolved to non-type value: $resolved");
-        }
-      } on RuntimeError {
-        // Handle special case: 'dynamic' type doesn't exist in environment usually
-        if (typeName == 'dynamic') {
-          Logger.debug("[ResolveType]   Resolved to dynamic (special case)");
-          // Need a representation for dynamic. Using a placeholder for now.
-          // Ideally, have a predefined DynamicRuntimeType() instance.
-          return BridgedClass(
-              nativeType: Object, name: 'dynamic'); // Corrected placeholder
-        }
-        throw RuntimeError("Type '$typeName' not found.");
-      }
-    } else {
-      // Handle generic function types like 'int Function(int)'
-      // These appear as GenericFunctionTypeImpl in the AST
-      final typeSource = typeNode.toSource();
-      if (typeSource.contains('Function')) {
-        Logger.debug(
-            "[ResolveType] Resolving function type annotation: $typeSource");
-        return BridgedClass(nativeType: Function, name: 'Function');
-      }
-
-      Logger.error(
-          "[ResolveType] Unsupported TypeAnnotation type: ${typeNode.runtimeType}");
-      throw UnimplementedError(
-          "Type resolution for ${typeNode.runtimeType} not implemented yet.");
-    }
+    return resolveRuntimeTypeAnnotation(typeNode, env, isAsync: isAsync);
   }
 
   @override

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:analyzer/dart/ast/ast.dart' hide TypeParameter;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:d4rt/d4rt.dart';
+import 'type_annotation_utils.dart';
 
 /// Represents an invocation for noSuchMethod support in interpreted code
 class InterpretedInvocation {
@@ -71,6 +72,7 @@ class PropertyAccessor {
 abstract class Callable {
   // Number of expected arguments
   int get arity;
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
   // Method to execute the callable
   Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
       [Map<String, Object?> namedArguments, List<RuntimeType>? typeArguments]);
@@ -171,32 +173,7 @@ class InterpretedFunction implements Callable {
   // Helper method for dynamic type resolution (similar to InterpreterVisitor logic)
   static RuntimeType _resolveTypeAnnotationDynamic(
       TypeAnnotation typeNode, Environment env) {
-    if (typeNode is NamedType) {
-      final typeName = typeNode.name.lexeme;
-
-      Logger.debug(
-          "[InterpretedFunction._resolveTypeAnnotationDynamic] Resolving NamedType: $typeName");
-
-      final resolved = env.get(typeName);
-      if (resolved is RuntimeType) {
-        Logger.debug(
-            "[InterpretedFunction._resolveTypeAnnotationDynamic] Resolved from environment to RuntimeType: ${resolved.name}");
-        if (typeNode.typeArguments != null &&
-            typeNode.typeArguments!.arguments.isNotEmpty) {
-          final resolvedTypeArguments = typeNode.typeArguments!.arguments
-              .map((argument) => _resolveTypeAnnotationDynamic(argument, env))
-              .toList();
-          return AppliedRuntimeType(resolved, resolvedTypeArguments);
-        }
-        return resolved;
-      } else {
-        throw RuntimeError(
-            "Symbol '$typeName' resolved to non-type value: $resolved");
-      }
-    } else {
-      throw RuntimeError(
-          "Unsupported type annotation for constraint: ${typeNode.runtimeType}");
-    }
+    return resolveRuntimeTypeAnnotation(typeNode, env);
   }
 
   // Private constructor for bind
@@ -338,6 +315,65 @@ class InterpretedFunction implements Callable {
         .whereType<NormalFormalParameter>()
         .where((p) => p.isRequiredPositional)
         .length;
+  }
+
+  @override
+  RuntimeType get callableRuntimeType {
+    final positionalParameterTypes = <RuntimeType>[];
+    final namedParameterTypes = <String, RuntimeType>{};
+    final requiredNamedParameters = <String>{};
+    int requiredPositionalCount = 0;
+
+    final params = _parameters?.parameters ?? const <FormalParameter>[];
+    for (final parameter in params) {
+      FormalParameter actualParameter = parameter;
+      if (parameter is DefaultFormalParameter) {
+        actualParameter = parameter.parameter;
+      }
+
+      RuntimeType parameterType = const NamedRuntimeType('dynamic');
+      String? parameterName;
+
+      if (actualParameter is SimpleFormalParameter) {
+        parameterType =
+            resolveRuntimeTypeAnnotation(actualParameter.type, _closure);
+        parameterName = actualParameter.name?.lexeme;
+      } else if (actualParameter is FieldFormalParameter) {
+        parameterType =
+            resolveRuntimeTypeAnnotation(actualParameter.type, _closure);
+        parameterName = actualParameter.name.lexeme;
+      } else if (actualParameter is FunctionTypedFormalParameter) {
+        parameterType = FunctionRuntimeType.untyped();
+        parameterName = actualParameter.name.lexeme;
+      }
+
+      if (parameter.isNamed) {
+        if (parameterName != null) {
+          namedParameterTypes[parameterName] = parameterType;
+          if (parameter.isRequiredNamed) {
+            requiredNamedParameters.add(parameterName);
+          }
+        }
+      } else {
+        positionalParameterTypes.add(parameterType);
+        if (parameter.isRequiredPositional) {
+          requiredPositionalCount++;
+        }
+      }
+    }
+
+    return FunctionRuntimeType(
+      returnType: declaredReturnType ?? const NamedRuntimeType('dynamic'),
+      positionalParameterTypes: positionalParameterTypes,
+      requiredPositionalParameterCount: requiredPositionalCount,
+      namedParameterTypes: namedParameterTypes,
+      requiredNamedParameters: requiredNamedParameters,
+      typeParameterCount: typeParameterNames.length,
+      isUntyped: declaredReturnType == null &&
+          positionalParameterTypes.isEmpty &&
+          namedParameterTypes.isEmpty &&
+          typeParameterNames.isEmpty,
+    );
   }
 
   // Calculate total positional parameters (required + optional)
@@ -4220,6 +4256,9 @@ class NativeFunction implements Callable, RuntimeType {
       : _name = name ?? "<native>";
 
   @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
+
+  @override
   Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
       [Map<String, Object?> namedArguments = const {},
       List<RuntimeType>? typeArguments]) {
@@ -4261,6 +4300,9 @@ class BridgedMethodCallable implements Callable {
   final String _methodName;
 
   BridgedMethodCallable(this._instance, this._adapter, this._methodName);
+
+  @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
 
   @override
   int get arity {
@@ -4306,6 +4348,9 @@ class BridgedStaticMethodCallable implements Callable {
       this._bridgedClass, this._adapter, this._methodName);
 
   @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
+
+  @override
   int get arity {
     // The arity is complex to determine statically for native adapters.
     // For now, return 0, but the adapter itself will do the validation.
@@ -4346,6 +4391,9 @@ class BridgedEnumStaticMethodCallable implements Callable {
       this._bridgedEnum, this._adapter, this._methodName);
 
   @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
+
+  @override
   int get arity => 0;
 
   @override
@@ -4378,6 +4426,9 @@ class InterpretedExtensionMethod implements Callable {
   final RuntimeType onType;
 
   InterpretedExtensionMethod(this.declaration, this.closure, this.onType);
+
+  @override
+  RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
 
   // Add getters for method type
   bool get isGetter => declaration.isGetter;
@@ -4552,6 +4603,9 @@ class BoundExtensionMethodCallable implements Callable {
   final InterpretedExtensionMethod extensionMethod;
 
   BoundExtensionMethodCallable(this.target, this.extensionMethod);
+
+  @override
+  RuntimeType get callableRuntimeType => extensionMethod.callableRuntimeType;
 
   // The arity of the bound method is the arity of the original extension method.
   @override

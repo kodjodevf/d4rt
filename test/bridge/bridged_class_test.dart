@@ -1169,6 +1169,37 @@ void main() {
       expect(stockValue, equals('stockXYZ'),
           reason: "Stock value should be 'stockXYZ'");
     });
+
+    test(
+        'Invoke bridged superclass members through interpreted intermediate class',
+        () {
+      final source = '''
+        import 'package:test/counter.dart';
+
+        class IntermediateCounter extends Counter {
+          IntermediateCounter(int initialValue, String id)
+              : super(initialValue, id);
+        }
+
+        class FinalCounter extends IntermediateCounter {
+          FinalCounter(int initialValue, String id) : super(initialValue, id);
+        }
+
+        main() {
+          return FinalCounter(10, 'invoke-intermediate');
+        }
+      ''';
+
+      interpreter.execute(source: source);
+
+      expect(interpreter.invoke('value', []), equals(10));
+
+      interpreter.invoke('increment', [5]);
+      expect(interpreter.invoke('value', []), equals(15));
+
+      expect(interpreter.invoke('add', [4]), equals(19));
+    });
+
     test('Invoke static method on instance with extra field via invoke', () {
       final source = '''
         import 'package:test/counter.dart';
