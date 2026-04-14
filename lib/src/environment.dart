@@ -123,16 +123,20 @@ class Environment {
     if (nativeObject == null) {
       return null;
     }
-    final bridgedClass = toBridgedClass(nativeObject.runtimeType);
+    final bridgedClass = toBridgedClass(nativeObject);
 
     return BridgedInstance(bridgedClass, nativeObject);
   }
 
-  BridgedClass toBridgedClass(Type nativeType) {
+  BridgedClass toBridgedClass(Object? nativeObject) {
+    final nativeType = nativeObject.runtimeType;
     BridgedClass? bridgedClass = _bridgedClassesLookupByType[nativeType];
 
     String nativeTypeName = nativeType.toString();
-
+    bridgedClass ??= _bridgedClassesLookupByType.entries
+        .firstWhereOrNull(
+            (e) => (e.value.isSubtypeOf(null, value: nativeObject)))
+        ?.value;
     if (bridgedClass == null && (nativeTypeName.substring(0, 1) == '_')) {
       if (nativeTypeName.endsWith('Impl')) {
         nativeTypeName = nativeTypeName.substringBeforeLast('Impl');

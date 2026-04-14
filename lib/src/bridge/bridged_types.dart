@@ -55,17 +55,13 @@ class BridgedClass implements RuntimeType {
   /// This function is used to perform subtype checking at runtime, which is essential
   /// for type safety and polymorphism in the bridge system.
   ///
-  /// Parameters:
-  /// - [other]: The runtime type to check against for subtype relationship
-  /// - [value]: Optional value that can be used for additional context during subtype checking
-  ///
   /// Returns:
   /// - `true` if this type is a subtype of [other]
   /// - `false` if this type is not a subtype of [other]
   ///
   /// The function can be null if subtype checking is not supported or not needed
   /// for this particular runtime type.
-  final bool Function(BridgedClass other, {Object? value})? isSubtypeOfFunc;
+  final bool Function(Object? value)? isSubtypeOfFunc;
   // Number of expected type parameters
   final int typeParameterCount;
 
@@ -99,10 +95,13 @@ class BridgedClass implements RuntimeType {
       this.isSubtypeOfFunc});
 
   @override
-  bool isSubtypeOf(RuntimeType other, {Object? value}) {
+  bool isSubtypeOf(RuntimeType? other, {Object? value}) {
+    if (isSubtypeOfFunc != null && other == null && value != null) {
+      return isSubtypeOfFunc!.call(value);
+    }
     if (other is BridgedClass) {
       if (isSubtypeOfFunc != null) {
-        return isSubtypeOfFunc!.call(other, value: value);
+        return isSubtypeOfFunc!.call(value as Type);
       }
       if (nativeType == other.nativeType || name == other.name) {
         return true;
