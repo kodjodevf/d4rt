@@ -137,16 +137,55 @@ class Environment {
         .firstWhereOrNull(
             (e) => (e.value.isSubtypeOf(null, value: nativeObject)))
         ?.value;
-    if (bridgedClass == null && (nativeTypeName.substring(0, 1) == '_')) {
-      if (nativeTypeName.endsWith('Impl')) {
-        nativeTypeName = nativeTypeName.substringBeforeLast('Impl');
+
+    if (bridgedClass == null) {
+      if (nativeObject is List) {
+        bridgedClass = _bridgedClassesLookupByType[List] ??
+            _bridgedClassesLookupByType.values
+                .firstWhereOrNull((e) => e.name == 'List');
+      } else if (nativeObject is Map) {
+        bridgedClass = _bridgedClassesLookupByType[Map] ??
+            _bridgedClassesLookupByType.values
+                .firstWhereOrNull((e) => e.name == 'Map');
+      } else if (nativeObject is Set) {
+        bridgedClass = _bridgedClassesLookupByType[Set] ??
+            _bridgedClassesLookupByType.values
+                .firstWhereOrNull((e) => e.name == 'Set');
+      } else if (nativeObject is Iterable) {
+        bridgedClass = _bridgedClassesLookupByType[Iterable] ??
+            _bridgedClassesLookupByType.values
+                .firstWhereOrNull((e) => e.name == 'Iterable');
+      } else if (nativeObject is String) {
+        bridgedClass = _bridgedClassesLookupByType[String] ??
+            _bridgedClassesLookupByType.values
+                .firstWhereOrNull((e) => e.name == 'String');
       }
+    }
+
+    if (bridgedClass == null &&
+        (nativeTypeName.startsWith('_') ||
+            nativeTypeName.startsWith('JS') ||
+            nativeTypeName.startsWith('_JS'))) {
+      String cleanName = nativeTypeName;
+      if (cleanName.startsWith('_JS')) {
+        cleanName = cleanName.substring(3);
+      } else if (cleanName.startsWith('JS')) {
+        cleanName = cleanName.substring(2);
+      } else if (cleanName.startsWith('_')) {
+        cleanName = cleanName.substring(1);
+      }
+      if (cleanName.endsWith('Impl')) {
+        cleanName = cleanName.substringBeforeLast('Impl');
+      }
+      if (cleanName.startsWith('Array')) {
+        cleanName = 'List${cleanName.substring(5)}';
+      }
+      final targetName = cleanName.substringBefore('<');
       bridgedClass = _bridgedClassesLookupByType.entries
           .firstWhereOrNull((e) =>
-              (e.value.name ==
-                  nativeTypeName.substring(1).substringBefore('<')) ||
+              (e.value.name == targetName) ||
               (e.value.nativeNames
-                      ?.any((name) => nativeTypeName.startsWith(name)) ??
+                      ?.any((name) => targetName.startsWith(name)) ??
                   false))
           ?.value;
     } else if (bridgedClass == null && nativeTypeName.contains('<')) {
@@ -480,14 +519,23 @@ class Environment {
     // Handle Dart primitive/core types by looking them up in the environment
     // Assumes core types (String, int, bool, List, Map, etc.) are registered as BridgedClass
     String? typeName;
-    if (value == null) typeName = 'Null';
-    if (value is String) typeName = 'String';
-    if (value is int) typeName = 'int';
-    if (value is double) typeName = 'double';
-    if (value is bool) typeName = 'bool';
-    if (value is List) typeName = 'List';
-    if (value is Map) typeName = 'Map';
-    if (value is Set) typeName = 'Set';
+    if (value == null) {
+      typeName = 'Null';
+    } else if (value is String) {
+      typeName = 'String';
+    } else if (value is int) {
+      typeName = 'int';
+    } else if (value is double) {
+      typeName = 'double';
+    } else if (value is bool) {
+      typeName = 'bool';
+    } else if (value is List) {
+      typeName = 'List';
+    } else if (value is Map) {
+      typeName = 'Map';
+    } else if (value is Set) {
+      typeName = 'Set';
+    }
 
     if (typeName != null) {
       try {

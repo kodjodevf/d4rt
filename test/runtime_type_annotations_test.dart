@@ -90,5 +90,28 @@ void main() {
         )),
       );
     });
+    test('Issue #6 - Int return type in functions', () {
+      const source = '''
+        int add(int a, int b) {
+          return a + b;
+        }
+        main() {
+          return add(10, 20);
+        }
+      ''';
+
+      expect(execute(source), equals(30));
+    });
+
+    test('Issue #8 - Property access on String.split list result', () {
+      const source = '''
+        main() {
+          List<String> parts = "1.2.3.4/5".split("/");
+          return parts.length;
+        }
+      ''';
+
+      expect(execute(source), equals(2));
+    });
   });
 }
