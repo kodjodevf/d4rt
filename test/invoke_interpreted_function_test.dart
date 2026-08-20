@@ -108,7 +108,24 @@ void main() {
       expect(result, equals(16));
     });
 
-    test('Function that receives a host function', () {
+    test('Function that receives a function', () {
+      final source = """
+      double squared(double x) => x * x;
+
+      T applyTwice<T>(T arg, T Function(T) fn) => fn(fn(arg));
+
+      main() => (squared,applyTwice);
+      """;
+      final InterpretedRecord tuple = d4rt.execute(source: source);
+      final InterpretedFunction squared = tuple.positionalFields[0] as InterpretedFunction;
+      final InterpretedFunction applyTwice = tuple.positionalFields[1] as InterpretedFunction;
+
+      final result = d4rt.invokeInterpretedFunction(applyTwice, [2, squared]);
+
+      expect(result, equals(16));
+    });
+
+    test('Function that receives host function', () {
       double squared(double x) => x * x;
 
       final source = """
@@ -118,9 +135,24 @@ void main() {
       """;
       final InterpretedFunction applyTwice = d4rt.execute(source: source);
 
-      final result = d4rt.invokeInterpretedFunction(applyTwice, [2, squared]); // result is squared function, not expected
+      final result = d4rt.invokeInterpretedFunction(applyTwice, [2, squared]);
+      // result is squared function itself, not as expected
+      // it seems that it is not possible to extract information about the raw dart function (arity, type of parameters...)
+      // TODO: maybe delete this test, meanwhile is left here as sort of documentation of this limitation
 
       expect(result, equals(16));
     }, skip: true);
+
+    test('Function that receives a complex type', () {
+      final source = """
+      String joinAList(List arg) => arg.join();
+
+      main() => joinAList;
+      """;
+      final InterpretedFunction joinAList = d4rt.execute(source: source);
+      final list = [1, 2, "join me"];
+      final result = d4rt.invokeInterpretedFunction(joinAList, [list]);
+      expect(result, equals(list.join()));
+    });
   });
 }
