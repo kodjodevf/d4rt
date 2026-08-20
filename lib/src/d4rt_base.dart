@@ -4,6 +4,7 @@ import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/logger/logger.dart';
 import 'package:d4rt/src/bridge/bridged_types.dart';
+import 'package:d4rt/src/runtime_interfaces.dart';
 import 'package:d4rt/src/runtime_types.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/src/environment.dart';
