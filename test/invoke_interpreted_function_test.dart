@@ -154,5 +154,36 @@ void main() {
       final result = d4rt.invokeInterpretedFunction(joinAList, [list]);
       expect(result, equals(list.join()));
     });
+
+    test('Strong interpreted function integration documentation example', () {
+      T Function() bindFunction0<T>(D4rt d, InterpretedFunction fn) {
+        return () => d.invokeInterpretedFunction(fn, []);
+      }
+
+      T Function(A) bindFunction1<T, A>(D4rt d, InterpretedFunction fn) {
+        return (A a) => d.invokeInterpretedFunction(fn, [a]);
+      }
+
+      T Function(A, B) bindFunction2<T, A, B>(D4rt d, InterpretedFunction fn) {
+        return (A a, B b) => d.invokeInterpretedFunction(fn, [a, b]);
+      }
+
+      T Function(A, B, C) bindFunction3<T, A, B, C>(
+          D4rt d, InterpretedFunction fn) {
+        return (A a, B b, C c) => d.invokeInterpretedFunction(fn, [a, b, c]);
+      }
+
+      final source = """
+        String joinAList(List arg) => arg.join();
+
+        main() => joinAList;
+      """;
+
+      final InterpretedFunction interpretedFn = d4rt.execute(source: source);
+      final hostFN = bindFunction1(d4rt, interpretedFn);
+      final list = [1, 2, "join me"];
+
+      expect(list.join(), hostFN(list));
+    });
   });
 }
