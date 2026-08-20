@@ -89,7 +89,7 @@ print(result); // Hi, Alice!
 
 ### Interpreted function invocation
 
-Invoke interpreted functions from host dart code
+Invoke interpreted functions from host dart code:
 ```dart
 final interpreter = D4rt();
 
@@ -104,7 +104,7 @@ final result = d4rt.invokeInterpretedFunction(interpretedFn, [1,2]);
 print(result); // 3
 ```
 
-Promote interpreted functions to host functions to better integration
+Promote interpreted functions to host functions to better integration:
 
 ```dart
 final interpreter = D4rt();
