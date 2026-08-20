@@ -987,6 +987,32 @@ class D4rt {
     return nativeValue;
   }
 
+
+  dynamic invokeInterpretedFunction(
+    InterpretedFunction f,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
+    if (_visitor == null) {
+      throw RuntimeError(
+        "No visitor found. Call execute() first to establish execution context.",
+      );
+    }
+
+    final globalEnv = _visitor!.globalEnvironment;
+    final interpreterArgs = positionalArguments
+        .map((v) => _bridgeNativeValueToInterpreter(v, globalEnv))
+        .toList();
+    final interpreterNamedArgs = namedArguments.map(
+      (k, v) => MapEntry(k, _bridgeNativeValueToInterpreter(v, globalEnv)),
+    );
+    return _tryFunction(
+      () => f.call(_visitor!, interpreterArgs,interpreterNamedArgs,typeArguments),
+      "Error invoking interpreted function '${f}'",
+    );
+  }
+
   Object? _bridgeInterpreterValueToNative(Object? interpreterValue) {
     if (interpreterValue == null ||
         interpreterValue is String ||
