@@ -87,6 +87,45 @@ final result = interpreter.execute(
 print(result); // Hi, Alice!
 ```
 
+### Interpreted function invocation
+
+Invoke interpreted functions from host dart code:
+```dart
+final interpreter = D4rt();
+
+final interpretedFn = interpreter.execute( 
+  source: '''
+      int sum(int a, int b) => a+b;
+      main() => sum;
+  '''
+);
+
+final result = d4rt.invokeInterpretedFunction(interpretedFn, [1,2]);
+print(result); // 3
+```
+
+Promote interpreted functions to host functions to better integration:
+
+```dart
+final interpreter = D4rt();
+
+final interpretedFn = interpreter.execute( 
+  source: '''
+      int sum(int a, int b) => a+b;
+      main() => sum;
+  '''
+);
+
+T Function(A, B) bindFunction2<T, A, B>(D4rt d, InterpretedFunction fn) {
+  return (A a, B b) => d.invokeInterpretedFunction(fn, [a, b]);
+}
+
+final nativeFn = bindFunction2(interpreter,interpretedFn);
+print( nativeFn(1,2) ); // 3
+```
+
+Note that it is possible to pass `InterpretedFunction` as argumento to `invokeInterpretedFunction`, but pass a native function it is not currently supported.
+
 ### Code Introspection
 
 Analyze Dart code structure without execution:

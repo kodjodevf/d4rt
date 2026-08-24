@@ -4,6 +4,7 @@ import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/bridge/bridged_enum.dart';
 import 'package:d4rt/src/utils/logger/logger.dart';
 import 'package:d4rt/src/bridge/bridged_types.dart';
+import 'package:d4rt/src/runtime_interfaces.dart';
 import 'package:d4rt/src/runtime_types.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/src/environment.dart';
@@ -985,6 +986,32 @@ class D4rt {
     Logger.warn(
         "Passing unknown native type $nativeType directly to interpreter.");
     return nativeValue;
+  }
+
+
+  dynamic invokeInterpretedFunction(
+    InterpretedFunction f,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
+    if (_visitor == null) {
+      throw RuntimeError(
+        "No visitor found. Call execute() first to establish execution context.",
+      );
+    }
+
+    final globalEnv = _visitor!.globalEnvironment;
+    final interpreterArgs = positionalArguments
+        .map((v) => _bridgeNativeValueToInterpreter(v, globalEnv))
+        .toList();
+    final interpreterNamedArgs = namedArguments.map(
+      (k, v) => MapEntry(k, _bridgeNativeValueToInterpreter(v, globalEnv)),
+    );
+    return _tryFunction(
+      () => f.call(_visitor!, interpreterArgs,interpreterNamedArgs,typeArguments),
+      "Error invoking interpreted function '${f}'",
+    );
   }
 
   Object? _bridgeInterpreterValueToNative(Object? interpreterValue) {
