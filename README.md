@@ -11,6 +11,9 @@ It allows you to execute Dart code dynamically, bridge native classes, and build
 ## Features
 
 - **Dart interpreter**: Run Dart code dynamically at runtime.
+- **Precompiled scripts & AST caching**: Pre-parse and validate scripts with `compile()` and execute repeatedly with `executeCompiled()` for maximum performance.
+- **Execution limits & timeouts**: Protect against infinite loops and runaway CPU usage with `timeout` and `maxSteps` sandbox limits.
+- **Interactive CLI & REPL**: Run scripts directly or launch an interactive shell with `dart run d4rt`.
 - **Full generics support**: Complete support for generic classes, functions, and type constraints with runtime validation.
 - **Type bounds checking**: Enforce generic type constraints (e.g., `T extends num`) with dynamic resolution.
 - **Bridging system**: Expose your own Dart/Flutter classes, enums, and methods to interpreted code.
@@ -158,6 +161,84 @@ final interpreter = D4rt();
 interpreter.execute(source: 'int x = 10;');
 final result = interpreter.eval('x + 5'); // Returns 15
 ```
+
+### Precompiled Scripts & AST Caching
+
+For high-performance scenarios where the same script is executed multiple times, precompile the AST once to avoid re-parsing overhead:
+
+```dart
+final d4rt = D4rt();
+
+// Compile once
+final script = d4rt.compile(source: '''
+  int multiply(int a, int b) => a * b;
+''');
+
+// Execute repeatedly with zero parsing overhead
+final r1 = d4rt.executeCompiled(script, name: 'multiply', positionalArgs: [6, 7]); // 42
+final r2 = d4rt.executeCompiled(script, name: 'multiply', positionalArgs: [10, 5]); // 50
+```
+
+You can also enable automatic AST caching for repeated source strings:
+
+```dart
+final d4rt = D4rt(enableAstCache: true);
+// Subsequent execute() calls with identical source strings will reuse cached ASTs
+```
+
+### Execution Limits & Timeout Protection
+
+Protect against infinite loops and runaway CPU usage by setting maximum step quotas or execution timeouts:
+
+```dart
+final d4rt = D4rt();
+
+try {
+  d4rt.execute(
+    source: '''
+      void main() {
+        while (true) { /* infinite loop */ }
+      }
+    ''',
+    maxSteps: 1000, // Maximum execution steps
+    timeout: Duration(milliseconds: 500), // Maximum execution duration
+  );
+} on ExecutionLimitException catch (e) {
+  print('Step limit exceeded: $e');
+} on ExecutionTimeoutException catch (e) {
+  print('Timed out: $e');
+}
+```
+
+### Command-Line Interface (CLI) & Interactive REPL
+
+d4rt includes a built-in CLI runner and an interactive REPL shell:
+
+```sh
+# Run a Dart script file directly
+dart run d4rt path/to/script.dart [args...]
+
+# Start an interactive REPL session
+dart run d4rt repl
+# or simply
+dart run d4rt
+```
+
+Inside the REPL:
+```text
+==============================================
+  d4rt v0.2.2 - Interactive Dart REPL
+  Type :help for help, :exit or Ctrl+C to quit
+==============================================
+
+d4rt> var x = 10;
+d4rt> int double(int n) => n * 2;
+d4rt> double(x)
+=> 20
+d4rt> :exit
+Goodbye!
+```
+
 ## Security Sandboxing
 
 d4rt includes a comprehensive permission-based security system to prevent malicious code execution. By default, access to dangerous modules like `dart:io` and `dart:isolate` is blocked unless explicitly granted.

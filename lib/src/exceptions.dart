@@ -118,3 +118,29 @@ class PatternMatchException implements Exception {
 class SyncGeneratorYieldLimitReached implements Exception {
   const SyncGeneratorYieldLimitReached();
 }
+
+/// Exception thrown when script execution exceeds configured execution limits
+/// (such as max step count or loop iterations).
+class ExecutionLimitException extends RuntimeError {
+  /// The maximum number of steps allowed.
+  final int? maxSteps;
+
+  /// Creates a new execution limit exception.
+  ExecutionLimitException(super.message, {this.maxSteps});
+
+  @override
+  String toString() => 'ExecutionLimitException: $message';
+}
+
+/// Exception thrown when script execution exceeds a configured timeout duration.
+class ExecutionTimeoutException extends RuntimeError {
+  /// The timeout duration that was exceeded.
+  final Duration timeout;
+
+  /// Creates a new execution timeout exception.
+  ExecutionTimeoutException(super.message, {required this.timeout});
+
+  @override
+  String toString() => 'ExecutionTimeoutException: $message';
+}
+

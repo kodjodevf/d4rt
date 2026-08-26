@@ -20,6 +20,7 @@ import 'package:d4rt/src/introspection.dart';
 import 'package:d4rt/src/bridge/bridge_registry_manager.dart';
 import 'package:d4rt/src/bridge/library_tracking.dart';
 import 'package:d4rt/src/utils/platform/filesystem.dart';
+import 'package:d4rt/src/script.dart';
 
 /// The main D4rt interpreter class.
 ///
@@ -48,6 +49,10 @@ class D4rt {
   InterpreterVisitor? _visitor;
   final Map<Type, BridgedClass> _bridgedDefLookupByType = {};
   final Set<Permission> _grantedPermissions = {};
+  final Map<String, PrecompiledScript> _astCache = {};
+
+  /// Whether automatic AST caching is enabled for repeated source strings.
+  bool enableAstCache;
 
   /// Bridge registry manager for tracking and deduplication.
   late final BridgeRegistryManager bridgeManager;
@@ -65,8 +70,16 @@ class D4rt {
   ///
   /// Initializes the bridge registry manager with optional custom registry.
   /// By default, uses the global library registry for deduplication.
-  D4rt({LibraryRegistry? customRegistry}) {
+  ///
+  /// [customRegistry] Optional custom library registry.
+  /// [enableAstCache] Whether to cache parsed ASTs for identical source strings (defaults to false).
+  D4rt({LibraryRegistry? customRegistry, this.enableAstCache = false}) {
     bridgeManager = BridgeRegistryManager(customRegistry);
+  }
+
+  /// Clears the internal AST compilation cache.
+  void clearAstCache() {
+    _astCache.clear();
   }
 
   /// Registers a bridged enum definition for use in interpreted code.
@@ -167,7 +180,11 @@ class D4rt {
   }
 
   ModuleLoader _initModule(Map<String, String>? sources,
-      {String? basePath, bool allowFileSystemImports = false}) {
+      {String? basePath,
+      bool allowFileSystemImports = false,
+      Duration? timeout,
+      int? maxSteps,
+      DateTime? startTime}) {
     final moduleLoader = ModuleLoader(
       Environment(),
       sources ?? {},
@@ -178,8 +195,12 @@ class D4rt {
       allowFileSystemImports: allowFileSystemImports,
     );
     _visitor = InterpreterVisitor(
-        globalEnvironment: moduleLoader.globalEnvironment,
-        moduleLoader: moduleLoader);
+      globalEnvironment: moduleLoader.globalEnvironment,
+      moduleLoader: moduleLoader,
+      timeout: timeout,
+      maxSteps: maxSteps,
+      startTime: startTime,
+    );
     Stdlib(moduleLoader.globalEnvironment).register();
     return moduleLoader;
   }
@@ -306,6 +327,125 @@ class D4rt {
   ///   allowFileSystemImports: true,
   /// );
   /// ```
+  /// Compiles Dart source code into a [PrecompiledScript] without executing it.
+  ///
+  /// The resulting [PrecompiledScript] can be executed repeatedly with [executeCompiled],
+  /// avoiding the overhead of re-parsing and AST validation on every execution.
+  ///
+  /// [source] The Dart source code to compile.
+  /// [basePath] Base directory path for resolving relative filesystem imports.
+  /// [uri] Optional URI identifier for the script.
+  PrecompiledScript compile({
+    required String source,
+    String? basePath,
+    Uri? uri,
+  }) {
+    if (enableAstCache && _astCache.containsKey(source)) {
+      return _astCache[source]!;
+    }
+
+    final result = parseString(
+      content: source,
+      throwIfDiagnostics: false,
+      path: basePath != null ? basePathEntryFilePath(basePath) : null,
+      featureSet: FeatureSet.latestLanguageVersion(),
+    );
+
+    final errors = result.errors
+        .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
+        .toList();
+    if (errors.isNotEmpty) {
+      final errorMessages = errors.map((e) {
+        final location = result.lineInfo.getLocation(e.offset);
+        return "- ${e.message} (line ${location.lineNumber}, column ${location.columnNumber})";
+      }).join("\n");
+      Logger.error("Parsing errors for the direct source:\n$errorMessages");
+      throw SourceCodeException(
+          'Fatal parsing errors for the direct source:\n$errorMessages');
+    }
+
+    final script = PrecompiledScript(
+      compilationUnit: result.unit,
+      lineInfo: result.lineInfo,
+      source: source,
+      uri: uri,
+      basePath: basePath,
+    );
+
+    if (enableAstCache) {
+      _astCache[source] = script;
+    }
+
+    return script;
+  }
+
+  /// Executes a previously compiled [PrecompiledScript].
+  ///
+  /// [script] The precompiled script to execute.
+  /// [name] The name of the function to call. Defaults to 'main'.
+  /// [positionalArgs] Positional arguments to pass to the function.
+  /// [namedArgs] Named arguments to pass to the function.
+  /// [sources] Additional sources or modules available during execution.
+  /// [allowFileSystemImports] Whether to allow loading modules from the filesystem.
+  /// [timeout] Optional maximum execution duration.
+  /// [maxSteps] Optional maximum execution steps.
+  dynamic executeCompiled(
+    PrecompiledScript script, {
+    String name = 'main',
+    List<Object?>? positionalArgs,
+    Map<String, Object?>? namedArgs,
+    @Deprecated('Use positionalArgs instead') Object? args,
+    Map<String, String>? sources,
+    bool allowFileSystemImports = false,
+    Duration? timeout,
+    int? maxSteps,
+  }) {
+    if (args != null && positionalArgs != null) {
+      throw ArgumentError(
+          'Cannot use both "args" (deprecated) and "positionalArgs". Use only "positionalArgs".');
+    }
+    if (args != null) {
+      Logger.warn(
+          '[D4rt.executeCompiled] The "args" parameter is deprecated. Use "positionalArgs" instead.');
+      positionalArgs = [args];
+    }
+
+    final startTime = (timeout != null) ? DateTime.now() : null;
+    _moduleLoader = _initModule(
+      sources,
+      basePath: script.basePath,
+      allowFileSystemImports: allowFileSystemImports,
+      timeout: timeout,
+      maxSteps: maxSteps,
+      startTime: startTime,
+    );
+
+    return _executeCompilationUnit(
+      compilationUnit: script.compilationUnit,
+      name: name,
+      positionalArgs: positionalArgs,
+      namedArgs: namedArgs,
+      libraryUri: script.uri,
+      basePath: script.basePath,
+      allowFileSystemImports: allowFileSystemImports,
+      timeout: timeout,
+      maxSteps: maxSteps,
+      startTime: startTime,
+    );
+  }
+
+  /// Execute the given source code.
+  ///
+  /// [source] The source code to execute. If not provided, the main source will be loaded from the given library.
+  /// [name] The name of the function to call. Defaults to 'main'.
+  /// [positionalArgs] The positional arguments to pass to the function.
+  /// [namedArgs] The named arguments to pass to the function.
+  /// [library] The URI of the named function source to load.
+  /// [sources] The sources to load.
+  /// [basePath] Base directory path for resolving relative imports from the filesystem.
+  /// [allowFileSystemImports] Whether to allow loading modules from the filesystem.
+  /// [timeout] Optional maximum execution duration.
+  /// [maxSteps] Optional maximum execution steps.
   dynamic execute({
     String? source,
     String name = 'main',
@@ -316,6 +456,8 @@ class D4rt {
     Map<String, String>? sources,
     String? basePath,
     bool allowFileSystemImports = false,
+    Duration? timeout,
+    int? maxSteps,
   }) {
     // Handle deprecated args parameter
     if (args != null && positionalArgs != null) {
@@ -327,8 +469,16 @@ class D4rt {
           '[D4rt.execute] The "args" parameter is deprecated. Use "positionalArgs" instead.');
       positionalArgs = [args];
     }
-    _moduleLoader = _initModule(sources,
-        basePath: basePath, allowFileSystemImports: allowFileSystemImports);
+
+    final startTime = (timeout != null) ? DateTime.now() : null;
+    _moduleLoader = _initModule(
+      sources,
+      basePath: basePath,
+      allowFileSystemImports: allowFileSystemImports,
+      timeout: timeout,
+      maxSteps: maxSteps,
+      startTime: startTime,
+    );
     Logger.debug("[D4rt.execute] Starting execution. library: $library");
     CompilationUnit compilationUnit;
 
@@ -368,31 +518,70 @@ class D4rt {
       if (source == null) {
         throw Exception('Source content must be provide');
       }
-      Logger.debug(
-          "[D4rt.execute] Executing the provided source string directly (no source URI).");
-      final result = parseString(
-        content: source,
-        throwIfDiagnostics: false,
-        path: basePath != null ? basePathEntryFilePath(basePath) : null,
-        featureSet: FeatureSet.latestLanguageVersion(),
-      );
 
-      final errors = result.errors
-          .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
-          .toList();
-      if (errors.isNotEmpty) {
-        final errorMessages = errors.map((e) {
-          final location = result.lineInfo.getLocation(e.offset);
-          return "- ${e.message} (ligne ${location.lineNumber}, colonne ${location.columnNumber})";
-        }).join("\n");
-        Logger.error("Parsing errors for the direct source:\n$errorMessages");
-        throw SourceCodeException(
-            'Fatal parsing errors for the direct source:\n$errorMessages');
+      if (enableAstCache && _astCache.containsKey(source)) {
+        compilationUnit = _astCache[source]!.compilationUnit;
+      } else {
+        Logger.debug(
+            "[D4rt.execute] Executing the provided source string directly (no source URI).");
+        final result = parseString(
+          content: source,
+          throwIfDiagnostics: false,
+          path: basePath != null ? basePathEntryFilePath(basePath) : null,
+          featureSet: FeatureSet.latestLanguageVersion(),
+        );
+
+        final errors = result.errors
+            .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
+            .toList();
+        if (errors.isNotEmpty) {
+          final errorMessages = errors.map((e) {
+            final location = result.lineInfo.getLocation(e.offset);
+            return "- ${e.message} (ligne ${location.lineNumber}, colonne ${location.columnNumber})";
+          }).join("\n");
+          Logger.error("Parsing errors for the direct source:\n$errorMessages");
+          throw SourceCodeException(
+              'Fatal parsing errors for the direct source:\n$errorMessages');
+        }
+        compilationUnit = result.unit;
+        if (enableAstCache) {
+          _astCache[source] = PrecompiledScript(
+            compilationUnit: compilationUnit,
+            lineInfo: result.lineInfo,
+            source: source,
+            basePath: basePath,
+          );
+        }
+        Logger.debug("[D4rt.execute] Direct source string parsed successfully.");
       }
-      compilationUnit = result.unit;
-      Logger.debug("[D4rt.execute] Direct source string parsed successfully.");
     }
 
+    return _executeCompilationUnit(
+      compilationUnit: compilationUnit,
+      name: name,
+      positionalArgs: positionalArgs,
+      namedArgs: namedArgs,
+      libraryUri: library != null ? Uri.parse(library) : null,
+      basePath: basePath,
+      allowFileSystemImports: allowFileSystemImports,
+      timeout: timeout,
+      maxSteps: maxSteps,
+      startTime: startTime,
+    );
+  }
+
+  dynamic _executeCompilationUnit({
+    required CompilationUnit compilationUnit,
+    required String name,
+    List<Object?>? positionalArgs,
+    Map<String, Object?>? namedArgs,
+    Uri? libraryUri,
+    String? basePath,
+    bool allowFileSystemImports = false,
+    Duration? timeout,
+    int? maxSteps,
+    DateTime? startTime,
+  }) {
     final Environment executionEnvironment = _moduleLoader.globalEnvironment;
     for (var function in _nativeFunctions) {
       executionEnvironment.define(function.name, function);
@@ -407,11 +596,13 @@ class D4rt {
     _visitor = InterpreterVisitor(
         globalEnvironment: executionEnvironment,
         moduleLoader: _moduleLoader,
-        initiallibrary: library != null
-            ? Uri.parse(library)
-            : (allowFileSystemImports && basePath != null
+        initiallibrary: libraryUri ??
+            (allowFileSystemImports && basePath != null
                 ? basePathDirectoryUri(basePath)
-                : null));
+                : null),
+        timeout: timeout,
+        maxSteps: maxSteps,
+        startTime: startTime);
     Object? functionResult;
     try {
       Logger.debug(" [execute] Starting Pass 2: Interpretation");
@@ -431,9 +622,6 @@ class D4rt {
 
       Logger.debug(
           " [execute] Ensuring imported classes have constructors populated...");
-      // For each InterpretedClass in the environment that was imported but has no constructors,
-      // we need to ensure its constructors are available. This is done by checking the
-      // environment for classes and triggering their processing if needed.
       _ensureImportedClassesHaveConstructors(executionEnvironment, _visitor!);
       Logger.debug(" [execute] Finished ensuring imported classes are ready.");
 
@@ -679,10 +867,23 @@ class D4rt {
   /// d4rt.eval('int double(int x) => x * 2;');
   /// final doubled = d4rt.eval('double(counter)'); // Returns 4
   /// ```
-  dynamic eval(String expression) {
+  dynamic eval(
+    String expression, {
+    Duration? timeout,
+    int? maxSteps,
+  }) {
     if (_visitor == null || !_hasExecutedOnce) {
       throw RuntimeError(
           'eval() requires an existing execution context. Call execute() first.');
+    }
+
+    if (timeout != null || maxSteps != null) {
+      _visitor = InterpreterVisitor(
+        globalEnvironment: _moduleLoader.globalEnvironment,
+        moduleLoader: _moduleLoader,
+        timeout: timeout,
+        maxSteps: maxSteps,
+      );
     }
 
     Logger.debug("[D4rt.eval] Evaluating: $expression");
@@ -1010,7 +1211,7 @@ class D4rt {
     );
     return _tryFunction(
       () => f.call(_visitor!, interpreterArgs,interpreterNamedArgs,typeArguments),
-      "Error invoking interpreted function '${f}'",
+      "Error invoking interpreted function '$f'",
     );
   }
 

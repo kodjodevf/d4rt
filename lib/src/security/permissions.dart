@@ -331,6 +331,9 @@ class ProcessRunPermission extends Permission {
   }
 }
 
+/// Type alias for [ProcessRunPermission] for convenience.
+typedef ProcessPermission = ProcessRunPermission;
+
 /// Isolate permissions control isolate creation and communication.
 class IsolatePermission extends Permission {
   @override

@@ -52,3 +52,4 @@ export 'package:d4rt/src/bridge/bridge_helpers.dart';
 export 'package:d4rt/src/bridge/bridge_annotations.dart';
 export 'package:d4rt/src/bridge/library_tracking.dart';
 export 'package:d4rt/src/bridge/bridge_registry_manager.dart';
+export 'package:d4rt/src/script.dart';

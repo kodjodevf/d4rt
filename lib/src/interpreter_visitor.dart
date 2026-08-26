@@ -20,6 +20,21 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       currentSyncGeneratorYields; // Collect yields in sync* generators
   Set<String> _currentStatementLabels = {};
 
+  /// Maximum allowed execution duration (if any).
+  final Duration? timeout;
+
+  /// Maximum allowed execution steps (if any).
+  final int? maxSteps;
+
+  /// Execution start time for timeout calculations.
+  final DateTime? _startTime;
+
+  /// Total number of execution steps performed so far.
+  int _stepCount = 0;
+
+  /// Returns the current execution step count.
+  int get stepCount => _stepCount;
+
   /// Cache for the Invocation class for noSuchMethod support
   late final InterpretedClass? _invocationClass = _createInvocationClass();
 
@@ -27,14 +42,45 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     required this.globalEnvironment,
     required this.moduleLoader, // Accept ModuleLoader in the constructor
     Uri? initiallibrary, // New: Optional URI for the initial source
+    this.timeout,
+    this.maxSteps,
+    DateTime? startTime,
   })  : currentLibrary = initiallibrary,
+        _startTime = startTime ?? (timeout != null ? DateTime.now() : null),
         environment = globalEnvironment {
     if (initiallibrary != null) {
       Logger.debug(
           "[InterpreterVisitor] Initial source URI set to: $initiallibrary");
     }
-    // Initialize currentAsyncState if it's null and we are in an async context implicitly
-    // This might be more complex depending on how top-level async calls are handled
+  }
+
+  /// Checks if the execution has exceeded configured timeout or step limits.
+  /// Throws [ExecutionLimitException] or [ExecutionTimeoutException] if limits are exceeded.
+  void checkExecutionLimits() {
+    if (maxSteps != null) {
+      _stepCount++;
+      if (_stepCount > maxSteps!) {
+        throw ExecutionLimitException(
+          'Execution step limit of $maxSteps steps exceeded.',
+          maxSteps: maxSteps,
+        );
+      }
+    } else if (timeout != null) {
+      _stepCount++;
+    }
+
+    if (timeout != null && _startTime != null) {
+      // Check elapsed time periodically (every 50 steps) to reduce overhead
+      if (_stepCount % 50 == 0) {
+        final elapsed = DateTime.now().difference(_startTime);
+        if (elapsed > timeout!) {
+          throw ExecutionTimeoutException(
+            'Execution timed out after ${timeout!.inMilliseconds}ms.',
+            timeout: timeout!,
+          );
+        }
+      }
+    }
   }
 
   /// Create a minimal InterpretedClass for representing Invocation objects
@@ -214,6 +260,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     try {
       environment = blockEnvironment;
       for (final statement in statements) {
+        checkExecutionLimits();
         // Explicitly handle declarations within blocks
         if (statement is FunctionDeclaration ||
             statement is ClassDeclaration ||
@@ -4356,6 +4403,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   @override
   Object? visitWhileStatement(WhileStatement node) {
     while (true) {
+      checkExecutionLimits();
       // Handle condition being BridgedInstance<bool>
       final conditionValue = node.condition.accept<Object?>(this);
       bool conditionResult;
@@ -4410,6 +4458,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   @override
   Object? visitDoStatement(DoStatement node) {
     do {
+      checkExecutionLimits();
       try {
         // Execute the body first
         node.body.accept<Object?>(this);
@@ -4519,6 +4568,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
       // 3. Loop execution
       while (true) {
+        checkExecutionLimits();
         // 3.a Evaluate condition
         bool conditionResult = true; // Default to true if no condition
         if (condition != null) {
@@ -4635,6 +4685,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
 
         // Iterate over the native list
         for (final element in iterableValue) {
+          checkExecutionLimits();
           // Assign current element to the loop variable
           environment.assign(variableName, element);
 

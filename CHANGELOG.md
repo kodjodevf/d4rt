@@ -1,3 +1,19 @@
+  ## 0.2.3
+  - Full support for Dart extension types, representation fields, custom constructors, methods, and getters/setters.
+- **feat: Precompiled Scripts & AST Caching (`PrecompiledScript`)**
+  - Added `d4rt.compile(source: ...)` to pre-parse and validate scripts without immediate execution.
+  - Added `d4rt.executeCompiled(script, ...)` for high-performance repeated execution.
+  - Added automatic AST caching support (`D4rt(enableAstCache: true)`).
+- **feat: Sandbox Execution Limits & Timeout Protection**
+  - Added `timeout: Duration?` and `maxSteps: int?` parameters to `execute()`, `eval()`, and `executeCompiled()`.
+  - Added `ExecutionTimeoutException` and `ExecutionLimitException` to guard against infinite loops and CPU runaway.
+- **feat: Interactive CLI & REPL Tool**
+  - Added command-line executable (`bin/d4rt.dart` & `bin/interpreter.dart`) to run Dart scripts or start an interactive REPL (`dart run d4rt`).
+  - Interactive REPL features multiline statement input, environment persistence, and commands (`:help`, `:clear`, `:exit`).
+- **fix: Dart Web Platform Compatibility**
+  - Fixed runtime type resolution for `int` return types on Dart Web (#6).
+  - Fixed property access and method calls on native JS collections like `JSArray` from `String.split()` (#8).
+
 ## 0.2.2
 - **feat: Extension Type Support**
 - **New additional features & Bug fixes**
