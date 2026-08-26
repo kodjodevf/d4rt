@@ -3,12 +3,14 @@ import 'package:d4rt/src/stdlib/math/math.dart';
 import 'package:d4rt/src/stdlib/math/point.dart';
 import 'package:d4rt/src/stdlib/math/rectangle.dart';
 import 'package:d4rt/src/stdlib/math/random.dart';
+import 'package:d4rt/src/stdlib/math/mutable_rectangle.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'package:d4rt/src/stdlib/math/math.dart';
 export 'package:d4rt/src/stdlib/math/point.dart';
 export 'package:d4rt/src/stdlib/math/rectangle.dart';
 export 'package:d4rt/src/stdlib/math/random.dart';
+export 'package:d4rt/src/stdlib/math/mutable_rectangle.dart';
 
 class MathStdlib {
   static void register(Environment environment) {
@@ -16,5 +18,7 @@ class MathStdlib {
     environment.defineBridge(RandomMath.definition);
     environment.defineBridge(PointMath.definition);
     environment.defineBridge(RectangleMath.definition);
+    environment.defineBridge(MutableRectangleMath.definition);
   }
 }
+

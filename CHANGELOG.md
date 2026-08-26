@@ -1,4 +1,5 @@
-  ## 0.2.3
+## 0.2.3
+- **feat: Extension Type Support**
   - Full support for Dart extension types, representation fields, custom constructors, methods, and getters/setters.
 - **feat: Precompiled Scripts & AST Caching (`PrecompiledScript`)**
   - Added `d4rt.compile(source: ...)` to pre-parse and validate scripts without immediate execution.
@@ -10,6 +11,13 @@
 - **feat: Interactive CLI & REPL Tool**
   - Added command-line executable (`bin/d4rt.dart` & `bin/interpreter.dart`) to run Dart scripts or start an interactive REPL (`dart run d4rt`).
   - Interactive REPL features multiline statement input, environment persistence, and commands (`:help`, `:clear`, `:exit`).
+- **feat: Standard Library Enhancements & Completeness**
+  - Added `Stopwatch` in `dart:core` (`Stopwatch()`, `createStarted()`, `elapsed`, etc.).
+  - Added `DateTime.copyWith` in `dart:core`.
+  - Added `SplayTreeSet`, `DoubleLinkedQueue`, `UnmodifiableMapView`, and `UnmodifiableSetView` in `dart:collection`.
+  - Added `Int8List`, `Uint8ClampedList`, `Uint16List`, `Int32List`, `Uint32List`, and `Float64List` in `dart:typed_data`.
+  - Added `MutableRectangle` in `dart:math`.
+  - Hardened `Uri` constructors and methods against dynamic collection arguments.
 - **fix: Dart Web Platform Compatibility**
   - Fixed runtime type resolution for `int` return types on Dart Web (#6).
   - Fixed property access and method calls on native JS collections like `JSArray` from `String.split()` (#8).
@@ -17,7 +25,6 @@
 ## 0.2.2
 - **feat: Extension Type Support**
 - **New additional features & Bug fixes**
-
 ## 0.2.1
 - **feat: Enum Support Enhancement**
   - Add native-like `values` access for both interpreted and bridged enums.

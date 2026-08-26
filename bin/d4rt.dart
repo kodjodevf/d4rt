@@ -119,7 +119,10 @@ Future<void> _startRepl({required bool isDebug}) async {
 
     // REPL commands
     if (buffer.isEmpty) {
-      if (trimmed == ':exit' || trimmed == ':quit' || trimmed == 'exit' || trimmed == 'quit') {
+      if (trimmed == ':exit' ||
+          trimmed == ':quit' ||
+          trimmed == 'exit' ||
+          trimmed == 'quit') {
         stdout.writeln('Goodbye!');
         break;
       }
