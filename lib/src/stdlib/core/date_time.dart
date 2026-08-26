@@ -131,6 +131,19 @@ class DateTimeCore {
           'toIso8601String': (visitor, target, positionalArgs, namedArgs) {
             return (target as DateTime).toIso8601String();
           },
+          'copyWith': (visitor, target, positionalArgs, namedArgs) {
+            return (target as DateTime).copyWith(
+              year: namedArgs['year'] as int?,
+              month: namedArgs['month'] as int?,
+              day: namedArgs['day'] as int?,
+              hour: namedArgs['hour'] as int?,
+              minute: namedArgs['minute'] as int?,
+              second: namedArgs['second'] as int?,
+              millisecond: namedArgs['millisecond'] as int?,
+              microsecond: namedArgs['microsecond'] as int?,
+              isUtc: namedArgs['isUtc'] as bool?,
+            );
+          },
         },
         getters: {
           'year': (visitor, target) => (target as DateTime).year,

@@ -15,10 +15,11 @@ class UriCore {
               host: namedArgs['host'] as String?,
               port: namedArgs['port'] as int?,
               path: namedArgs['path'] as String?,
-              pathSegments: namedArgs['pathSegments'] as Iterable<String>?,
+              pathSegments:
+                  (namedArgs['pathSegments'] as Iterable?)?.map((e) => e.toString()),
               query: namedArgs['query'] as String?,
               queryParameters:
-                  namedArgs['queryParameters'] as Map<String, dynamic>?,
+                  (namedArgs['queryParameters'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)),
               fragment: namedArgs['fragment'] as String?,
             );
           },
@@ -117,10 +118,11 @@ class UriCore {
               host: namedArgs['host'] as String?,
               port: namedArgs['port'] as int?,
               path: namedArgs['path'] as String?,
-              pathSegments: namedArgs['pathSegments'] as Iterable<String>?,
+              pathSegments:
+                  (namedArgs['pathSegments'] as Iterable?)?.map((e) => e.toString()),
               query: namedArgs['query'] as String?,
               queryParameters:
-                  namedArgs['queryParameters'] as Map<String, dynamic>?,
+                  (namedArgs['queryParameters'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)),
               fragment: namedArgs['fragment'] as String?,
             );
           },
