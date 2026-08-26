@@ -30,6 +30,7 @@ import 'package:d4rt/src/stdlib/core/regexp.dart';
 import 'package:d4rt/src/stdlib/core/function.dart';
 import 'package:d4rt/src/stdlib/core/stopwatch.dart';
 import 'package:d4rt/src/stdlib/core/expando.dart';
+import 'package:d4rt/src/stdlib/core/rune_iterator.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'package:d4rt/src/stdlib/core/double.dart';
@@ -57,6 +58,7 @@ export 'package:d4rt/src/stdlib/core/function.dart';
 export 'package:d4rt/src/stdlib/core/exceptions.dart';
 export 'package:d4rt/src/stdlib/core/stopwatch.dart';
 export 'package:d4rt/src/stdlib/core/expando.dart';
+export 'package:d4rt/src/stdlib/core/rune_iterator.dart';
 
 class CoreStdlib {
   static void register(Environment environment) {
@@ -73,6 +75,7 @@ class CoreStdlib {
     environment.defineBridge(SinkCore.definition);
     environment.defineBridge(StringCore.definition);
     environment.defineBridge(RunesCore.definition);
+    environment.defineBridge(RuneIteratorCore.definition);
     environment.defineBridge(StringBufferCore.definition);
     environment.defineBridge(StringSinkCore.definition);
     environment.defineBridge(BigIntCore.definition);

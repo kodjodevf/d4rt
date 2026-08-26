@@ -11,6 +11,9 @@ import 'typed_data/uint16_list.dart';
 import 'typed_data/int32_list.dart';
 import 'typed_data/uint32_list.dart';
 import 'typed_data/float64_list.dart';
+import 'typed_data/int64_list.dart';
+import 'typed_data/uint64_list.dart';
+import 'typed_data/bytes_builder.dart';
 
 export 'typed_data/endian.dart';
 export 'typed_data/byte_buffer.dart';
@@ -24,6 +27,9 @@ export 'typed_data/uint16_list.dart';
 export 'typed_data/int32_list.dart';
 export 'typed_data/uint32_list.dart';
 export 'typed_data/float64_list.dart';
+export 'typed_data/int64_list.dart';
+export 'typed_data/uint64_list.dart';
+export 'typed_data/bytes_builder.dart';
 
 class TypedDataStdlib {
   static void register(Environment environment) {
@@ -39,5 +45,8 @@ class TypedDataStdlib {
     environment.defineBridge(Int32ListTypedData.definition);
     environment.defineBridge(Uint32ListTypedData.definition);
     environment.defineBridge(Float64ListTypedData.definition);
+    environment.defineBridge(Int64ListTypedData.definition);
+    environment.defineBridge(Uint64ListTypedData.definition);
+    environment.defineBridge(BytesBuilderTypedData.definition);
   }
 }

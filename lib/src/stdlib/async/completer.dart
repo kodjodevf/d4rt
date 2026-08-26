@@ -6,12 +6,16 @@ class CompleterAsync {
         nativeType: Completer,
         name: 'Completer',
         typeParameterCount: 1, // Completer<T>
+        isSubtypeOfFunc: (value) => value is Completer,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty || namedArgs.isNotEmpty) {
               throw RuntimeError('Completer constructor takes no arguments.');
             }
             return Completer<dynamic>();
+          },
+          'sync': (visitor, positionalArgs, namedArgs) {
+            return Completer<dynamic>.sync();
           },
         },
         staticMethods: {
