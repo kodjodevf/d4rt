@@ -7,6 +7,7 @@ import 'package:d4rt/src/stdlib/isolate.dart';
 import 'package:d4rt/src/stdlib/math.dart';
 import 'package:d4rt/src/stdlib/collection.dart';
 import 'package:d4rt/src/stdlib/typed_data.dart';
+import 'package:d4rt/src/stdlib/developer.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:d4rt/src/stdlib/stdlib_io.dart'
     if (dart.library.html) 'package:d4rt/src/stdlib/stdlib_web.dart';
@@ -485,7 +486,8 @@ class ModuleLoader {
         'io',
         'collection',
         'typed_data',
-        'isolate'
+        'isolate',
+        'developer'
       ];
       if (knownStdlibDartLibs.contains(uri.path)) {
         if (uri.path == 'convert') {
@@ -510,6 +512,10 @@ class ModuleLoader {
         }
         if (uri.path == 'isolate') {
           IsolateStdlib.register(globalEnvironment);
+          return '';
+        }
+        if (uri.path == 'developer') {
+          DeveloperStdlib.register(globalEnvironment);
           return '';
         }
         Logger.info(

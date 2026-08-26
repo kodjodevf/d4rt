@@ -1,4 +1,3 @@
-import 'package:d4rt/src/environment.dart';
 import 'package:d4rt/src/stdlib/convert/ascii.dart';
 import 'package:d4rt/src/stdlib/convert/base64.dart';
 import 'package:d4rt/src/stdlib/convert/byte_conversion.dart';
@@ -11,8 +10,7 @@ import 'package:d4rt/src/stdlib/convert/latin1.dart';
 import 'package:d4rt/src/stdlib/convert/line_splitter.dart';
 import 'package:d4rt/src/stdlib/convert/utf.dart';
 import 'dart:convert';
-import 'package:d4rt/src/callable.dart';
-import 'package:d4rt/src/exceptions.dart';
+import 'package:d4rt/d4rt.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'package:d4rt/src/stdlib/convert/ascii.dart';
@@ -89,25 +87,25 @@ class ConvertStdlib {
     environment.define(
         'base64Encode',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          if (arguments.length != 1) {
+          if (arguments.length != 1 || arguments[0] is! List) {
             throw RuntimeError(
                 'base64Encode requires one positional argument (List<int> source).');
           }
 
           return base64Encode(
-            (arguments[0] as List).cast<int>(),
+            (arguments[0] as List).toNativeList().cast<int>(),
           );
         }, arity: 1, name: 'base64Encode'));
     environment.define(
         'base64UrlEncode',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          if (arguments.length != 1) {
+          if (arguments.length != 1 || arguments[0] is! List) {
             throw RuntimeError(
                 'base64UrlEncode requires one positional argument (List<int> source).');
           }
 
           return base64UrlEncode(
-            (arguments[0] as List).cast<int>(),
+            (arguments[0] as List).toNativeList().cast<int>(),
           );
         }, arity: 1, name: 'base64UrlEncode'));
     environment.define(
