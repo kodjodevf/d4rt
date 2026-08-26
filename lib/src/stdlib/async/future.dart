@@ -58,7 +58,8 @@ class FutureAsync {
             }
             final eagerError = namedArgs.get<bool?>('eagerError') ?? false;
             final cleanUp = namedArgs.get<InterpretedFunction?>('cleanUp');
-            return Future.wait(futures.cast<Future>(),
+            final normalizedFutures = futures.map((e) => e is Future ? e : Future.value(e));
+            return Future.wait(normalizedFutures,
                 eagerError: eagerError,
                 cleanUp: cleanUp == null
                     ? null
@@ -69,7 +70,8 @@ class FutureAsync {
             if (futures is! Iterable) {
               throw RuntimeError('Future.any requires an Iterable.');
             }
-            return Future.any(futures.cast<Future>());
+            final normalizedFutures = futures.map((e) => e is Future ? e : Future.value(e));
+            return Future.any(normalizedFutures);
           },
           'forEach': (visitor, positionalArgs, namedArgs) {
             final elements = positionalArgs[0] as Iterable;

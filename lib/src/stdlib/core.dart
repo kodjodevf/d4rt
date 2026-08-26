@@ -29,6 +29,7 @@ import 'package:d4rt/src/stdlib/core/stack_trace.dart';
 import 'package:d4rt/src/stdlib/core/regexp.dart';
 import 'package:d4rt/src/stdlib/core/function.dart';
 import 'package:d4rt/src/stdlib/core/stopwatch.dart';
+import 'package:d4rt/src/stdlib/core/expando.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'package:d4rt/src/stdlib/core/double.dart';
@@ -55,6 +56,7 @@ export 'package:d4rt/src/stdlib/core/regexp.dart';
 export 'package:d4rt/src/stdlib/core/function.dart';
 export 'package:d4rt/src/stdlib/core/exceptions.dart';
 export 'package:d4rt/src/stdlib/core/stopwatch.dart';
+export 'package:d4rt/src/stdlib/core/expando.dart';
 
 class CoreStdlib {
   static void register(Environment environment) {
@@ -96,6 +98,7 @@ class CoreStdlib {
     environment.defineBridge(ArgumentErrorCore.definition);
     environment.defineBridge(RangeErrorCore.definition);
     environment.defineBridge(StopwatchCore.definition);
+    environment.defineBridge(ExpandoCore.definition);
     environment.define(
         'dynamic',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {

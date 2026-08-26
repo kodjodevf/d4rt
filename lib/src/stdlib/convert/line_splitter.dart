@@ -11,6 +11,17 @@ class LineSplitterConvert {
             return LineSplitter();
           },
         },
+        staticMethods: {
+          'split': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.isEmpty || positionalArgs[0] is! String) {
+              throw RuntimeError('LineSplitter.split requires a String argument.');
+            }
+            final lines = positionalArgs[0] as String;
+            final start = positionalArgs.length > 1 ? positionalArgs[1] as int : 0;
+            final end = positionalArgs.length > 2 ? positionalArgs[2] as int? : null;
+            return LineSplitter.split(lines, start, end).toList();
+          },
+        },
         methods: {
           'convert': (visitor, target, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 || positionalArgs[0] is! String) {

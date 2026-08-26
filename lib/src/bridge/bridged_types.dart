@@ -100,8 +100,11 @@ class BridgedClass implements RuntimeType {
       return isSubtypeOfFunc!.call(value);
     }
     if (other is BridgedClass) {
-      if (isSubtypeOfFunc != null) {
-        return isSubtypeOfFunc!.call(value as Type);
+      if (isSubtypeOfFunc != null && value != null) {
+        return isSubtypeOfFunc!.call(value);
+      }
+      if (other.isSubtypeOfFunc != null && value != null) {
+        return other.isSubtypeOfFunc!.call(value);
       }
       if (nativeType == other.nativeType || name == other.name) {
         return true;

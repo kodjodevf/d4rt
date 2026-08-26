@@ -5,10 +5,26 @@ class StackTraceCore {
         nativeType: StackTrace,
         name: 'StackTrace',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is StackTrace,
         nativeNames: [
           '_StringStackTrace',
+          '_StackTrace',
+          '_AsyncStackTrace',
+          '_EmptyStackTrace',
         ],
+        constructors: {
+          'fromString': (visitor, positionalArgs, namedArgs) {
+            return StackTrace.fromString(positionalArgs[0] as String);
+          },
+        },
+        staticGetters: {
+          'current': (visitor) => StackTrace.current,
+          'empty': (visitor) => StackTrace.empty,
+        },
         staticMethods: {
+          'fromString': (visitor, positionalArgs, namedArgs) {
+            return StackTrace.fromString(positionalArgs[0] as String);
+          },
           'current': (visitor, positionalArgs, namedArgs) {
             return StackTrace.current;
           },

@@ -202,6 +202,9 @@ class Environment {
         ?.value;
 
     if (bridgedClass == null) {
+      if (_enclosing != null) {
+        return _enclosing.toBridgedClass(nativeObject);
+      }
       throw RuntimeError(
           'Cannot bridge native object: No registered bridged class found for native type $nativeType.');
     }
@@ -551,6 +554,11 @@ class Environment {
             "[getRuntimeType] RuntimeType for primitive '$typeName' not found in environment.");
       }
     }
+
+    try {
+      final bridgedClass = toBridgedClass(value);
+      return bridgedClass;
+    } catch (_) {}
 
     return null; // Type couldn't be determined
   }

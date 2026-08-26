@@ -5938,7 +5938,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
                 if (isNullable && returnValue == null) {
                   showError = false;
                 }
-                if (declaredType.name == "void" && returnValue == null) {
+                if (declaredType.name == "void" &&
+                    (returnValue == null ||
+                        eDecl.functionExpression.body.isAsynchronous)) {
+                  showError = false;
+                }
+                if (eDecl.functionExpression.body.isAsynchronous &&
+                    returnValue is Future) {
                   showError = false;
                 }
                 if (declaredType.name == "Object" && returnValue != null) {
