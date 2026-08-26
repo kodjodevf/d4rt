@@ -31,6 +31,8 @@ import 'package:d4rt/src/stdlib/core/function.dart';
 import 'package:d4rt/src/stdlib/core/stopwatch.dart';
 import 'package:d4rt/src/stdlib/core/expando.dart';
 import 'package:d4rt/src/stdlib/core/rune_iterator.dart';
+import 'package:d4rt/src/stdlib/core/weak_reference.dart';
+import 'package:d4rt/src/stdlib/core/finalizer.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'package:d4rt/src/stdlib/core/double.dart';
@@ -59,6 +61,8 @@ export 'package:d4rt/src/stdlib/core/exceptions.dart';
 export 'package:d4rt/src/stdlib/core/stopwatch.dart';
 export 'package:d4rt/src/stdlib/core/expando.dart';
 export 'package:d4rt/src/stdlib/core/rune_iterator.dart';
+export 'package:d4rt/src/stdlib/core/weak_reference.dart';
+export 'package:d4rt/src/stdlib/core/finalizer.dart';
 
 class CoreStdlib {
   static void register(Environment environment) {
@@ -102,6 +106,8 @@ class CoreStdlib {
     environment.defineBridge(RangeErrorCore.definition);
     environment.defineBridge(StopwatchCore.definition);
     environment.defineBridge(ExpandoCore.definition);
+    environment.defineBridge(WeakReferenceCore.definition);
+    environment.defineBridge(FinalizerCore.definition);
     environment.define(
         'dynamic',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
