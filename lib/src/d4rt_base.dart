@@ -54,6 +54,9 @@ class D4rt {
   /// Whether automatic AST caching is enabled for repeated source strings.
   bool enableAstCache;
 
+  /// Optional callback to intercept print output globally for this interpreter.
+  void Function(String)? onPrint;
+
   /// Bridge registry manager for tracking and deduplication.
   late final BridgeRegistryManager bridgeManager;
 
@@ -73,7 +76,12 @@ class D4rt {
   ///
   /// [customRegistry] Optional custom library registry.
   /// [enableAstCache] Whether to cache parsed ASTs for identical source strings (defaults to false).
-  D4rt({LibraryRegistry? customRegistry, this.enableAstCache = false}) {
+  /// [onPrint] Optional callback to capture/redirect print output.
+  D4rt({
+    LibraryRegistry? customRegistry,
+    this.enableAstCache = false,
+    this.onPrint,
+  }) {
     bridgeManager = BridgeRegistryManager(customRegistry);
   }
 
@@ -184,7 +192,8 @@ class D4rt {
       bool allowFileSystemImports = false,
       Duration? timeout,
       int? maxSteps,
-      DateTime? startTime}) {
+      DateTime? startTime,
+      void Function(String)? onPrint}) {
     final moduleLoader = ModuleLoader(
       Environment(),
       sources ?? {},
@@ -200,6 +209,7 @@ class D4rt {
       timeout: timeout,
       maxSteps: maxSteps,
       startTime: startTime,
+      onPrint: onPrint ?? this.onPrint,
     );
     Stdlib(moduleLoader.globalEnvironment).register();
     return moduleLoader;
@@ -389,6 +399,7 @@ class D4rt {
   /// [allowFileSystemImports] Whether to allow loading modules from the filesystem.
   /// [timeout] Optional maximum execution duration.
   /// [maxSteps] Optional maximum execution steps.
+  /// [onPrint] Optional callback to capture/redirect print output.
   dynamic executeCompiled(
     PrecompiledScript script, {
     String name = 'main',
@@ -399,6 +410,7 @@ class D4rt {
     bool allowFileSystemImports = false,
     Duration? timeout,
     int? maxSteps,
+    void Function(String)? onPrint,
   }) {
     if (args != null && positionalArgs != null) {
       throw ArgumentError(
@@ -418,6 +430,7 @@ class D4rt {
       timeout: timeout,
       maxSteps: maxSteps,
       startTime: startTime,
+      onPrint: onPrint ?? this.onPrint,
     );
 
     return _executeCompilationUnit(
@@ -431,6 +444,7 @@ class D4rt {
       timeout: timeout,
       maxSteps: maxSteps,
       startTime: startTime,
+      onPrint: onPrint ?? this.onPrint,
     );
   }
 
@@ -446,6 +460,7 @@ class D4rt {
   /// [allowFileSystemImports] Whether to allow loading modules from the filesystem.
   /// [timeout] Optional maximum execution duration.
   /// [maxSteps] Optional maximum execution steps.
+  /// [onPrint] Optional callback to capture/redirect print output.
   dynamic execute({
     String? source,
     String name = 'main',
@@ -458,6 +473,7 @@ class D4rt {
     bool allowFileSystemImports = false,
     Duration? timeout,
     int? maxSteps,
+    void Function(String)? onPrint,
   }) {
     // Handle deprecated args parameter
     if (args != null && positionalArgs != null) {
@@ -478,6 +494,7 @@ class D4rt {
       timeout: timeout,
       maxSteps: maxSteps,
       startTime: startTime,
+      onPrint: onPrint ?? this.onPrint,
     );
     Logger.debug("[D4rt.execute] Starting execution. library: $library");
     CompilationUnit compilationUnit;
@@ -516,38 +533,37 @@ class D4rt {
       }
     } else {
       if (source == null) {
-        throw Exception('Source content must be provide');
+        throw RuntimeError('No source provided for execution.');
       }
+      Logger.debug(
+          "[D4rt.execute] Parsing direct source string (AST cache: $enableAstCache)...");
 
       if (enableAstCache && _astCache.containsKey(source)) {
+        Logger.debug("[D4rt.execute] Reusing cached AST for source.");
         compilationUnit = _astCache[source]!.compilationUnit;
       } else {
-        Logger.debug(
-            "[D4rt.execute] Executing the provided source string directly (no source URI).");
-        final result = parseString(
+        final parseResult = parseString(
           content: source,
           throwIfDiagnostics: false,
-          path: basePath != null ? basePathEntryFilePath(basePath) : null,
           featureSet: FeatureSet.latestLanguageVersion(),
         );
 
-        final errors = result.errors
+        final errors = parseResult.errors
             .where((e) => e.diagnosticCode.severity == DiagnosticSeverity.ERROR)
             .toList();
+
         if (errors.isNotEmpty) {
           final errorMessages = errors.map((e) {
-            final location = result.lineInfo.getLocation(e.offset);
-            return "- ${e.message} (ligne ${location.lineNumber}, colonne ${location.columnNumber})";
+            final location = parseResult.lineInfo.getLocation(e.offset);
+            return 'Line ${location.lineNumber}, Column ${location.columnNumber}: ${e.message}';
           }).join("\n");
-          Logger.error("Parsing errors for the direct source:\n$errorMessages");
-          throw SourceCodeException(
-              'Fatal parsing errors for the direct source:\n$errorMessages');
+          throw SourceCodeException('Parsing errors:\n$errorMessages');
         }
-        compilationUnit = result.unit;
+
+        compilationUnit = parseResult.unit;
         if (enableAstCache) {
           _astCache[source] = PrecompiledScript(
             compilationUnit: compilationUnit,
-            lineInfo: result.lineInfo,
             source: source,
             basePath: basePath,
           );
@@ -567,6 +583,7 @@ class D4rt {
       timeout: timeout,
       maxSteps: maxSteps,
       startTime: startTime,
+      onPrint: onPrint ?? this.onPrint,
     );
   }
 
@@ -581,6 +598,7 @@ class D4rt {
     Duration? timeout,
     int? maxSteps,
     DateTime? startTime,
+    void Function(String)? onPrint,
   }) {
     final Environment executionEnvironment = _moduleLoader.globalEnvironment;
     for (var function in _nativeFunctions) {
@@ -602,7 +620,8 @@ class D4rt {
                 : null),
         timeout: timeout,
         maxSteps: maxSteps,
-        startTime: startTime);
+        startTime: startTime,
+        onPrint: onPrint ?? this.onPrint);
     Object? functionResult;
     try {
       Logger.debug(" [execute] Starting Pass 2: Interpretation");
@@ -871,18 +890,20 @@ class D4rt {
     String expression, {
     Duration? timeout,
     int? maxSteps,
+    void Function(String)? onPrint,
   }) {
     if (_visitor == null || !_hasExecutedOnce) {
       throw RuntimeError(
           'eval() requires an existing execution context. Call execute() first.');
     }
 
-    if (timeout != null || maxSteps != null) {
+    if (timeout != null || maxSteps != null || onPrint != null) {
       _visitor = InterpreterVisitor(
         globalEnvironment: _moduleLoader.globalEnvironment,
         moduleLoader: _moduleLoader,
         timeout: timeout,
         maxSteps: maxSteps,
+        onPrint: onPrint ?? this.onPrint,
       );
     }
 

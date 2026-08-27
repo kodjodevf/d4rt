@@ -1,4 +1,22 @@
 ## 0.2.3
+- **feat: Record Supertype Bridge (`Record`)**
+  - Added `RecordCore` bridge in `dart:core` allowing `rec is Record` type checks and record inspection.
+- **feat: Collection View Bridge (`MapView`)**
+  - Added `MapViewCollection` in `dart:collection` for wrapping and delegating map operations.
+- **feat: Hashing Utilities (`Object.hash`, `Object.hashAll`, `Object.hashAllUnordered`)**
+  - Added modern Dart hashing utilities in `dart:core` for custom object hashing and composite key creation.
+- **feat: Microtask Scheduling & Zones (`scheduleMicrotask` & `Zone`)**
+  - Added `scheduleMicrotask(void Function() callback)` in `dart:async`.
+  - Added full bridge for `Zone` (`Zone.current`, `Zone.root`, `zone.run(...)`, `zone.runGuarded(...)`, `zone.inSameErrorZone(...)`, `zone[key]`).
+- **feat: Enhanced CLI Tooling (`bin/d4rt.dart`)**
+  - Added `--eval` / `-e "<code>"` flag to evaluate inline Dart scripts directly from the CLI.
+  - Added `--introspection` / `-i <file>` and `--json-introspection <file>` to inspect declaration metadata via CLI.
+- **feat: Output Redirection & Print Interception (`onPrint`)**
+  - Added `onPrint: void Function(String)?` callback to `D4rt(...)`, `d4rt.execute(...)`, `d4rt.eval(...)`, and `d4rt.executeCompiled(...)` for capturing/redirecting script output.
+- **feat: `dart:async` Zones & Error Boundaries (`runZoned` & `runZonedGuarded`)**
+  - Added global `runZoned` and `runZonedGuarded` in `dart:async` standard library.
+- **feat: Introspection JSON Serialization (`toMap` & `toJson`)**
+  - Added `toMap()` and `toJson()` to `IntrospectionResult`, `DeclarationInfo`, `FunctionInfo`, `ClassInfo`, `EnumInfo`, `VariableInfo`, and `ExtensionInfo`.
 - **feat: Extension Type Support**
   - Full support for Dart extension types, representation fields, custom constructors, methods, and getters/setters.
 - **feat: Precompiled Scripts & AST Caching (`PrecompiledScript`)**
@@ -12,12 +30,17 @@
   - Added command-line executable (`bin/d4rt.dart` & `bin/interpreter.dart`) to run Dart scripts or start an interactive REPL (`dart run d4rt`).
   - Interactive REPL features multiline statement input, environment persistence, and commands (`:help`, `:clear`, `:exit`).
 - **feat: Standard Library Enhancements & Completeness**
-  - Added `Stopwatch` in `dart:core` (`Stopwatch()`, `createStarted()`, `elapsed`, etc.).
+  - Added `dart:developer` library with `log(...)`, `debugger(...)`, `inspect(...)`, `postEvent(...)`, `registerExtension(...)`, `Timeline`, `TimelineTask`, `UserTag`, `Service`, and `ServiceExtensionResponse`.
+  - Added `Expando`, `RuneIterator`, `WeakReference`, `Finalizer`, and `Stopwatch` in `dart:core`.
+  - Extended `StackTrace` (`StackTrace.fromString(...)`, `StackTrace.current`, `StackTrace.empty`) in `dart:core`.
   - Added `DateTime.copyWith` in `dart:core`.
+  - Added `BytesBuilder`, `Int64List`, `Uint64List`, `Int8List`, `Uint8ClampedList`, `Uint16List`, `Int32List`, `Uint32List`, and `Float64List` in `dart:typed_data`.
+  - Added `Completer.sync()` in `dart:async`.
+  - Added `LineSplitter.split(...)` and hardened `base64Encode`/`base64UrlEncode` in `dart:convert`.
   - Added `SplayTreeSet`, `DoubleLinkedQueue`, `UnmodifiableMapView`, and `UnmodifiableSetView` in `dart:collection`.
-  - Added `Int8List`, `Uint8ClampedList`, `Uint16List`, `Int32List`, `Uint32List`, and `Float64List` in `dart:typed_data`.
   - Added `MutableRectangle` in `dart:math`.
   - Hardened `Uri` constructors and methods against dynamic collection arguments.
+  - Enhanced universal runtime type subtyping (`BridgedClass.isSubtypeOf`).
 - **fix: Dart Web Platform Compatibility**
   - Fixed runtime type resolution for `int` return types on Dart Web (#6).
   - Fixed property access and method calls on native JS collections like `JSArray` from `String.split()` (#8).

@@ -35,6 +35,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   /// Returns the current execution step count.
   int get stepCount => _stepCount;
 
+  /// Optional callback to intercept print output.
+  final void Function(String)? onPrint;
+
   /// Cache for the Invocation class for noSuchMethod support
   late final InterpretedClass? _invocationClass = _createInvocationClass();
 
@@ -45,6 +48,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     this.timeout,
     this.maxSteps,
     DateTime? startTime,
+    this.onPrint,
   })  : currentLibrary = initiallibrary,
         _startTime = startTime ?? (timeout != null ? DateTime.now() : null),
         environment = globalEnvironment {
@@ -3558,6 +3562,13 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             } on ReturnException catch (e) {
               return e.value;
             }
+          }
+
+          if (methodName == 'toString' && positionalArgs.isEmpty) {
+            return targetValue.toString();
+          }
+          if (methodName == '==' && positionalArgs.length == 1) {
+            return targetValue == positionalArgs[0];
           }
 
           // Otherwise, rethrow the original error

@@ -521,9 +521,13 @@ class User { ... }
 | Try/catch/finally              | ✅ Supported (multiple catch, on/type, rethrow, stacktrace)                    |
 | Imports                        | ✅ Supported (URIs, show/hide clauses for libraries defined in `sources`)      |
 | Generics                       | ✅ Full support (generic classes/functions, type constraints, runtime validation) |
+| Extension types                | ✅ Full support (representation fields, constructors, methods)                |
+| Precompiled scripts & AST Cache| ✅ Full support (`compile`, `executeCompiled`, AST caching)                   |
+| Execution limits & Timeouts    | ✅ Full support (`timeout`, `maxSteps`, sandbox exceptions)                   |
 | Operator overloading           | ✅ Full support                    |
 | FFI                            | 🚫 Not supported                                                               |
-| Isolates                       | ✅ Full support                                                               |
+| Isolates (`dart:isolate`)      | ✅ Full support                                                               |
+| Developer (`dart:developer`)   | ✅ Full support (Timeline, UserTag, Service, log, debugger, inspect)           |
 | Reflection/Mirrors             | 🚫 Not supported                                                               |
 | Records                        | ✅ Supported (positional, named, pattern matching)                             |
 | String interpolation           | ✅ Supported                                                                   |

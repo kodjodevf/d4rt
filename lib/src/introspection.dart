@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:d4rt/d4rt.dart';
 
@@ -11,6 +12,12 @@ sealed class DeclarationInfo {
   String get declarationType;
 
   const DeclarationInfo({required this.name});
+
+  /// Converts this declaration info into a map representation.
+  Map<String, dynamic> toMap();
+
+  /// Converts this declaration info into a JSON string.
+  String toJson() => jsonEncode(toMap());
 
   @override
   String toString() => '$declarationType: $name';
@@ -48,6 +55,18 @@ class FunctionInfo extends DeclarationInfo {
 
   @override
   String get declarationType => 'function';
+
+  @override
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'declarationType': declarationType,
+        'arity': arity,
+        'isAsync': isAsync,
+        'isGenerator': isGenerator,
+        if (returnType != null) 'returnType': returnType,
+        'parameterNames': parameterNames,
+        'namedParameterNames': namedParameterNames,
+      };
 
   @override
   String toString() {
@@ -98,6 +117,19 @@ class ClassInfo extends DeclarationInfo {
 
   @override
   String get declarationType => isAbstract ? 'abstract class' : 'class';
+
+  @override
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'declarationType': declarationType,
+        'superTypes': superTypes,
+        'interfaces': interfaces,
+        'mixins': mixins,
+        'methods': methods,
+        'fields': fields,
+        'constructors': constructors,
+        'isAbstract': isAbstract,
+      };
 
   @override
   String toString() {
@@ -154,6 +186,18 @@ class VariableInfo extends DeclarationInfo {
   }
 
   @override
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'declarationType': declarationType,
+        if (declaredType != null) 'declaredType': declaredType,
+        'valueType': valueType,
+        'value': value?.toString(),
+        'isFinal': isFinal,
+        'isConst': isConst,
+        'isLate': isLate,
+      };
+
+  @override
   String toString() {
     final typeStr = declaredType ?? valueType;
     return '$declarationType $name: $typeStr = $value';
@@ -178,6 +222,14 @@ class EnumInfo extends DeclarationInfo {
   String get declarationType => 'enum';
 
   @override
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'declarationType': declarationType,
+        'values': values,
+        'methods': methods,
+      };
+
+  @override
   String toString() => 'enum $name { ${values.join(', ')} }';
 }
 
@@ -197,6 +249,14 @@ class ExtensionInfo extends DeclarationInfo {
 
   @override
   String get declarationType => 'extension';
+
+  @override
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'declarationType': declarationType,
+        'onType': onType,
+        'methods': methods,
+      };
 
   @override
   String toString() => 'extension $name on $onType';
@@ -226,6 +286,18 @@ class IntrospectionResult {
     this.enums = const [],
     this.extensions = const [],
   });
+
+  /// Converts this introspection result into a map representation.
+  Map<String, dynamic> toMap() => {
+        'functions': functions.map((f) => f.toMap()).toList(),
+        'classes': classes.map((c) => c.toMap()).toList(),
+        'variables': variables.map((v) => v.toMap()).toList(),
+        'enums': enums.map((e) => e.toMap()).toList(),
+        'extensions': extensions.map((ext) => ext.toMap()).toList(),
+      };
+
+  /// Converts this introspection result into a JSON string.
+  String toJson() => jsonEncode(toMap());
 
   /// Get all declarations as a single list.
   List<DeclarationInfo> get all => [
@@ -346,12 +418,21 @@ class IntrospectionBuilder {
       final value = entry.value;
 
       // Skip internal/builtin names unless requested
-      if (!includeBuiltins && _isBuiltinName(name)) {
+      if (!includeBuiltins &&
+          (_isBuiltinName(name) || value is NativeFunction)) {
         continue;
       }
 
       if (value is InterpretedFunction) {
         functions.add(_buildFunctionInfo(name, value));
+      } else if (value is NativeFunction) {
+        if (includeBuiltins) {
+          functions.add(FunctionInfo(
+            name: name,
+            arity: value.arity,
+            parameterNames: const [],
+          ));
+        }
       } else if (value is InterpretedClass) {
         classes.add(_buildClassInfo(name, value));
       } else if (value is InterpretedEnum) {

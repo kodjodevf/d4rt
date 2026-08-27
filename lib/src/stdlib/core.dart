@@ -33,8 +33,10 @@ import 'package:d4rt/src/stdlib/core/expando.dart';
 import 'package:d4rt/src/stdlib/core/rune_iterator.dart';
 import 'package:d4rt/src/stdlib/core/weak_reference.dart';
 import 'package:d4rt/src/stdlib/core/finalizer.dart';
+import 'package:d4rt/src/stdlib/core/record.dart';
 
 export 'package:d4rt/src/environment.dart';
+export 'package:d4rt/src/stdlib/core/record.dart';
 export 'package:d4rt/src/stdlib/core/double.dart';
 export 'package:d4rt/src/stdlib/core/int.dart';
 export 'package:d4rt/src/stdlib/core/iterable.dart';
@@ -108,6 +110,7 @@ class CoreStdlib {
     environment.defineBridge(ExpandoCore.definition);
     environment.defineBridge(WeakReferenceCore.definition);
     environment.defineBridge(FinalizerCore.definition);
+    environment.defineBridge(RecordCore.definition);
     environment.define(
         'dynamic',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
@@ -121,7 +124,12 @@ class CoreStdlib {
     environment.define(
         'print',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          print(visitor.valueToString(arguments[0]));
+          final message = visitor.valueToString(arguments[0]);
+          if (visitor.onPrint != null) {
+            visitor.onPrint!(message);
+          } else {
+            print(message);
+          }
           return null;
         }, arity: 1, name: 'print'));
   }
