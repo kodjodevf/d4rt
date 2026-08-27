@@ -6,6 +6,7 @@ class TimerAsync {
         nativeType: Timer,
         name: 'Timer',
         nativeNames: ['TimerImpl'],
+        isSubtypeOfFunc: (value) => value is Timer,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 2 || namedArgs.isNotEmpty) {
@@ -27,7 +28,7 @@ class TimerAsync {
             });
           },
           'run': (visitor, positionalArgs, namedArgs) {
-            final callback = positionalArgs[1] as InterpretedFunction;
+            final callback = positionalArgs[0] as InterpretedFunction;
             return Timer.run(() {
               callback.call(visitor, []);
             });

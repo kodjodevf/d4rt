@@ -9,6 +9,7 @@ class DirectoryIo {
         nativeType: Directory,
         name: 'Directory',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Directory,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isEmpty || positionalArgs[0] is! String) {

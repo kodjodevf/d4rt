@@ -34,6 +34,17 @@ class AsyncStdlib {
           return null;
         }, arity: 1, name: 'scheduleMicrotask'));
 
+    // Register unawaited
+    environment.define(
+        'unawaited',
+        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+          if (arguments.isEmpty || arguments[0] is! Future) {
+            throw RuntimeError('unawaited requires a Future argument.');
+          }
+          unawaited(arguments[0] as Future);
+          return null;
+        }, arity: 1, name: 'unawaited'));
+
     // Register runZoned
     environment.define(
         'runZoned',

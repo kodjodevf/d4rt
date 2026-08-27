@@ -8,6 +8,7 @@ class FileSystemEntityIo {
         nativeType: FileSystemEntity,
         name: 'FileSystemEntity',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is FileSystemEntity,
         staticMethods: {
           'identical': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 2 ||

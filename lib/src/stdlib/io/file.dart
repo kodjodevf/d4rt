@@ -394,6 +394,7 @@ class FileIo {
         nativeType: File,
         name: 'File',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is File,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 || positionalArgs[0] is! String) {

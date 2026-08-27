@@ -6,6 +6,7 @@ class FutureAsync {
         nativeType: Future,
         name: 'Future',
         typeParameterCount: 1, // Future<T>
+        isSubtypeOfFunc: (value) => value is Future,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 &&
@@ -202,6 +203,7 @@ class TimeoutExceptionAsync {
   static BridgedClass get definition => BridgedClass(
         nativeType: TimeoutException,
         name: 'TimeoutException',
+        isSubtypeOfFunc: (value) => value is TimeoutException,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final message = positionalArgs.get<String?>(0);

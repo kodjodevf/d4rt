@@ -961,6 +961,67 @@ class HeaderValueIo {
       );
 }
 
+class HttpStatusIo {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: HttpStatus,
+        name: 'HttpStatus',
+        typeParameterCount: 0,
+        staticGetters: {
+          'continue_': (visitor) => HttpStatus.continue_,
+          'switchingProtocols': (visitor) => HttpStatus.switchingProtocols,
+          'ok': (visitor) => HttpStatus.ok,
+          'created': (visitor) => HttpStatus.created,
+          'accepted': (visitor) => HttpStatus.accepted,
+          'nonAuthoritativeInformation': (visitor) =>
+              HttpStatus.nonAuthoritativeInformation,
+          'noContent': (visitor) => HttpStatus.noContent,
+          'resetContent': (visitor) => HttpStatus.resetContent,
+          'partialContent': (visitor) => HttpStatus.partialContent,
+          'multipleChoices': (visitor) => HttpStatus.multipleChoices,
+          'movedPermanently': (visitor) => HttpStatus.movedPermanently,
+          'found': (visitor) => HttpStatus.found,
+          'movedTemporarily': (visitor) => HttpStatus.movedTemporarily,
+          'seeOther': (visitor) => HttpStatus.seeOther,
+          'notModified': (visitor) => HttpStatus.notModified,
+          'useProxy': (visitor) => HttpStatus.useProxy,
+          'temporaryRedirect': (visitor) => HttpStatus.temporaryRedirect,
+          'permanentRedirect': (visitor) => HttpStatus.permanentRedirect,
+          'badRequest': (visitor) => HttpStatus.badRequest,
+          'unauthorized': (visitor) => HttpStatus.unauthorized,
+          'paymentRequired': (visitor) => HttpStatus.paymentRequired,
+          'forbidden': (visitor) => HttpStatus.forbidden,
+          'notFound': (visitor) => HttpStatus.notFound,
+          'methodNotAllowed': (visitor) => HttpStatus.methodNotAllowed,
+          'notAcceptable': (visitor) => HttpStatus.notAcceptable,
+          'proxyAuthenticationRequired': (visitor) =>
+              HttpStatus.proxyAuthenticationRequired,
+          'requestTimeout': (visitor) => HttpStatus.requestTimeout,
+          'conflict': (visitor) => HttpStatus.conflict,
+          'gone': (visitor) => HttpStatus.gone,
+          'lengthRequired': (visitor) => HttpStatus.lengthRequired,
+          'preconditionFailed': (visitor) => HttpStatus.preconditionFailed,
+          'requestEntityTooLarge': (visitor) => HttpStatus.requestEntityTooLarge,
+          'requestUriTooLong': (visitor) => HttpStatus.requestUriTooLong,
+          'unsupportedMediaType': (visitor) => HttpStatus.unsupportedMediaType,
+          'requestedRangeNotSatisfiable': (visitor) =>
+              HttpStatus.requestedRangeNotSatisfiable,
+          'expectationFailed': (visitor) => HttpStatus.expectationFailed,
+          'unprocessableEntity': (visitor) => HttpStatus.unprocessableEntity,
+          'locked': (visitor) => HttpStatus.locked,
+          'failedDependency': (visitor) => HttpStatus.failedDependency,
+          'upgradeRequired': (visitor) => HttpStatus.upgradeRequired,
+          'tooManyRequests': (visitor) => HttpStatus.tooManyRequests,
+          'internalServerError': (visitor) => HttpStatus.internalServerError,
+          'notImplemented': (visitor) => HttpStatus.notImplemented,
+          'badGateway': (visitor) => HttpStatus.badGateway,
+          'serviceUnavailable': (visitor) => HttpStatus.serviceUnavailable,
+          'gatewayTimeout': (visitor) => HttpStatus.gatewayTimeout,
+          'httpVersionNotSupported': (visitor) =>
+              HttpStatus.httpVersionNotSupported,
+        },
+      );
+}
+
 class IoHttpStdlib {
   static void register(Environment environment) {
     environment.defineBridge(HttpClientIo.definition);
@@ -971,6 +1032,7 @@ class IoHttpStdlib {
     environment.defineBridge(ContentTypeIo.definition);
     environment.defineBridge(CookieIo.definition);
     environment.defineBridge(HeaderValueIo.definition);
+    environment.defineBridge(HttpStatusIo.definition);
 
     // Define constructor functions for credentials
     environment.define(

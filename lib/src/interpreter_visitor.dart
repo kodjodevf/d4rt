@@ -8618,6 +8618,16 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             }
           }
           break;
+        case 'Set':
+          final unwrapped = expressionValue is BridgedInstance
+              ? expressionValue.nativeObject
+              : expressionValue;
+          if (unwrapped is! Set) {
+            result = false;
+          } else {
+            result = true;
+          }
+          break;
         case 'Null':
           result = expressionValue == null;
           break;

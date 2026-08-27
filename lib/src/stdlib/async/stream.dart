@@ -16,6 +16,7 @@ class StreamAsync {
         nativeType: Stream,
         name: 'Stream',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is Stream,
         nativeNames: [
           '_MultiStream',
           '_ControllerStream',
@@ -505,6 +506,7 @@ class StreamSubscriptionAsync {
         nativeType: StreamSubscription,
         name: 'StreamSubscription',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is StreamSubscription,
         nativeNames: [
           '_ControllerSubscription',
           '_BroadcastSubscription',
@@ -620,6 +622,7 @@ class StreamTransformerAsync {
         nativeType: StreamTransformer,
         name: 'StreamTransformer',
         typeParameterCount: 2,
+        isSubtypeOfFunc: (value) => value is StreamTransformer,
         constructors: {
           'fromHandlers': (visitor, positionalArgs, namedArgs) {
             final handleData = namedArgs['handleData'] as InterpretedFunction?;
@@ -683,6 +686,7 @@ class StreamIteratorAsync {
         nativeType: StreamIterator,
         name: 'StreamIterator',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is StreamIterator,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 || positionalArgs[0] is! Stream) {

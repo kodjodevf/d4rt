@@ -1,4 +1,15 @@
 ## 0.2.3
+- **feat: `Link` Bridge, `HttpStatus` & `FileSystemEntity` Subtyping (`dart:io`)**
+  - Added `LinkIo` bridge in `dart:io` supporting symbolic link management (`create`, `target`, `update`, `resolveSymbolicLinks`, `rename`, `delete`, `exists`, `stat`) with permission checks.
+  - Added `HttpStatusIo` bridge in `dart:io` containing all standard HTTP status code constants (`HttpStatus.ok`, `HttpStatus.notFound`, etc.).
+  - Added unified `FileSystemEntity` subtyping and optimized bridge lookup ordering for `File`, `Directory`, and `Link`.
+- **feat: `dart:async` Reliability, `unawaited` & Subtyping**
+  - Fixed argument resolution in `Timer.run` callback invocation.
+  - Added global top-level function `unawaited(Future<void> future)` in `dart:async`.
+  - Added `isSubtypeOfFunc` subtyping bridges on `Future`, `Stream`, `StreamSubscription`, `StreamTransformer`, `StreamIterator`, `StreamController`, `Timer`, and `TimeoutException`.
+- **feat: `LinkedHashSet` Bridge & `Set` Subtyping (`dart:collection`)**
+  - Added `LinkedHashSetCollection` bridge in `dart:collection` with `LinkedHashSet()`, `LinkedHashSet.from()`, `LinkedHashSet.of()`, and `LinkedHashSet.identity()`.
+  - Added built-in `Set` type check support in `visitIsExpression` for both native and bridged sets (`set is Set`).
 - **feat: Geometry & Operators Bridge (`Rectangle.fromPoints`, `Point` operators in `dart:math`)**
   - Added `Rectangle.fromPoints(Point a, Point b)` in `dart:math`.
   - Added binary operator dispatch (`+`, `-`, `*`, etc.) for bridged instances in expressions.

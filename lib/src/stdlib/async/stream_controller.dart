@@ -16,6 +16,7 @@ class StreamControllerAsync {
         nativeType: StreamController,
         name: 'StreamController',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is StreamController,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final sync = namedArgs['sync'] as bool? ?? false;
