@@ -55,33 +55,30 @@ class ConvertStdlib {
     environment.define(
         'jsonEncode',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          if (arguments.length != 1) {
+          if (arguments.isEmpty) {
             throw RuntimeError(
-                'jsonEncode requires one positional argument (object).');
+                'jsonEncode requires at least one positional argument (object).');
           }
-          final toEncodableArg =
-              namedArguments['toEncodable'] as InterpretedFunction?;
+          final toEncodableArg = namedArguments['toEncodable'] ??
+              (arguments.length > 1 ? arguments[1] : null);
           return jsonEncode(
             arguments[0],
-            toEncodable: toEncodableArg == null
-                ? null
-                : (object) => toEncodableArg.call(visitor, [object]),
+            toEncodable: wrapJsonToEncodable(visitor, toEncodableArg),
           );
         }, arity: 1, name: 'jsonEncode'));
 
     environment.define(
         'jsonDecode',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          if (arguments.length != 1 || arguments[0] is! String) {
+          if (arguments.isEmpty || arguments[0] is! String) {
             throw RuntimeError(
                 'jsonDecode requires one positional argument (String source).');
           }
-          final reviverArg = namedArguments['reviver'] as InterpretedFunction?;
+          final reviverArg = namedArguments['reviver'] ??
+              (arguments.length > 1 ? arguments[1] : null);
           return jsonDecode(
             arguments[0] as String,
-            reviver: reviverArg == null
-                ? null
-                : (key, value) => reviverArg.call(visitor, [key, value]),
+            reviver: wrapJsonReviver(visitor, reviverArg),
           );
         }, arity: 1, name: 'jsonDecode'));
     environment.define(

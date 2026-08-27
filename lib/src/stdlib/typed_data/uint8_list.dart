@@ -18,6 +18,7 @@ class Uint8ListTypedData {
         name: 'Uint8List',
         nativeType: Uint8List,
         nativeNames: ['_Uint8ArrayView'],
+        isSubtypeOfFunc: (value) => value is Uint8List,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 && positionalArgs[0] is int) {

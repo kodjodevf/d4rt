@@ -96,28 +96,26 @@ class BridgedClass implements RuntimeType {
 
   @override
   bool isSubtypeOf(RuntimeType? other, {Object? value}) {
+    final actualValue = value is BridgedInstance ? value.nativeObject : value;
+
     if (other == null) {
-      if (isSubtypeOfFunc != null && value != null) {
-        return isSubtypeOfFunc!.call(value);
+      if (isSubtypeOfFunc != null && actualValue != null) {
+        return isSubtypeOfFunc!.call(actualValue);
       }
       return false;
     }
 
     if (other.name == 'dynamic' || other.name == 'Object') {
-      return value != null || other.name == 'dynamic';
+      return actualValue != null || other.name == 'dynamic';
     }
 
     if (other is AppliedRuntimeType) {
-      return isSubtypeOf(other.baseType, value: value);
-    }
-
-    if (isSubtypeOfFunc != null && value != null) {
-      return isSubtypeOfFunc!.call(value);
+      return isSubtypeOf(other.baseType, value: actualValue);
     }
 
     if (other is BridgedClass) {
-      if (other.isSubtypeOfFunc != null && value != null) {
-        return other.isSubtypeOfFunc!.call(value);
+      if (other.isSubtypeOfFunc != null && actualValue != null) {
+        return other.isSubtypeOfFunc!.call(actualValue);
       }
       if (nativeType == other.nativeType || name == other.name) {
         return true;

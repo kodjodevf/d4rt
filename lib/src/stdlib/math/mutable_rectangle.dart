@@ -1,11 +1,32 @@
 import 'dart:math';
 import 'package:d4rt/d4rt.dart';
 
+Point<num> _unwrapPoint(Object? obj) {
+  if (obj is BridgedInstance) {
+    return obj.nativeObject as Point<num>;
+  }
+  if (obj is Point<num>) {
+    return obj;
+  }
+  throw RuntimeError('Expected a Point, got ${obj?.runtimeType}');
+}
+
+Rectangle<num> _unwrapRectangle(Object? obj) {
+  if (obj is BridgedInstance) {
+    return obj.nativeObject as Rectangle<num>;
+  }
+  if (obj is Rectangle<num>) {
+    return obj;
+  }
+  throw RuntimeError('Expected a Rectangle, got ${obj?.runtimeType}');
+}
+
 class MutableRectangleMath {
   static BridgedClass get definition => BridgedClass(
         nativeType: MutableRectangle,
         name: 'MutableRectangle',
         typeParameterCount: 1, // MutableRectangle<T extends num>
+        isSubtypeOfFunc: (value) => value is MutableRectangle,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 4 ||
@@ -24,38 +45,35 @@ class MutableRectangleMath {
             );
           },
           'fromPoints': (visitor, positionalArgs, namedArgs) {
-            if (positionalArgs.length != 2 ||
-                positionalArgs[0] is! Point ||
-                positionalArgs[1] is! Point) {
+            if (positionalArgs.length != 2) {
               throw RuntimeError(
                   'MutableRectangle.fromPoints requires 2 Point arguments.');
             }
-            return MutableRectangle<num>.fromPoints(
-              positionalArgs[0] as Point<num>,
-              positionalArgs[1] as Point<num>,
-            );
+            final a = _unwrapPoint(positionalArgs[0]);
+            final b = _unwrapPoint(positionalArgs[1]);
+            return MutableRectangle<num>.fromPoints(a, b);
           },
         },
         methods: {
           'containsPoint': (visitor, target, positionalArgs, namedArgs) {
-            return (target as MutableRectangle)
-                .containsPoint(positionalArgs[0] as Point);
+            final other = _unwrapPoint(positionalArgs[0]);
+            return (target as MutableRectangle).containsPoint(other);
           },
           'containsRectangle': (visitor, target, positionalArgs, namedArgs) {
-            return (target as MutableRectangle)
-                .containsRectangle(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as MutableRectangle).containsRectangle(other);
           },
           'intersects': (visitor, target, positionalArgs, namedArgs) {
-            return (target as MutableRectangle)
-                .intersects(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as MutableRectangle).intersects(other);
           },
           'intersection': (visitor, target, positionalArgs, namedArgs) {
-            return (target as MutableRectangle)
-                .intersection(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as MutableRectangle).intersection(other);
           },
           'boundingBox': (visitor, target, positionalArgs, namedArgs) {
-            return (target as MutableRectangle)
-                .boundingBox(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as MutableRectangle).boundingBox(other);
           },
           'toString': (visitor, target, positionalArgs, namedArgs) {
             return (target as MutableRectangle).toString();

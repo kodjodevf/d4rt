@@ -1,6 +1,43 @@
 import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
 
+Object? Function(Object? nonEncodable)? wrapJsonToEncodable(
+    InterpreterVisitor visitor, Object? toEncodableArg) {
+  if (toEncodableArg is InterpretedFunction) {
+    return (object) => toEncodableArg.call(visitor, [object]);
+  } else if (toEncodableArg is Callable) {
+    return (object) => toEncodableArg.call(visitor, [object], {});
+  } else if (toEncodableArg is Function) {
+    return (object) => (toEncodableArg as dynamic)(object);
+  }
+  // Automatic fallback for InterpretedInstance defining toJson()
+  return (object) {
+    if (object is InterpretedInstance) {
+      final toJsonMethod = object.klass.methods['toJson'];
+      if (toJsonMethod != null) {
+        try {
+          return toJsonMethod.bind(object).call(visitor, [], {});
+        } on ReturnException catch (e) {
+          return e.value;
+        }
+      }
+    }
+    throw JsonUnsupportedObjectError(object);
+  };
+}
+
+Object? Function(Object? key, Object? value)? wrapJsonReviver(
+    InterpreterVisitor visitor, Object? reviverArg) {
+  if (reviverArg is InterpretedFunction) {
+    return (key, value) => reviverArg.call(visitor, [key, value]);
+  } else if (reviverArg is Callable) {
+    return (key, value) => reviverArg.call(visitor, [key, value], {});
+  } else if (reviverArg is Function) {
+    return (key, value) => (reviverArg as dynamic)(key, value);
+  }
+  return null;
+}
+
 class JsonCodecConvert {
   static BridgedClass get definition => BridgedClass(
         nativeType: JsonCodec,
@@ -8,35 +45,36 @@ class JsonCodecConvert {
         typeParameterCount: 0,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
-            final reviverArg = namedArgs['reviver'] as InterpretedFunction?;
-            final toEncodableArg =
-                namedArgs['toEncodable'] as InterpretedFunction?;
+            final reviverArg = namedArgs['reviver'] ??
+                (positionalArgs.isNotEmpty ? positionalArgs[0] : null);
+            final toEncodableArg = namedArgs['toEncodable'] ??
+                (positionalArgs.length > 1 ? positionalArgs[1] : null);
 
             return JsonCodec(
-              reviver: reviverArg == null
-                  ? null
-                  : (key, value) => reviverArg.call(visitor, [key, value]),
-              toEncodable: toEncodableArg == null
-                  ? null
-                  : (object) => toEncodableArg.call(visitor, [object]),
+              reviver: wrapJsonReviver(visitor, reviverArg),
+              toEncodable: wrapJsonToEncodable(visitor, toEncodableArg),
             );
           },
         },
         methods: {
           'encode': (visitor, target, positionalArgs, namedArgs) {
+            final toEncodableArg = namedArgs['toEncodable'] ??
+                (positionalArgs.length > 1 ? positionalArgs[1] : null);
+            if (toEncodableArg != null) {
+              return (target as JsonCodec).encode(
+                positionalArgs[0],
+                toEncodable: wrapJsonToEncodable(visitor, toEncodableArg),
+              );
+            }
             return (target as JsonCodec).encode(positionalArgs[0]);
           },
           'decode': (visitor, target, positionalArgs, namedArgs) {
             final source = positionalArgs[0] as String;
-            final reviverArg = namedArgs['reviver'] as InterpretedFunction? ??
-                (positionalArgs.length > 1
-                    ? positionalArgs[1] as InterpretedFunction?
-                    : null);
+            final reviverArg = namedArgs['reviver'] ??
+                (positionalArgs.length > 1 ? positionalArgs[1] : null);
             return (target as JsonCodec).decode(
               source,
-              reviver: reviverArg == null
-                  ? null
-                  : (key, value) => reviverArg.call(visitor, [key, value]),
+              reviver: wrapJsonReviver(visitor, reviverArg),
             );
           },
           'fuse': (visitor, target, positionalArgs, namedArgs) {
@@ -65,12 +103,21 @@ class JsonEncoderConvert {
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final toEncodableArg = positionalArgs.isNotEmpty
-                ? positionalArgs[0] as InterpretedFunction?
-                : null;
+                ? positionalArgs[0]
+                : namedArgs['toEncodable'];
             return JsonEncoder(
-              toEncodableArg == null
-                  ? null
-                  : (object) => toEncodableArg.call(visitor, [object]),
+              wrapJsonToEncodable(visitor, toEncodableArg),
+            );
+          },
+          'withIndent': (visitor, positionalArgs, namedArgs) {
+            final indent = positionalArgs.isNotEmpty
+                ? positionalArgs[0] as String?
+                : namedArgs['indent'] as String?;
+            final toEncodableArg = namedArgs['toEncodable'] ??
+                (positionalArgs.length > 1 ? positionalArgs[1] : null);
+            return JsonEncoder.withIndent(
+              indent,
+              wrapJsonToEncodable(visitor, toEncodableArg),
             );
           },
         },
@@ -121,12 +168,10 @@ class JsonDecoderConvert {
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final reviverArg = positionalArgs.isNotEmpty
-                ? positionalArgs[0] as InterpretedFunction?
-                : null;
+                ? positionalArgs[0]
+                : namedArgs['reviver'];
             return JsonDecoder(
-              reviverArg == null
-                  ? null
-                  : (key, value) => reviverArg.call(visitor, [key, value]),
+              wrapJsonReviver(visitor, reviverArg),
             );
           },
         },

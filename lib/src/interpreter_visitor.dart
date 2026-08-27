@@ -1431,6 +1431,31 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       }
     }
 
+    // Check for bridged class operator methods (e.g. Point +, Point -, Point *)
+    final bridgedInstance = leftOperandValue is BridgedInstance
+        ? leftOperandValue
+        : leftBridgedInstance.$1;
+    if (bridgedInstance != null && operatorName != '==' && operatorName != '!=') {
+      final method =
+          bridgedInstance.bridgedClass.findInstanceMethodAdapter(operatorName);
+      if (method != null) {
+        Logger.debug(
+            "[BinaryExpression] Found bridged class operator '$operatorName' on ${bridgedInstance.bridgedClass.name}. Calling...");
+        try {
+          final actualRight = rightOperandValue is BridgedInstance
+              ? rightOperandValue.nativeObject
+              : rightOperandValue;
+          return method(
+              this, bridgedInstance.nativeObject, [actualRight], {});
+        } on ReturnException catch (e) {
+          return e.value;
+        } catch (e) {
+          throw RuntimeError(
+              "Error executing bridged operator '$operatorName': $e");
+        }
+      }
+    }
+
     // Only try extension immediately for operators where standard checks might bypass it
     // (e.g., ==, !=, <, >, <=, >= which have generic fallbacks)
     bool checkExtensionEarly = [

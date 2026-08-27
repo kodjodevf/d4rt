@@ -1,4 +1,15 @@
 ## 0.2.3
+- **feat: Geometry & Operators Bridge (`Rectangle.fromPoints`, `Point` operators in `dart:math`)**
+  - Added `Rectangle.fromPoints(Point a, Point b)` in `dart:math`.
+  - Added binary operator dispatch (`+`, `-`, `*`, etc.) for bridged instances in expressions.
+  - Added robust unwrapping and `isSubtypeOfFunc` on `Point`, `Rectangle`, and `MutableRectangle`.
+- **feat: `TypedData` Supertype Bridge & Polymorphism (`dart:typed_data`)**
+  - Added `TypedDataBaseTypedData` bridge in `dart:typed_data` enabling `data is TypedData` type checks and direct property access (`buffer`, `lengthInBytes`, `offsetInBytes`, `elementSizeInBytes`).
+  - Improved `isSubtypeOf` resolution across all bridged classes when unwrapping `BridgedInstance` values.
+- **feat: Advanced JSON Support & Automatic `toJson()` Serialization (`dart:convert`)**
+  - Added `JsonEncoder.withIndent(indent, [toEncodable])` for pretty-printing JSON in interpreted code.
+  - Added automatic serialization of interpreted class instances defining `toJson()` in `jsonEncode(...)` and `JsonEncoder`.
+  - Added full closure compatibility for `toEncodable` and `reviver` callbacks.
 - **feat: Record Supertype Bridge (`Record`)**
   - Added `RecordCore` bridge in `dart:core` allowing `rec is Record` type checks and record inspection.
 - **feat: Collection View Bridge (`MapView`)**

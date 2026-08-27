@@ -1,11 +1,32 @@
 import 'dart:math';
 import 'package:d4rt/d4rt.dart';
 
+Point<num> _unwrapPoint(Object? obj) {
+  if (obj is BridgedInstance) {
+    return obj.nativeObject as Point<num>;
+  }
+  if (obj is Point<num>) {
+    return obj;
+  }
+  throw RuntimeError('Expected a Point, got ${obj?.runtimeType}');
+}
+
+Rectangle<num> _unwrapRectangle(Object? obj) {
+  if (obj is BridgedInstance) {
+    return obj.nativeObject as Rectangle<num>;
+  }
+  if (obj is Rectangle<num>) {
+    return obj;
+  }
+  throw RuntimeError('Expected a Rectangle, got ${obj?.runtimeType}');
+}
+
 class RectangleMath {
   static BridgedClass get definition => BridgedClass(
         nativeType: Rectangle,
         name: 'Rectangle',
         typeParameterCount: 1, // Rectangle<T extends num>
+        isSubtypeOfFunc: (value) => value is Rectangle,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 4 ||
@@ -23,27 +44,36 @@ class RectangleMath {
               positionalArgs[3] as num,
             );
           },
+          'fromPoints': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 2) {
+              throw RuntimeError(
+                  'Rectangle.fromPoints requires 2 Point arguments.');
+            }
+            final a = _unwrapPoint(positionalArgs[0]);
+            final b = _unwrapPoint(positionalArgs[1]);
+            return Rectangle.fromPoints(a, b);
+          },
         },
         methods: {
           'containsPoint': (visitor, target, positionalArgs, namedArgs) {
-            return (target as Rectangle)
-                .containsPoint(positionalArgs[0] as Point);
+            final other = _unwrapPoint(positionalArgs[0]);
+            return (target as Rectangle).containsPoint(other);
           },
           'containsRectangle': (visitor, target, positionalArgs, namedArgs) {
-            return (target as Rectangle)
-                .containsRectangle(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as Rectangle).containsRectangle(other);
           },
           'intersects': (visitor, target, positionalArgs, namedArgs) {
-            return (target as Rectangle)
-                .intersects(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as Rectangle).intersects(other);
           },
           'intersection': (visitor, target, positionalArgs, namedArgs) {
-            return (target as Rectangle)
-                .intersection(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as Rectangle).intersection(other);
           },
           'boundingBox': (visitor, target, positionalArgs, namedArgs) {
-            return (target as Rectangle)
-                .boundingBox(positionalArgs[0] as Rectangle);
+            final other = _unwrapRectangle(positionalArgs[0]);
+            return (target as Rectangle).boundingBox(other);
           },
         },
         getters: {

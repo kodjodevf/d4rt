@@ -6,6 +6,7 @@ class ByteDataTypedData {
         name: 'ByteData',
         nativeType: ByteData,
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is ByteData,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 &&

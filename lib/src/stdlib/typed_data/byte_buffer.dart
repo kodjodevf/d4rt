@@ -6,6 +6,7 @@ class ByteBufferTypedData {
         name: 'ByteBuffer',
         nativeType: ByteBuffer,
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is ByteBuffer,
         constructors: {},
         methods: {
           'asUint8List': (visitor, target, positionalArgs, namedArgs) {
