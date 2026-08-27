@@ -42,6 +42,7 @@ class ConvertStdlib {
     environment.defineBridge(JsonCodecConvert.definition);
     environment.defineBridge(JsonEncoderConvert.definition);
     environment.defineBridge(JsonDecoderConvert.definition);
+    environment.defineBridge(JsonUnsupportedObjectErrorConvert.definition);
     environment.defineBridge(CodecConvert.definition);
     environment.defineBridge(ConverterConvert.definition);
     environment.defineBridge(Latin1CodecConvert.definition);

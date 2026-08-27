@@ -6,6 +6,7 @@ class Utf8CodecConvert {
         nativeType: Utf8Codec,
         name: 'Utf8Codec',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Utf8Codec,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final allowMalformed =

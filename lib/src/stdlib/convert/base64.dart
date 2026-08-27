@@ -6,6 +6,7 @@ class Base64CodecConvert {
         nativeType: Base64Codec,
         name: 'Base64Codec',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Base64Codec,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty || namedArgs.isNotEmpty) {

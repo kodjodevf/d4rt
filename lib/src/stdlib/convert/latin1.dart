@@ -6,6 +6,7 @@ class Latin1CodecConvert {
         nativeType: Latin1Codec,
         name: 'Latin1Codec',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Latin1Codec,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final allowInvalid = namedArgs.get<bool?>('allowInvalid') ?? false;

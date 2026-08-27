@@ -6,6 +6,7 @@ class HtmlEscapeConvert {
         nativeType: HtmlEscape,
         name: 'HtmlEscape',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is HtmlEscape,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final mode = positionalArgs.isNotEmpty
@@ -52,8 +53,12 @@ class HtmlEscapeConvert {
           'cast': (visitor, target, positionalArgs, namedArgs) {
             return (target as HtmlEscape).cast<String, String>();
           },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as HtmlEscape).toString();
+          },
         },
         getters: {
+          'mode': (visitor, target) => (target as HtmlEscape).mode,
           'hashCode': (visitor, target) => (target as HtmlEscape).hashCode,
           'runtimeType': (visitor, target) =>
               (target as HtmlEscape).runtimeType,
@@ -64,6 +69,7 @@ class HtmlEscapeConvert {
         nativeType: HtmlEscapeMode,
         name: 'HtmlEscapeMode',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is HtmlEscapeMode,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return HtmlEscapeMode(
@@ -74,11 +80,29 @@ class HtmlEscapeConvert {
                 escapeSlash: namedArgs['escapeSlash'] as bool? ?? false);
           },
         },
-        methods: {},
+        staticGetters: {
+          'attribute': (visitor) => HtmlEscapeMode.attribute,
+          'element': (visitor) => HtmlEscapeMode.element,
+          'unknown': (visitor) => HtmlEscapeMode.unknown,
+          'sqAttribute': (visitor) => HtmlEscapeMode.sqAttribute,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as HtmlEscapeMode).toString();
+          },
+        },
         getters: {
-          'attribute': (visitor, target) => HtmlEscapeMode.attribute,
-          'element': (visitor, target) => HtmlEscapeMode.element,
-          'unknown': (visitor, target) => HtmlEscapeMode.unknown,
+          'escapeQuot': (visitor, target) =>
+              (target as HtmlEscapeMode).escapeQuot,
+          'escapeApos': (visitor, target) =>
+              (target as HtmlEscapeMode).escapeApos,
+          'escapeLtGt': (visitor, target) =>
+              (target as HtmlEscapeMode).escapeLtGt,
+          'escapeSlash': (visitor, target) =>
+              (target as HtmlEscapeMode).escapeSlash,
+          'hashCode': (visitor, target) => (target as HtmlEscapeMode).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as HtmlEscapeMode).runtimeType,
         },
       );
 

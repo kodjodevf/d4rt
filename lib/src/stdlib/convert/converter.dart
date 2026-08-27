@@ -6,6 +6,7 @@ class ConverterConvert {
         nativeType: Converter,
         name: 'Converter',
         typeParameterCount: 2, // Converter<S, T>
+        isSubtypeOfFunc: (value) => value is Converter,
         methods: {
           'convert': (visitor, target, positionalArgs, namedArgs) {
             return (target as Converter).convert(positionalArgs[0]);

@@ -101,11 +101,11 @@ class CoreStdlib {
     environment.defineBridge(NullCore.definition);
     environment.defineBridge(ComparableCore.definition);
     environment.defineBridge(SymbolCore.definition);
-    environment.defineBridge(ErrorCore.definition);
-    environment.defineBridge(AssertionErrorCore.definition);
-    environment.defineBridge(TypeErrorCore.definition);
-    environment.defineBridge(ArgumentErrorCore.definition);
     environment.defineBridge(RangeErrorCore.definition);
+    environment.defineBridge(ArgumentErrorCore.definition);
+    environment.defineBridge(TypeErrorCore.definition);
+    environment.defineBridge(AssertionErrorCore.definition);
+    environment.defineBridge(ErrorCore.definition);
     environment.defineBridge(StopwatchCore.definition);
     environment.defineBridge(ExpandoCore.definition);
     environment.defineBridge(WeakReferenceCore.definition);

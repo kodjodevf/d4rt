@@ -4,19 +4,29 @@ import 'package:d4rt/d4rt.dart';
 Object? Function(Object? nonEncodable)? wrapJsonToEncodable(
     InterpreterVisitor visitor, Object? toEncodableArg) {
   if (toEncodableArg is InterpretedFunction) {
-    return (object) => toEncodableArg.call(visitor, [object]);
+    return (object) {
+      final actual = object is BridgedInstance ? object.nativeObject : object;
+      return toEncodableArg.call(visitor, [actual]);
+    };
   } else if (toEncodableArg is Callable) {
-    return (object) => toEncodableArg.call(visitor, [object], {});
+    return (object) {
+      final actual = object is BridgedInstance ? object.nativeObject : object;
+      return toEncodableArg.call(visitor, [actual], {});
+    };
   } else if (toEncodableArg is Function) {
-    return (object) => (toEncodableArg as dynamic)(object);
+    return (object) {
+      final actual = object is BridgedInstance ? object.nativeObject : object;
+      return (toEncodableArg as dynamic)(actual);
+    };
   }
   // Automatic fallback for InterpretedInstance defining toJson()
   return (object) {
-    if (object is InterpretedInstance) {
-      final toJsonMethod = object.klass.methods['toJson'];
+    final actual = object is BridgedInstance ? object.nativeObject : object;
+    if (actual is InterpretedInstance) {
+      final toJsonMethod = actual.klass.methods['toJson'];
       if (toJsonMethod != null) {
         try {
-          return toJsonMethod.bind(object).call(visitor, [], {});
+          return toJsonMethod.bind(actual).call(visitor, [], {});
         } on ReturnException catch (e) {
           return e.value;
         }
@@ -43,6 +53,7 @@ class JsonCodecConvert {
         nativeType: JsonCodec,
         name: 'JsonCodec',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is JsonCodec,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final reviverArg = namedArgs['reviver'] ??
@@ -60,22 +71,28 @@ class JsonCodecConvert {
           'encode': (visitor, target, positionalArgs, namedArgs) {
             final toEncodableArg = namedArgs['toEncodable'] ??
                 (positionalArgs.length > 1 ? positionalArgs[1] : null);
+            final unwrapped = positionalArgs[0] is BridgedInstance
+                ? (positionalArgs[0] as BridgedInstance).nativeObject
+                : positionalArgs[0];
             if (toEncodableArg != null) {
               return (target as JsonCodec).encode(
-                positionalArgs[0],
+                unwrapped,
                 toEncodable: wrapJsonToEncodable(visitor, toEncodableArg),
               );
             }
-            return (target as JsonCodec).encode(positionalArgs[0]);
+            return (target as JsonCodec).encode(unwrapped);
           },
           'decode': (visitor, target, positionalArgs, namedArgs) {
             final source = positionalArgs[0] as String;
             final reviverArg = namedArgs['reviver'] ??
                 (positionalArgs.length > 1 ? positionalArgs[1] : null);
-            return (target as JsonCodec).decode(
-              source,
-              reviver: wrapJsonReviver(visitor, reviverArg),
-            );
+            if (reviverArg != null) {
+              return (target as JsonCodec).decode(
+                source,
+                reviver: wrapJsonReviver(visitor, reviverArg),
+              );
+            }
+            return (target as JsonCodec).decode(source);
           },
           'fuse': (visitor, target, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 ||
@@ -88,9 +105,11 @@ class JsonCodecConvert {
           },
         },
         getters: {
-          'encoder': (visitor, target) => (target as JsonCodec).encoder,
           'decoder': (visitor, target) => (target as JsonCodec).decoder,
+          'encoder': (visitor, target) => (target as JsonCodec).encoder,
           'inverted': (visitor, target) => (target as JsonCodec).inverted,
+          'hashCode': (visitor, target) => (target as JsonCodec).hashCode,
+          'runtimeType': (visitor, target) => (target as JsonCodec).runtimeType,
         },
       );
 }
@@ -100,6 +119,7 @@ class JsonEncoderConvert {
         nativeType: JsonEncoder,
         name: 'JsonEncoder',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is JsonEncoder,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final toEncodableArg = positionalArgs.isNotEmpty
@@ -123,7 +143,10 @@ class JsonEncoderConvert {
         },
         methods: {
           'convert': (visitor, target, positionalArgs, namedArgs) {
-            return (target as JsonEncoder).convert(positionalArgs[0]);
+            final unwrapped = positionalArgs[0] is BridgedInstance
+                ? (positionalArgs[0] as BridgedInstance).nativeObject
+                : positionalArgs[0];
+            return (target as JsonEncoder).convert(unwrapped);
           },
           'fuse': (visitor, target, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 ||
@@ -155,8 +178,16 @@ class JsonEncoderConvert {
           'cast': (visitor, target, positionalArgs, namedArgs) {
             return (target as JsonEncoder).cast<dynamic, String>();
           },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as JsonEncoder).toString();
+          },
         },
-        getters: {},
+        getters: {
+          'indent': (visitor, target) => (target as JsonEncoder).indent,
+          'hashCode': (visitor, target) => (target as JsonEncoder).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as JsonEncoder).runtimeType,
+        },
       );
 }
 
@@ -165,6 +196,7 @@ class JsonDecoderConvert {
         nativeType: JsonDecoder,
         name: 'JsonDecoder',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is JsonDecoder,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final reviverArg = positionalArgs.isNotEmpty
@@ -210,7 +242,53 @@ class JsonDecoderConvert {
           'cast': (visitor, target, positionalArgs, namedArgs) {
             return (target as JsonDecoder).cast<String, dynamic>();
           },
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as JsonDecoder).toString();
+          },
         },
-        getters: {},
+        getters: {
+          'hashCode': (visitor, target) => (target as JsonDecoder).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as JsonDecoder).runtimeType,
+        },
+      );
+}
+
+class JsonUnsupportedObjectErrorConvert {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: JsonUnsupportedObjectError,
+        name: 'JsonUnsupportedObjectError',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is JsonUnsupportedObjectError,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final unsupportedObject =
+                positionalArgs.isNotEmpty ? positionalArgs[0] : null;
+            final cause = namedArgs['cause'];
+            final partialResult = namedArgs['partialResult'] as String?;
+            return JsonUnsupportedObjectError(
+              unsupportedObject,
+              cause: cause,
+              partialResult: partialResult,
+            );
+          },
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) {
+            return (target as JsonUnsupportedObjectError).toString();
+          },
+        },
+        getters: {
+          'unsupportedObject': (visitor, target) =>
+              (target as JsonUnsupportedObjectError).unsupportedObject,
+          'cause': (visitor, target) =>
+              (target as JsonUnsupportedObjectError).cause,
+          'partialResult': (visitor, target) =>
+              (target as JsonUnsupportedObjectError).partialResult,
+          'hashCode': (visitor, target) =>
+              (target as JsonUnsupportedObjectError).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as JsonUnsupportedObjectError).runtimeType,
+        },
       );
 }

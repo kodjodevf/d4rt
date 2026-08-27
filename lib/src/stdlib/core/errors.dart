@@ -5,6 +5,7 @@ class ErrorCore {
         nativeType: Error,
         name: 'Error',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Error,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return Error();
@@ -34,6 +35,7 @@ class AssertionErrorCore {
         nativeType: AssertionError,
         name: 'AssertionError',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is AssertionError,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final message =
@@ -62,6 +64,7 @@ class TypeErrorCore {
         nativeType: TypeError,
         name: 'TypeError',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is TypeError,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return TypeError();
@@ -85,6 +88,7 @@ class ArgumentErrorCore {
         nativeType: ArgumentError,
         name: 'ArgumentError',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is ArgumentError,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return ArgumentError();
@@ -141,6 +145,7 @@ class RangeErrorCore {
         nativeType: RangeError,
         name: 'RangeError',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is RangeError,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final message =

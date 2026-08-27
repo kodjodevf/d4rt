@@ -6,6 +6,7 @@ class AsciiCodecConvert {
         nativeType: AsciiCodec,
         name: 'AsciiCodec',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is AsciiCodec,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final allowInvalid = namedArgs['allowInvalid'] as bool? ?? false;

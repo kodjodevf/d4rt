@@ -1,4 +1,9 @@
 ## 0.2.3
+- **feat: `HtmlEscapeMode` Static Getters, `JsonUnsupportedObjectError` & Codec Subtyping (`dart:convert`)**
+  - Added `staticGetters` on `HtmlEscapeMode` (`attribute`, `element`, `sqAttribute`, `unknown`) and instance mode properties (`escapeQuot`, `escapeApos`, `escapeLtGt`, `escapeSlash`).
+  - Added `JsonUnsupportedObjectErrorConvert` bridge with `cause`, `partialResult`, `unsupportedObject`, and `isSubtypeOfFunc`.
+  - Added robust closure and `BridgedInstance` unwrapping for `toEncodable` in `JsonCodec.encode`, `JsonEncoder.convert`, and global `jsonEncode`.
+  - Added subtyping bridges across `Codec`, `Converter`, `Encoding`, `JsonCodec`, `Utf8Codec`, `AsciiCodec`, `Latin1Codec`, `Base64Codec`, `HtmlEscape`, and `LineSplitter`.
 - **feat: `Link` Bridge, `HttpStatus` & `FileSystemEntity` Subtyping (`dart:io`)**
   - Added `LinkIo` bridge in `dart:io` supporting symbolic link management (`create`, `target`, `update`, `resolveSymbolicLinks`, `rename`, `delete`, `exists`, `stat`) with permission checks.
   - Added `HttpStatusIo` bridge in `dart:io` containing all standard HTTP status code constants (`HttpStatus.ok`, `HttpStatus.notFound`, etc.).

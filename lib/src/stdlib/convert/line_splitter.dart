@@ -6,6 +6,7 @@ class LineSplitterConvert {
         nativeType: LineSplitter,
         name: 'LineSplitter',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is LineSplitter,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return LineSplitter();

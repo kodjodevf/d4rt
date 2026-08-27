@@ -5,6 +5,7 @@ class ExceptionCore {
         nativeType: Exception,
         name: 'Exception',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Exception,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final message =
@@ -29,6 +30,7 @@ class FormatExceptionCore {
         nativeType: FormatException,
         name: 'FormatException',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is FormatException,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final message =

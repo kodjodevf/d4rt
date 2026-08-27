@@ -6,6 +6,7 @@ class CodecConvert {
         nativeType: Codec,
         name: 'Codec',
         typeParameterCount: 2, // Codec<S, T>
+        isSubtypeOfFunc: (value) => value is Codec,
         nativeNames: ['_FusedCodec'],
         methods: {
           'encode': (visitor, target, positionalArgs, namedArgs) {

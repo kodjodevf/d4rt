@@ -7,6 +7,7 @@ class EncodingConvert {
         nativeType: Encoding,
         name: 'Encoding',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Encoding || value is Codec,
         staticMethods: {
           'getByName': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
