@@ -6,6 +6,7 @@ class UnmodifiableListViewCollection {
         nativeType: UnmodifiableListView,
         name: 'UnmodifiableListView',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is UnmodifiableListView,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length != 1) {

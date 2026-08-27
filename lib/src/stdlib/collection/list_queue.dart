@@ -6,6 +6,7 @@ class ListQueueCollection {
         nativeType: ListQueue,
         name: 'ListQueue',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is ListQueue,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length > 1) {
@@ -34,6 +35,18 @@ class ListQueueCollection {
             }
             throw RuntimeError(
                 "Argument to ListQueue.from must be an Iterable.");
+          },
+          'of': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1) {
+              throw RuntimeError(
+                  "Constructor ListQueue.of(Iterable elements) expects one positional argument.");
+            }
+            final elements = positionalArgs[0];
+            if (elements is Iterable) {
+              return ListQueue<dynamic>.of(elements);
+            }
+            throw RuntimeError(
+                "Argument to ListQueue.of must be an Iterable.");
           },
         },
         methods: {

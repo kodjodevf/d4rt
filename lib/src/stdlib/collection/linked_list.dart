@@ -6,6 +6,7 @@ class LinkedListCollection {
         nativeType: LinkedList,
         name: 'LinkedList',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is LinkedList,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty || namedArgs.isNotEmpty) {
@@ -121,6 +122,8 @@ class LinkedListEntryCollection {
         nativeType: BridgedLinkedListEntry,
         name: 'LinkedListEntry',
         typeParameterCount: 0,
+        isSubtypeOfFunc: (value) =>
+            value is LinkedListEntry || value is BridgedLinkedListEntry,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length == 1 && namedArgs.isEmpty) {

@@ -7,6 +7,7 @@ class HashMapCollection {
         nativeType: HashMap,
         name: 'HashMap',
         typeParameterCount: 2,
+        isSubtypeOfFunc: (value) => value is HashMap,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty) {

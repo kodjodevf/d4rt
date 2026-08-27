@@ -6,6 +6,7 @@ class DoubleLinkedQueueCollection {
         nativeType: DoubleLinkedQueue,
         name: 'DoubleLinkedQueue',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is DoubleLinkedQueue,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             return DoubleLinkedQueue<dynamic>();
@@ -49,6 +50,12 @@ class DoubleLinkedQueueCollection {
           'removeLast': (visitor, target, positionalArgs, namedArgs) {
             return (target as DoubleLinkedQueue).removeLast();
           },
+          'firstEntry': (visitor, target, positionalArgs, namedArgs) {
+            return (target as DoubleLinkedQueue).firstEntry();
+          },
+          'lastEntry': (visitor, target, positionalArgs, namedArgs) {
+            return (target as DoubleLinkedQueue).lastEntry();
+          },
           'contains': (visitor, target, positionalArgs, namedArgs) {
             return (target as DoubleLinkedQueue).contains(positionalArgs[0]);
           },
@@ -73,6 +80,54 @@ class DoubleLinkedQueueCollection {
               (target as DoubleLinkedQueue).hashCode,
           'runtimeType': (visitor, target) =>
               (target as DoubleLinkedQueue).runtimeType,
+        },
+      );
+}
+
+class DoubleLinkedQueueEntryCollection {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: DoubleLinkedQueueEntry,
+        name: 'DoubleLinkedQueueEntry',
+        typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is DoubleLinkedQueueEntry,
+        constructors: {
+          '': (visitor, positionalArgs, namedArgs) {
+            final element =
+                positionalArgs.isNotEmpty ? positionalArgs[0] : null;
+            return DoubleLinkedQueueEntry<dynamic>(element);
+          },
+        },
+        methods: {
+          'append': (visitor, target, positionalArgs, namedArgs) {
+            (target as DoubleLinkedQueueEntry).append(positionalArgs[0]);
+            return null;
+          },
+          'prepend': (visitor, target, positionalArgs, namedArgs) {
+            (target as DoubleLinkedQueueEntry).prepend(positionalArgs[0]);
+            return null;
+          },
+          'remove': (visitor, target, positionalArgs, namedArgs) {
+            return (target as DoubleLinkedQueueEntry).remove();
+          },
+          'previousEntry': (visitor, target, positionalArgs, namedArgs) {
+            return (target as DoubleLinkedQueueEntry).previousEntry();
+          },
+          'nextEntry': (visitor, target, positionalArgs, namedArgs) {
+            return (target as DoubleLinkedQueueEntry).nextEntry();
+          },
+        },
+        getters: {
+          'element': (visitor, target) =>
+              (target as DoubleLinkedQueueEntry).element,
+          'hashCode': (visitor, target) =>
+              (target as DoubleLinkedQueueEntry).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as DoubleLinkedQueueEntry).runtimeType,
+        },
+        setters: {
+          'element': (visitor, target, value) {
+            (target as DoubleLinkedQueueEntry).element = value;
+          },
         },
       );
 }

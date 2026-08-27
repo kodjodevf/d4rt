@@ -6,6 +6,7 @@ class QueueCollection {
         nativeType: Queue,
         name: 'Queue',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is Queue,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty || namedArgs.isNotEmpty) {
@@ -27,6 +28,17 @@ class QueueCollection {
                   "The argument type 'Null' can't be assigned to the parameter type 'Iterable<dynamic>'.");
             }
             throw RuntimeError("Argument to Queue.from must be an Iterable.");
+          },
+          'of': (visitor, positionalArgs, namedArgs) {
+            if (positionalArgs.length != 1 || namedArgs.isNotEmpty) {
+              throw RuntimeError(
+                  "Constructor Queue.of(elements) expects one positional argument.");
+            }
+            final elements = positionalArgs[0];
+            if (elements is Iterable) {
+              return Queue<dynamic>.of(elements);
+            }
+            throw RuntimeError("Argument to Queue.of must be an Iterable.");
           },
         },
         methods: {

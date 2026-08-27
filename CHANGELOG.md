@@ -1,4 +1,15 @@
 ## 0.2.3
+- **feat: Dart 3.0+ Pattern Matching, Relational/Logical Patterns, `for-in` & `if-case` Collection Elements**
+  - Added support for `RelationalPattern` (`> 0`, `< 100`, `>= 18`, `<= 65`, `== 'admin'`, `!= null`) in switch expressions, switch statements, and `if-case`.
+  - Added support for `LogicalAndPattern` (`>= 0 && <= 100`) with cumulative variable binding.
+  - Added support for `ParenthesizedPattern` (`(pattern)`), `NullCheckPattern` (`pattern?`), `NullAssertPattern` (`pattern!`), and `CastPattern` (`pattern as Type`).
+  - Added `for-in` pattern destructuring loops (`for (final (x, y) in points)` and `await for (final (x, y) in stream)`).
+  - Added `for-in` pattern elements (`[for (final (k, v) in map.entries) '$k=$v']`) and `if-case` elements (`[if (user case (var name, var age) when age >= 18) name]`) in List, Set, and Map collection literals.
+  - Added guard clauses (`when` clause) in `SwitchPatternCase` for switch statements.
+- **feat: Closures, Capability & Stream Subtyping (`dart:isolate`)**
+  - Added subtyping bridges across `Capability`, `SendPort` (`sp is Capability`), `ReceivePort` (`rp is Stream`), `Isolate`, `RawReceivePort`, `RemoteError` (`err is Error`), and `TransferableTypedData`.
+  - Added support for all callable and closure types (`InterpretedFunction`, `Callable`, native `Function`) in `Isolate.run`, `ReceivePort.listen`, and `RawReceivePort` handlers.
+  - Reordered isolate bridge definitions ensuring `SendPort` and `ReceivePort` take precedence over abstract `Capability`.
 - **feat: `Flow` Bridge, `ServiceProtocolInfo`, Service Constants & Closures (`dart:developer`)**
   - Added `FlowDeveloper` bridge with `Flow.begin()`, `Flow.step(id)`, `Flow.end(id)`, and `flow.id`.
   - Added `ServiceProtocolInfoDeveloper` bridge exposing `serverUri` and `serverWebSocketUri`.
@@ -17,7 +28,11 @@
   - Fixed argument resolution in `Timer.run` callback invocation.
   - Added global top-level function `unawaited(Future<void> future)` in `dart:async`.
   - Added `isSubtypeOfFunc` subtyping bridges on `Future`, `Stream`, `StreamSubscription`, `StreamTransformer`, `StreamIterator`, `StreamController`, `Timer`, and `TimeoutException`.
-- **feat: `LinkedHashSet` Bridge & `Set` Subtyping (`dart:collection`)**
+- **feat: `HasNextIterator`, Queue `.of()` Constructors & Subtyping (`dart:collection`)**
+  - Added `HasNextIteratorCollection` bridge supporting `HasNextIterator(iterator)`, `hasNext` getter, and `next()` method.
+  - Added `.of(elements)` factory constructors to `QueueCollection`, `ListQueueCollection`, and `DoubleLinkedQueueCollection`.
+  - Added `DoubleLinkedQueueEntryCollection` bridge with `append`, `prepend`, `remove`, `previousEntry`, and `nextEntry`.
+  - Added `isSubtypeOfFunc` subtyping bridges across `Queue`, `ListQueue`, `DoubleLinkedQueue`, `HashMap`, `LinkedHashMap`, `SplayTreeMap`, `HashSet`, `LinkedHashSet`, `SplayTreeSet`, `LinkedList`, `LinkedListEntry`, `UnmodifiableListView`, `UnmodifiableMapView`, and `UnmodifiableSetView`.
   - Added `LinkedHashSetCollection` bridge in `dart:collection` with `LinkedHashSet()`, `LinkedHashSet.from()`, `LinkedHashSet.of()`, and `LinkedHashSet.identity()`.
   - Added built-in `Set` type check support in `visitIsExpression` for both native and bridged sets (`set is Set`).
 - **feat: Geometry & Operators Bridge (`Rectangle.fromPoints`, `Point` operators in `dart:math`)**

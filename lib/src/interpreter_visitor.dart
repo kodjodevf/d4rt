@@ -4578,6 +4578,15 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // Regular for-in loop - expect Iterable
         _executeForIn(loopParts.identifier, loopParts.iterable, node.body);
       }
+    } else if (loopParts is ForEachPartsWithPattern) {
+      // For-in loop with pattern: for (final (a, b) in list)
+      if (node.awaitKeyword != null) {
+        return _executeAwaitForInPattern(
+            loopParts.pattern, loopParts.iterable, node.body);
+      } else {
+        _executeForInPattern(
+            loopParts.pattern, loopParts.iterable, node.body);
+      }
     } else {
       // Should not happen with valid Dart code
       throw StateError('Unknown ForLoopParts type: ${loopParts.runtimeType}');
@@ -4869,6 +4878,135 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         }
       }
     }
+  }
+
+  void _executeForInPattern(
+      DartPattern pattern, Expression iterableExpression, Statement body) {
+    final expressionValue = iterableExpression.accept<Object?>(this);
+
+    Object? iterableValue;
+    if (toBridgedInstance(expressionValue).$2) {
+      final bridgedInstance = toBridgedInstance(expressionValue).$1!;
+      if (bridgedInstance.nativeObject is Iterable) {
+        iterableValue = bridgedInstance.nativeObject;
+      } else {
+        throw RuntimeError(
+            'Value used in for-in loop must be an Iterable, but got BridgedInstance containing ${bridgedInstance.nativeObject.runtimeType}');
+      }
+    } else if (expressionValue is Iterable) {
+      iterableValue = expressionValue;
+    } else {
+      throw RuntimeError(
+          'Value used in for-in loop must be an Iterable, but got ${expressionValue?.runtimeType}');
+    }
+
+    if (iterableValue is Iterable) {
+      for (final element in iterableValue) {
+        checkExecutionLimits();
+        final loopEnvironment = Environment(enclosing: environment);
+        final previousEnvironment = environment;
+        environment = loopEnvironment;
+
+        try {
+          _matchAndBind(pattern, element, loopEnvironment);
+
+          try {
+            body.accept<Object?>(this);
+          } on BreakException catch (e) {
+            Logger.debug(
+                "[ForInPattern] Caught BreakException (label: ${e.label}) with current labels: $_currentStatementLabels");
+            if (e.label == null || _currentStatementLabels.contains(e.label)) {
+              Logger.debug("[ForInPattern] Breaking loop.");
+              break;
+            } else {
+              Logger.debug("[ForInPattern] Rethrowing outer break...");
+              rethrow;
+            }
+          } on ContinueException catch (e) {
+            Logger.debug(
+                "[ForInPattern] Caught ContinueException (label: ${e.label}) with current labels: $_currentStatementLabels");
+            if (e.label == null || _currentStatementLabels.contains(e.label)) {
+              Logger.debug("[ForInPattern] Continuing loop.");
+              continue;
+            } else {
+              Logger.debug("[ForInPattern] Rethrowing outer continue...");
+              rethrow;
+            }
+          }
+        } finally {
+          environment = previousEnvironment;
+        }
+      }
+    }
+  }
+
+  Object? _executeAwaitForInPattern(
+      DartPattern pattern, Expression iterableExpression, Statement body) {
+    final expressionValue = iterableExpression.accept<Object?>(this);
+
+    Object? streamValue;
+    if (toBridgedInstance(expressionValue).$2) {
+      final bridgedInstance = toBridgedInstance(expressionValue).$1!;
+      if (bridgedInstance.nativeObject is Stream) {
+        streamValue = bridgedInstance.nativeObject;
+      } else {
+        throw RuntimeError(
+            'Value used in await for-in loop must be a Stream, but got BridgedInstance containing ${bridgedInstance.nativeObject.runtimeType}');
+      }
+    } else if (expressionValue is Stream) {
+      streamValue = expressionValue;
+    } else {
+      throw RuntimeError(
+          'Value used in await for-in loop must be a Stream, but got ${expressionValue?.runtimeType}');
+    }
+
+    if (streamValue is Stream) {
+      if (currentAsyncState == null) {
+        throw RuntimeError(
+            "await for statement can only be used inside async functions");
+      }
+
+      return AsyncSuspensionRequest(
+        _convertStreamAndProcessForInPattern(
+            pattern, streamValue, body),
+        currentAsyncState!,
+      );
+    }
+    return null;
+  }
+
+  Future<Object?> _convertStreamAndProcessForInPattern(
+      DartPattern pattern, Stream<Object?> stream, Statement body) async {
+    final List<Object?> elements = await stream.toList();
+    for (final element in elements) {
+      checkExecutionLimits();
+      final loopEnvironment = Environment(enclosing: environment);
+      final previousEnvironment = environment;
+      environment = loopEnvironment;
+
+      try {
+        _matchAndBind(pattern, element, loopEnvironment);
+
+        try {
+          body.accept<Object?>(this);
+        } on BreakException catch (e) {
+          if (e.label == null || _currentStatementLabels.contains(e.label)) {
+            break;
+          } else {
+            rethrow;
+          }
+        } on ContinueException catch (e) {
+          if (e.label == null || _currentStatementLabels.contains(e.label)) {
+            continue;
+          } else {
+            rethrow;
+          }
+        }
+      } finally {
+        environment = previousEnvironment;
+      }
+    }
+    return null;
   }
 
   // Add handler for VariableDeclarationList used in ForPartsWithDeclarations
@@ -5562,25 +5700,76 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         // else case handled by error throws above
       }
     } else if (element is IfElement) {
-      final conditionValue = element.expression.accept<Object?>(this);
-      bool conditionResult;
-      final bridgedInstance = toBridgedInstance(conditionValue);
-      if (conditionValue is bool) {
-        conditionResult = conditionValue;
-      } else if (bridgedInstance.$2 &&
-          bridgedInstance.$1?.nativeObject is bool) {
-        conditionResult = bridgedInstance.$1!.nativeObject as bool;
-      } else {
-        throw RuntimeError(
-            'Condition in collection \'if\' must be a boolean, but got ${conditionValue?.runtimeType}');
-      }
+      if (element.caseClause != null) {
+        final exprValue = element.expression.accept<Object?>(this);
+        final patternEnv = Environment(enclosing: environment);
+        final originalEnv = environment;
+        bool matched = false;
+        try {
+          _matchAndBind(
+              element.caseClause!.guardedPattern.pattern, exprValue, patternEnv);
 
-      if (conditionResult) {
-        _processCollectionElement(element.thenElement, collection,
-            isMap: isMap);
-      } else if (element.elseElement != null) {
-        _processCollectionElement(element.elseElement!, collection,
-            isMap: isMap);
+          bool guardPassed = true;
+          if (element.caseClause!.guardedPattern.whenClause != null) {
+            environment = patternEnv;
+            try {
+              final guardValue = element
+                  .caseClause!.guardedPattern.whenClause!.expression
+                  .accept<Object?>(this);
+              final bridgedGuard = toBridgedInstance(guardValue);
+              if (guardValue is bool) {
+                guardPassed = guardValue;
+              } else if (bridgedGuard.$2 &&
+                  bridgedGuard.$1?.nativeObject is bool) {
+                guardPassed = bridgedGuard.$1!.nativeObject as bool;
+              } else {
+                throw RuntimeError(
+                    "Guard condition must be a boolean, but was ${guardValue?.runtimeType}.");
+              }
+            } finally {
+              environment = originalEnv;
+            }
+          }
+
+          if (guardPassed) {
+            matched = true;
+            environment = patternEnv;
+            try {
+              _processCollectionElement(element.thenElement, collection,
+                  isMap: isMap);
+            } finally {
+              environment = originalEnv;
+            }
+          }
+        } on PatternMatchException {
+          matched = false;
+        }
+
+        if (!matched && element.elseElement != null) {
+          _processCollectionElement(element.elseElement!, collection,
+              isMap: isMap);
+        }
+      } else {
+        final conditionValue = element.expression.accept<Object?>(this);
+        bool conditionResult;
+        final bridgedInstance = toBridgedInstance(conditionValue);
+        if (conditionValue is bool) {
+          conditionResult = conditionValue;
+        } else if (bridgedInstance.$2 &&
+            bridgedInstance.$1?.nativeObject is bool) {
+          conditionResult = bridgedInstance.$1!.nativeObject as bool;
+        } else {
+          throw RuntimeError(
+              'Condition in collection \'if\' must be a boolean, but got ${conditionValue?.runtimeType}');
+        }
+
+        if (conditionResult) {
+          _processCollectionElement(element.thenElement, collection,
+              isMap: isMap);
+        } else if (element.elseElement != null) {
+          _processCollectionElement(element.elseElement!, collection,
+              isMap: isMap);
+        }
       }
     } else if (element is ForElement) {
       final loopParts = element.forLoopParts;
@@ -5618,6 +5807,25 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             }
           } finally {
             environment = previousEnvironment;
+          }
+        } else {
+          throw RuntimeError(
+              'Value used in collection \'for-in\' must be an Iterable, but got ${iterableValue?.runtimeType}');
+        }
+      } else if (loopParts is ForEachPartsWithPattern) {
+        final iterableValue = loopParts.iterable.accept<Object?>(this);
+        if (iterableValue is Iterable) {
+          for (final item in iterableValue) {
+            final loopEnvironment = Environment(enclosing: environment);
+            final previousEnvironment = environment;
+            environment = loopEnvironment;
+            try {
+              _matchAndBind(loopParts.pattern, item, loopEnvironment);
+              _processCollectionElement(element.body, collection,
+                  isMap: isMap);
+            } finally {
+              environment = previousEnvironment;
+            }
           }
         } else {
           throw RuntimeError(
@@ -9535,52 +9743,53 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           }
           statementsToExecute = member.statements;
         } else if (member is SwitchPatternCase) {
-          // Try explicit cast to potentially help the linter
-          final pattern = member.guardedPattern.pattern;
-          if (pattern is ConstantPattern) {
-            // This handles 'case <constant>:'
-            if (!matched) {
-              // Access expression from the ConstantPattern
-              final caseValue = pattern.expression.accept<Object?>(this);
-              Logger.debug(
-                  "[Switch] Checking pattern case value: $caseValue against $switchValue");
-              if (switchValue == caseValue) {
-                matched = true;
-                execute = true; // Start executing
-                Logger.debug("[Switch] Matched pattern case: $caseValue");
+          if (!matched) {
+            final pattern = member.guardedPattern.pattern;
+            final tempEnvironment = Environment(enclosing: environment);
+            try {
+              _matchAndBind(pattern, switchValue, tempEnvironment);
+
+              bool guardPassed = true;
+              if (member.guardedPattern.whenClause != null) {
+                final previousEnv = environment;
+                environment = tempEnvironment;
+                try {
+                  final guardValue = member
+                      .guardedPattern.whenClause!.expression
+                      .accept<Object?>(this);
+                  final bridgedGuard = toBridgedInstance(guardValue);
+                  if (guardValue is bool) {
+                    guardPassed = guardValue;
+                  } else if (bridgedGuard.$2 &&
+                      bridgedGuard.$1?.nativeObject is bool) {
+                    guardPassed = bridgedGuard.$1!.nativeObject as bool;
+                  } else {
+                    throw RuntimeError(
+                        "Switch case guard condition must evaluate to a boolean.");
+                  }
+                } finally {
+                  environment = previousEnv;
+                }
               }
-            }
-            statementsToExecute = member.statements;
-          } else {
-            // Handle other pattern types using our improved _matchAndBind function
-            if (!matched) {
-              // Create a temporary environment for pattern matching in switch
-              final tempEnvironment = Environment(enclosing: environment);
-              try {
-                _matchAndBind(pattern, switchValue, tempEnvironment);
-                // If we get here, the pattern matched
+
+              if (guardPassed) {
                 matched = true;
                 execute = true;
-                // Copy any bound variables to the current environment
-                // In a full implementation, we might want to handle variable scoping more carefully
                 for (final name in tempEnvironment.values.keys) {
                   try {
                     final value = tempEnvironment.get(name);
                     environment.define(name, value);
-                  } catch (e) {
-                    // Variable might already exist or other issue, ignore for now
-                  }
+                  } catch (_) {}
                 }
                 Logger.debug(
                     "[Switch] Matched pattern case: ${pattern.runtimeType}");
-              } on PatternMatchException catch (e) {
-                Logger.debug(
-                    "[Switch] Pattern ${pattern.runtimeType} did not match: ${e.message}");
-                // Pattern didn't match, continue to next case
               }
+            } on PatternMatchException catch (e) {
+              Logger.debug(
+                  "[Switch] Pattern ${pattern.runtimeType} did not match: ${e.message}");
             }
-            statementsToExecute = member.statements;
           }
+          statementsToExecute = member.statements;
         } else if (member is SwitchDefault) {
           Logger.debug("[Switch] Reached default case.");
           // Execute default only if no previous case matched
@@ -10299,6 +10508,72 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
               "Logical OR pattern: neither left (${leftError.message}) nor right (${rightError.message}) pattern matched.");
         }
       }
+    } else if (pattern is LogicalAndPattern) {
+      Logger.debug(
+          "[_matchAndBind] Matching logical AND pattern against value ${value?.runtimeType}");
+      _matchAndBind(pattern.leftOperand, value, environment);
+      _matchAndBind(pattern.rightOperand, value, environment);
+      Logger.debug("[_matchAndBind] Logical AND pattern matched successfully.");
+    } else if (pattern is RelationalPattern) {
+      final operandValue = pattern.operand.accept<Object?>(this);
+      final operatorType = pattern.operator.type;
+      bool matches = false;
+      if (operatorType == TokenType.EQ_EQ) {
+        matches = value == operandValue;
+      } else if (operatorType == TokenType.BANG_EQ) {
+        matches = value != operandValue;
+      } else if (value is num && operandValue is num) {
+        if (operatorType == TokenType.GT) {
+          matches = value > operandValue;
+        } else if (operatorType == TokenType.LT) {
+          matches = value < operandValue;
+        } else if (operatorType == TokenType.GT_EQ) {
+          matches = value >= operandValue;
+        } else if (operatorType == TokenType.LT_EQ) {
+          matches = value <= operandValue;
+        }
+      } else if (value is Comparable && operandValue is Comparable) {
+        final cmp = value.compareTo(operandValue);
+        if (operatorType == TokenType.GT) {
+          matches = cmp > 0;
+        } else if (operatorType == TokenType.LT) {
+          matches = cmp < 0;
+        } else if (operatorType == TokenType.GT_EQ) {
+          matches = cmp >= 0;
+        } else if (operatorType == TokenType.LT_EQ) {
+          matches = cmp <= 0;
+        }
+      } else {
+        throw PatternMatchException(
+            "Relational pattern cannot compare ${value?.runtimeType} and ${operandValue?.runtimeType}");
+      }
+      if (!matches) {
+        throw PatternMatchException(
+            "Relational pattern ${pattern.operator.lexeme} $operandValue failed for value $value");
+      }
+    } else if (pattern is ParenthesizedPattern) {
+      _matchAndBind(pattern.pattern, value, environment);
+    } else if (pattern is NullCheckPattern) {
+      if (value == null) {
+        throw PatternMatchException(
+            "Null check pattern failed: value is null");
+      }
+      _matchAndBind(pattern.pattern, value, environment);
+    } else if (pattern is NullAssertPattern) {
+      if (value == null) {
+        throw PatternMatchException(
+            "Null assert pattern failed: value is null");
+      }
+      _matchAndBind(pattern.pattern, value, environment);
+    } else if (pattern is CastPattern) {
+      final typeAnnotation = pattern.type;
+      final expectedType = InterpretedClass.resolveTypeAnnotationDynamic(
+          typeAnnotation, environment);
+      if (!_valueMatchesType(value, expectedType)) {
+        throw PatternMatchException(
+            "Cast pattern failed: value is not of type ${expectedType.name}");
+      }
+      _matchAndBind(pattern.pattern, value, environment);
     } else {
       throw UnimplementedError(
           "Pattern type not yet supported in _matchAndBind: ${pattern.runtimeType}");

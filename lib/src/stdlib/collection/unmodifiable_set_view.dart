@@ -6,6 +6,7 @@ class UnmodifiableSetViewCollection {
         nativeType: UnmodifiableSetView,
         name: 'UnmodifiableSetView',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is UnmodifiableSetView,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final set = positionalArgs[0] as Set;

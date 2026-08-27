@@ -6,6 +6,7 @@ class UnmodifiableMapViewCollection {
         nativeType: UnmodifiableMapView,
         name: 'UnmodifiableMapView',
         typeParameterCount: 2,
+        isSubtypeOfFunc: (value) => value is UnmodifiableMapView,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final map = positionalArgs[0] as Map;

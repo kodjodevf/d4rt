@@ -6,6 +6,7 @@ class SplayTreeSetCollection {
         nativeType: SplayTreeSet,
         name: 'SplayTreeSet',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is SplayTreeSet,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             InterpretedFunction? compareFn;

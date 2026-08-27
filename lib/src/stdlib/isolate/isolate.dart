@@ -8,6 +8,8 @@ class IsolateSpawnExceptionIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: IsolateSpawnException,
         name: 'IsolateSpawnException',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is IsolateSpawnException,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final message = positionalArgs[0] as String;
@@ -37,6 +39,8 @@ class IsolateIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: Isolate,
         name: 'Isolate',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is Isolate,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final controlPort = positionalArgs[0] as SendPort;
@@ -52,23 +56,26 @@ class IsolateIsolate {
         staticMethods: {
           'run': (visitor, positionalArgs, namedArgs) {
             final computation = positionalArgs[0];
-            if (computation is! InterpretedFunction) {
+            final debugName = namedArgs.get<String?>('debugName');
+            return Isolate.run(() {
+              if (computation is InterpretedFunction) {
+                return computation.call(visitor, []);
+              } else if (computation is Callable) {
+                return computation.call(visitor, [], {});
+              } else if (computation is Function) {
+                return (computation as dynamic)();
+              }
               throw RuntimeError(
                   'Isolate.run requires a Function for computation.');
-            }
-            final debugName = namedArgs.get<String?>('debugName');
-            return Isolate.run(() => computation.call(visitor, []),
-                debugName: debugName);
+            }, debugName: debugName);
           },
           'spawn': (visitor, positionalArgs, namedArgs) {
             final entryPoint = positionalArgs[0];
             positionalArgs[1]; // message (ignored in this stub implementation)
-            if (entryPoint is! InterpretedFunction) {
+            if (entryPoint is! InterpretedFunction && entryPoint is! Callable && entryPoint is! Function) {
               throw RuntimeError(
                   'Isolate.spawn requires a Function for entryPoint.');
             }
-            // In a real implementation, this would need to handle the conversion
-            // from InterpretedFunction to a native function
             throw RuntimeError('Isolate.spawn not fully implemented in D4rt');
           },
           'spawnUri': (visitor, positionalArgs, namedArgs) {
@@ -196,6 +203,8 @@ class SendPortIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: SendPort,
         name: 'SendPort',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is SendPort,
         methods: {
           'send': (visitor, target, positionalArgs, namedArgs) {
             final message = positionalArgs[0];
@@ -215,6 +224,8 @@ class ReceivePortIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: ReceivePort,
         name: 'ReceivePort',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is ReceivePort || value is Stream,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final debugName = positionalArgs.get<String>(0) ?? '';
@@ -239,19 +250,51 @@ class ReceivePortIsolate {
         },
         methods: {
           'listen': (visitor, target, positionalArgs, namedArgs) {
-            final onData = positionalArgs.get<InterpretedFunction?>(0);
-            final onError = namedArgs.get<InterpretedFunction?>('onError');
-            final onDone = namedArgs.get<InterpretedFunction?>('onDone');
+            final onData = positionalArgs.get<dynamic>(0);
+            final onError = namedArgs['onError'];
+            final onDone = namedArgs['onDone'];
             final cancelOnError = namedArgs.get<bool?>('cancelOnError');
 
+            void handleData(dynamic message) {
+              if (onData is InterpretedFunction) {
+                onData.call(visitor, [message]);
+              } else if (onData is Callable) {
+                onData.call(visitor, [message], {});
+              } else if (onData is Function) {
+                (onData as dynamic)(message);
+              }
+            }
+
+            void Function(Object, [StackTrace?])? handleError;
+            if (onError != null) {
+              handleError = (error, [stackTrace]) {
+                if (onError is InterpretedFunction) {
+                  onError.call(visitor, [error]);
+                } else if (onError is Callable) {
+                  onError.call(visitor, [error], {});
+                } else if (onError is Function) {
+                  (onError as dynamic)(error);
+                }
+              };
+            }
+
+            void Function()? handleDone;
+            if (onDone != null) {
+              handleDone = () {
+                if (onDone is InterpretedFunction) {
+                  onDone.call(visitor, []);
+                } else if (onDone is Callable) {
+                  onDone.call(visitor, [], {});
+                } else if (onDone is Function) {
+                  (onDone as dynamic)();
+                }
+              };
+            }
+
             return (target as ReceivePort).listen(
-              onData == null
-                  ? null
-                  : (message) => onData.call(visitor, [message]),
-              onError: onError == null
-                  ? null
-                  : (error) => onError.call(visitor, [error]),
-              onDone: onDone == null ? null : () => onDone.call(visitor, []),
+              onData == null ? null : handleData,
+              onError: handleError,
+              onDone: handleDone,
               cancelOnError: cancelOnError,
             );
           },
@@ -262,20 +305,35 @@ class ReceivePortIsolate {
           // Stream methods
           'map': (visitor, target, positionalArgs, namedArgs) {
             final transform = positionalArgs[0];
-            if (transform is! InterpretedFunction) {
+            if (transform is! InterpretedFunction && transform is! Callable && transform is! Function) {
               throw RuntimeError(
                   'Stream.map requires a Function for transform.');
             }
-            return (target as Stream)
-                .map((event) => transform.call(visitor, [event]));
+            return (target as Stream).map((event) {
+              if (transform is InterpretedFunction) {
+                return transform.call(visitor, [event]);
+              } else if (transform is Callable) {
+                return transform.call(visitor, [event], {});
+              } else if (transform is Function) {
+                return (transform as dynamic)(event);
+              }
+            });
           },
           'where': (visitor, target, positionalArgs, namedArgs) {
             final test = positionalArgs[0];
-            if (test is! InterpretedFunction) {
+            if (test is! InterpretedFunction && test is! Callable && test is! Function) {
               throw RuntimeError('Stream.where requires a Function for test.');
             }
-            return (target as Stream)
-                .where((event) => test.call(visitor, [event]) as bool);
+            return (target as Stream).where((event) {
+              if (test is InterpretedFunction) {
+                return test.call(visitor, [event]) as bool;
+              } else if (test is Callable) {
+                return test.call(visitor, [event], {}) as bool;
+              } else if (test is Function) {
+                return (test as dynamic)(event) as bool;
+              }
+              return false;
+            });
           },
           'take': (visitor, target, positionalArgs, namedArgs) {
             final count = positionalArgs[0] as int;
@@ -294,16 +352,25 @@ class RawReceivePortIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: RawReceivePort,
         name: 'RawReceivePort',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is RawReceivePort,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
-            final handler = positionalArgs.get<InterpretedFunction?>(0);
+            final handler = positionalArgs.get<dynamic>(0);
             final debugName = positionalArgs.get<String>(1) ?? '';
+            final rawPort = RawReceivePort(null, debugName);
             if (handler != null) {
-              final rawPort = RawReceivePort(null, debugName);
-              rawPort.handler = (message) => handler.call(visitor, [message]);
-              return rawPort;
+              rawPort.handler = (message) {
+                if (handler is InterpretedFunction) {
+                  handler.call(visitor, [message]);
+                } else if (handler is Callable) {
+                  handler.call(visitor, [message], {});
+                } else if (handler is Function) {
+                  (handler as dynamic)(message);
+                }
+              };
             }
-            return RawReceivePort(null, debugName);
+            return rawPort;
           },
         },
         getters: {
@@ -316,13 +383,18 @@ class RawReceivePortIsolate {
         },
         setters: {
           'handler': (visitor, target, value) {
-            if (value is InterpretedFunction) {
-              (target as RawReceivePort).handler =
-                  (message) => value.call(visitor!, [message]);
-            } else if (value == null) {
+            if (value == null) {
               (target as RawReceivePort).handler = null;
             } else {
-              (target as RawReceivePort).handler = value as Function?;
+              (target as RawReceivePort).handler = (message) {
+                if (value is InterpretedFunction) {
+                  value.call(visitor!, [message]);
+                } else if (value is Callable) {
+                  value.call(visitor!, [message], {});
+                } else if (value is Function) {
+                  (value as dynamic)(message);
+                }
+              };
             }
           },
           'keepIsolateAlive': (visitor, target, value) {
@@ -343,6 +415,8 @@ class RemoteErrorIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: RemoteError,
         name: 'RemoteError',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is RemoteError || value is Error,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             final description = positionalArgs[0] as String;
@@ -370,6 +444,8 @@ class TransferableTypedDataIsolate {
   static BridgedClass get definition => BridgedClass(
         nativeType: TransferableTypedData,
         name: 'TransferableTypedData',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is TransferableTypedData,
         constructors: {
           'fromList': (visitor, positionalArgs, namedArgs) {
             final list = positionalArgs[0];

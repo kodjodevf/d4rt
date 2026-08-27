@@ -6,6 +6,7 @@ class SplayTreeMapCollection {
         nativeType: SplayTreeMap,
         name: 'SplayTreeMap',
         typeParameterCount: 2,
+        isSubtypeOfFunc: (value) => value is SplayTreeMap,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length > 1) {

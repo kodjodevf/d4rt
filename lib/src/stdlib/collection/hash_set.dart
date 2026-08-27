@@ -7,6 +7,7 @@ class HashSetCollection {
         nativeType: HashSet,
         name: 'HashSet',
         typeParameterCount: 1,
+        isSubtypeOfFunc: (value) => value is HashSet,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty) {

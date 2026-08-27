@@ -6,6 +6,7 @@ class LinkedHashMapCollection {
         nativeType: LinkedHashMap,
         name: 'LinkedHashMap',
         typeParameterCount: 2,
+        isSubtypeOfFunc: (value) => value is LinkedHashMap,
         constructors: {
           '': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isNotEmpty) {
