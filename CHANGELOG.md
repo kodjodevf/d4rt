@@ -1,4 +1,9 @@
 ## 0.2.3
+- **feat: `Flow` Bridge, `ServiceProtocolInfo`, Service Constants & Closures (`dart:developer`)**
+  - Added `FlowDeveloper` bridge with `Flow.begin()`, `Flow.step(id)`, `Flow.end(id)`, and `flow.id`.
+  - Added `ServiceProtocolInfoDeveloper` bridge exposing `serverUri` and `serverWebSocketUri`.
+  - Added `staticGetters` for standard error code constants on `ServiceExtensionResponse` (`invalidParams`, `extensionError`, `extensionErrorMin`, `extensionErrorMax`).
+  - Added support for all callable and closure types (`InterpretedFunction`, `Callable`, native `Function`) in `Timeline.timeSync` and `registerExtension`.
 - **feat: `HtmlEscapeMode` Static Getters, `JsonUnsupportedObjectError` & Codec Subtyping (`dart:convert`)**
   - Added `staticGetters` on `HtmlEscapeMode` (`attribute`, `element`, `sqAttribute`, `unknown`) and instance mode properties (`escapeQuot`, `escapeApos`, `escapeLtGt`, `escapeSlash`).
   - Added `JsonUnsupportedObjectErrorConvert` bridge with `cause`, `partialResult`, `unsupportedObject`, and `isSubtypeOfFunc`.

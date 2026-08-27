@@ -34,6 +34,20 @@ class ServiceExtensionResponseDeveloper {
         name: 'ServiceExtensionResponse',
         typeParameterCount: 0,
         isSubtypeOfFunc: (value) => value is ServiceExtensionResponse,
+        staticGetters: {
+          'invalidParams': (visitor) => ServiceExtensionResponse.invalidParams,
+          'kInvalidParams': (visitor) => ServiceExtensionResponse.invalidParams,
+          'extensionError': (visitor) => ServiceExtensionResponse.extensionError,
+          'kExtensionError': (visitor) => ServiceExtensionResponse.extensionError,
+          'extensionErrorMin': (visitor) =>
+              ServiceExtensionResponse.extensionErrorMin,
+          'kExtensionErrorMin': (visitor) =>
+              ServiceExtensionResponse.extensionErrorMin,
+          'extensionErrorMax': (visitor) =>
+              ServiceExtensionResponse.extensionErrorMax,
+          'kExtensionErrorMax': (visitor) =>
+              ServiceExtensionResponse.extensionErrorMax,
+        },
         constructors: {
           'result': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.isEmpty || positionalArgs[0] is! String) {
@@ -73,6 +87,29 @@ class ServiceExtensionResponseDeveloper {
               (target as ServiceExtensionResponse).hashCode,
           'runtimeType': (visitor, target) =>
               (target as ServiceExtensionResponse).runtimeType,
+        },
+      );
+}
+
+class ServiceProtocolInfoDeveloper {
+  static BridgedClass get definition => BridgedClass(
+        nativeType: ServiceProtocolInfo,
+        name: 'ServiceProtocolInfo',
+        typeParameterCount: 0,
+        isSubtypeOfFunc: (value) => value is ServiceProtocolInfo,
+        getters: {
+          'serverUri': (visitor, target) =>
+              (target as ServiceProtocolInfo).serverUri,
+          'serverWebSocketUri': (visitor, target) =>
+              (target as ServiceProtocolInfo).serverWebSocketUri,
+          'hashCode': (visitor, target) =>
+              (target as ServiceProtocolInfo).hashCode,
+          'runtimeType': (visitor, target) =>
+              (target as ServiceProtocolInfo).runtimeType,
+        },
+        methods: {
+          'toString': (visitor, target, positionalArgs, namedArgs) =>
+              (target as ServiceProtocolInfo).toString(),
         },
       );
 }

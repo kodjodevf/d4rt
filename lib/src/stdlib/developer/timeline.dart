@@ -27,17 +27,25 @@ class TimelineDeveloper {
           },
           'timeSync': (visitor, positionalArgs, namedArgs) {
             if (positionalArgs.length < 2 ||
-                positionalArgs[0] is! String ||
-                positionalArgs[1] is! InterpretedFunction) {
+                positionalArgs[0] is! String) {
               throw RuntimeError(
                   "Timeline.timeSync expects a String name and a function callback.");
             }
             final name = positionalArgs[0] as String;
-            final callback = positionalArgs[1] as InterpretedFunction;
+            final callback = positionalArgs[1];
             final arguments = namedArgs['arguments'] as Map?;
             return Timeline.timeSync(
               name,
-              () => callback.call(visitor, []),
+              () {
+                if (callback is InterpretedFunction) {
+                  return callback.call(visitor, []);
+                } else if (callback is Callable) {
+                  return callback.call(visitor, [], {});
+                } else if (callback is Function) {
+                  return (callback as dynamic)();
+                }
+                throw RuntimeError("Invalid callback for Timeline.timeSync.");
+              },
               arguments: arguments != null ? Map.from(arguments) : null,
             );
           },

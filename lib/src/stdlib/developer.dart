@@ -6,11 +6,13 @@ import 'package:d4rt/src/exceptions.dart';
 import 'developer/timeline.dart';
 import 'developer/user_tag.dart';
 import 'developer/service.dart';
+import 'developer/flow.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'developer/timeline.dart';
 export 'developer/user_tag.dart';
 export 'developer/service.dart';
+export 'developer/flow.dart';
 
 class DeveloperStdlib {
   static void register(Environment environment) {
@@ -20,6 +22,8 @@ class DeveloperStdlib {
     environment.defineBridge(UserTagDeveloper.definition);
     environment.defineBridge(ServiceDeveloper.definition);
     environment.defineBridge(ServiceExtensionResponseDeveloper.definition);
+    environment.defineBridge(ServiceProtocolInfoDeveloper.definition);
+    environment.defineBridge(FlowDeveloper.definition);
 
     // Register Global Functions
     environment.define(
@@ -86,15 +90,21 @@ class DeveloperStdlib {
         'registerExtension',
         NativeFunction((visitor, arguments, namedArguments, typeArguments) {
           if (arguments.length < 2 ||
-              arguments[0] is! String ||
-              arguments[1] is! InterpretedFunction) {
+              arguments[0] is! String) {
             throw RuntimeError(
                 "registerExtension requires a String method and a function handler.");
           }
           final method = arguments[0] as String;
-          final handler = arguments[1] as InterpretedFunction;
+          final handler = arguments[1];
           registerExtension(method, (methodName, parameters) async {
-            final result = handler.call(visitor, [methodName, parameters]);
+            Object? result;
+            if (handler is InterpretedFunction) {
+              result = handler.call(visitor, [methodName, parameters]);
+            } else if (handler is Callable) {
+              result = handler.call(visitor, [methodName, parameters], {});
+            } else if (handler is Function) {
+              result = (handler as dynamic)(methodName, parameters);
+            }
             final resolvedResult = result is Future ? await result : result;
             if (resolvedResult is ServiceExtensionResponse) {
               return resolvedResult;
