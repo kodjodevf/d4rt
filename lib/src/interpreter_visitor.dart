@@ -9735,7 +9735,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
             final caseValue = member.expression.accept<Object?>(this);
             Logger.debug(
                 "[Switch] Checking legacy case value: $caseValue against $switchValue");
-            if (switchValue == caseValue) {
+            if (_areValuesEqual(switchValue, caseValue)) {
               matched = true;
               execute = true;
               Logger.debug("[Switch] Matched legacy case: $caseValue");
@@ -9918,6 +9918,21 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   // Pattern Matching Helper
   // =======================================================================
 
+  bool _areValuesEqual(Object? a, Object? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    if (a is BridgedEnumValue && b is BridgedEnumValue) {
+      return a == b;
+    }
+    if (a is BridgedEnumValue && b is Enum) {
+      return a.nativeValue == b;
+    }
+    if (a is Enum && b is BridgedEnumValue) {
+      return a == b.nativeValue;
+    }
+    return a == b;
+  }
+
   /// Attempts to match the [pattern] against the [value].
   /// If successful, binds any variables declared in the pattern within the [environment].
   /// Throws [PatternMatchException] on failure.
@@ -9984,8 +9999,8 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       // Evaluate the constant expression within the pattern
       final patternValue = pattern.expression.accept<Object?>(this);
       // Compare the switch value against the evaluated pattern constant
-      // Use simple equality check for now.
-      if (value != patternValue) {
+      // Use equality check supporting native and bridged enums.
+      if (!_areValuesEqual(value, patternValue)) {
         throw PatternMatchException(
             "Constant pattern value $patternValue does not match switch value $value");
       }
@@ -10519,9 +10534,9 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
       final operatorType = pattern.operator.type;
       bool matches = false;
       if (operatorType == TokenType.EQ_EQ) {
-        matches = value == operandValue;
+        matches = _areValuesEqual(value, operandValue);
       } else if (operatorType == TokenType.BANG_EQ) {
-        matches = value != operandValue;
+        matches = !_areValuesEqual(value, operandValue);
       } else if (value is num && operandValue is num) {
         if (operatorType == TokenType.GT) {
           matches = value > operandValue;
