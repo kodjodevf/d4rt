@@ -1,3 +1,5 @@
+## 0.2.4
+- feat: Enhance enum handling with improved equality checks and add comprehensive switch statement tests
 ## 0.2.3
 - **feat: Dart 3.0+ Pattern Matching, Relational/Logical Patterns, `for-in` & `if-case` Collection Elements**
   - Added support for `RelationalPattern` (`> 0`, `< 100`, `>= 18`, `<= 65`, `== 'admin'`, `!= null`) in switch expressions, switch statements, and `if-case`.
