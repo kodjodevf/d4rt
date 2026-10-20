@@ -302,6 +302,8 @@ void main() {
   - `ProcessRunPermission.commandWithArgs('git', ['status'])` - Restrict arguments too
 
 - **`IsolatePermission`**: Controls isolate creation and communication
+  - `IsolatePermission.spawn` - Allow creating and controlling isolates
+  - `IsolatePermission.communicate` - Allow sending and receiving messages
   - `IsolatePermission.any` - Allow all isolate operations
 
 - **`DangerousPermission`**: Controls operations that can escape the sandbox
@@ -312,7 +314,9 @@ void main() {
 All scoped permissions fail closed: a host-only rule does not authorize a
 connection without a host, and a port-specific rule requires the actual port.
 Filesystem scopes are canonicalized, so symlinks cannot be used to escape a
-`readPath`/`writePath` boundary, including through recursive directory listings.
+`readPath`/`writePath` boundary, including through recursive directory listings
+and link resolution. Creating or updating a symlink also requires write access
+to its target.
 Scoped network permissions disable transparent HTTP redirects; follow redirects
 manually so every destination is checked. HTTP proxy endpoints returned by
 `findProxy` are also checked against the network permission scope.

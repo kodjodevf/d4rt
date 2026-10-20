@@ -354,6 +354,80 @@ void main() {
       }
     });
 
+    test('symlinks cannot target paths outside a write scope', () {
+      final root = io.Directory.systemTemp.createTempSync('d4rt-link-');
+      final allowed = io.Directory(p.join(root.path, 'allowed'))..createSync();
+      final outside = io.Directory(p.join(root.path, 'outside'))..createSync();
+      final linkPath = p.join(allowed.path, 'escape');
+
+      try {
+        final d4rt = D4rt()
+          ..grant(FilesystemPermission.writePath(allowed.path));
+
+        expect(
+          () => d4rt.execute(
+            source:
+                '''
+            import 'dart:io';
+            void main() {
+              Link(${_dartString(linkPath)}).createSync(
+                ${_dartString(p.join(outside.path, 'target.txt'))},
+              );
+            }
+          ''',
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('Filesystem permission denied'),
+            ),
+          ),
+        );
+        expect(io.Link(linkPath).existsSync(), isFalse);
+      } finally {
+        if (outside.existsSync()) outside.deleteSync(recursive: true);
+        if (allowed.existsSync()) allowed.deleteSync(recursive: true);
+        if (root.existsSync()) root.deleteSync(recursive: true);
+      }
+    });
+
+    test('resolving a symlink cannot reveal an out-of-scope target', () {
+      final root = io.Directory.systemTemp.createTempSync('d4rt-resolve-');
+      final allowed = io.Directory(p.join(root.path, 'allowed'))..createSync();
+      final outside = io.Directory(p.join(root.path, 'outside'))..createSync();
+      final secret = io.File(p.join(outside.path, 'secret.txt'))
+        ..writeAsStringSync('secret');
+      final linkPath = p.join(allowed.path, 'escape');
+      io.Link(linkPath).createSync(secret.path);
+
+      try {
+        final d4rt = D4rt()..grant(FilesystemPermission.readPath(allowed.path));
+
+        expect(
+          () => d4rt.execute(
+            source:
+                '''
+            import 'dart:io';
+            String main() =>
+                File(${_dartString(linkPath)}).resolveSymbolicLinksSync();
+          ''',
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('Filesystem permission denied'),
+            ),
+          ),
+        );
+      } finally {
+        if (outside.existsSync()) outside.deleteSync(recursive: true);
+        if (allowed.existsSync()) allowed.deleteSync(recursive: true);
+        if (root.existsSync()) root.deleteSync(recursive: true);
+      }
+    });
+
     test('directory listings cannot traverse symlinks outside a scope', () {
       final root = io.Directory.systemTemp.createTempSync('d4rt-list-');
       final allowed = io.Directory(p.join(root.path, 'allowed'))..createSync();
@@ -478,6 +552,134 @@ void main() {
         ''',
         ),
         returnsNormally,
+      );
+    });
+
+    test('dart:developer bridges recheck permissions at runtime', () {
+      final d4rt = D4rt()..grant(DangerousPermission.developerTools);
+      d4rt.registertopLevelFunction('revokeDeveloper', (
+        visitor,
+        arguments,
+        namedArguments,
+        typeArguments,
+      ) {
+        d4rt.revoke(DangerousPermission.developerTools);
+        return null;
+      });
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:developer';
+          void main() {
+            final tag = UserTag('revoked');
+            revokeDeveloper();
+            tag.makeCurrent();
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('DangerousPermission.developerTools'),
+          ),
+        ),
+      );
+    });
+
+    test('isolate permissions separate spawning from communication', () {
+      final communicateOnly = D4rt()..grant(IsolatePermission.communicate);
+      expect(
+        () => communicateOnly.execute(
+          source: '''
+          import 'dart:isolate';
+          void main() {
+            Isolate.run(() => 1);
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('IsolatePermission.spawn'),
+          ),
+        ),
+      );
+
+      final spawnOnly = D4rt()..grant(IsolatePermission.spawn);
+      expect(
+        () => spawnOnly.execute(
+          source: '''
+          import 'dart:isolate';
+          void main() {
+            ReceivePort();
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('IsolatePermission.communicate'),
+          ),
+        ),
+      );
+    });
+
+    test('stdlib permission checks ignore URI suffixes', () {
+      final d4rt = D4rt();
+
+      for (final uri in ['dart:io?bypass', 'dart:io#bypass']) {
+        expect(
+          () => d4rt.execute(
+            source:
+                '''
+            import '$uri';
+            void main() {}
+          ''',
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('FilesystemPermission'),
+            ),
+          ),
+        );
+      }
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:isolate?bypass';
+          void main() {}
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('IsolatePermission'),
+          ),
+        ),
+      );
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:developer?bypass';
+          void main() {}
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('DangerousPermission.developerTools'),
+          ),
+        ),
       );
     });
 

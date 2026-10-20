@@ -3,22 +3,29 @@
   - Permissions now implement value equality, so equivalent permissions can be
     checked and revoked reliably. Scoped filesystem permissions are canonicalized
     to prevent symlink escapes. Scoped network and process permissions fail closed
-    when host, port, command or arguments are missing.
+    when host, port, command or arguments are missing. Isolate spawning and
+    communication enforce their respective capabilities at runtime.
   - Added permission checks to HTTP, socket, DNS, server bind and UDP send
     operations. Scoped network permissions disable transparent HTTP redirects,
     and explicit redirect destinations and HTTP proxy endpoints are checked
     before use.
     `Process.run`/`start`/`runSync` now enforce command and argument scopes
     instead of only checking for a generic process permission. Directory
-    listings also validate every emitted entry, preventing symlink escapes.
+    listings and link resolution also validate every emitted or resolved path,
+    and link creation checks its target, preventing symlink escapes and symlink
+    planting.
   - `D4rt.eval()` now requires `DangerousPermission.codeEvaluation`.
   - Importing `dart:developer` now requires
-    `DangerousPermission.developerTools`; developer and VM-service calls are
-    checked again at runtime so they remain protected after permission changes.
+    `DangerousPermission.developerTools`; every developer bridge operation,
+    including timeline, tag, flow and VM-service APIs, is checked again at
+    runtime so it remains protected after permission changes.
   - `D4rt.analyze()` no longer evaluates top-level variable initializers,
     including initializers from imported modules.
   - Missing modules are rejected even when other bridges are registered, and
-    module initialization now honors `timeout` and `maxSteps`.
+    module initialization now honors `timeout` and `maxSteps`. Standard library
+    permission checks use the parsed library name, so URI query strings or
+    fragments cannot bypass `dart:io`, `dart:isolate` or `dart:developer`
+    restrictions.
   - The CLI is deny-by-default and exposes `--allow-fs`, `--allow-network`,
     `--allow-process`, `--allow-isolate`, `--allow-dangerous` and `--allow-all`.
     Scripts get read-only access to their own directory by default.

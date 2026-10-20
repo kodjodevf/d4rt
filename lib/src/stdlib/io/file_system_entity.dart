@@ -290,10 +290,22 @@ class FileSystemEntityIo {
         );
       },
       'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
-        return (target as FileSystemEntity).resolveSymbolicLinks();
+        final entity = target as FileSystemEntity;
+        checkFilesystemReadPermission(
+          visitor,
+          entity.path,
+          operation: 'resolve symbolic links',
+        );
+        return entity.resolveSymbolicLinks();
       },
       'resolveSymbolicLinksSync': (visitor, target, positionalArgs, namedArgs) {
-        return (target as FileSystemEntity).resolveSymbolicLinksSync();
+        final entity = target as FileSystemEntity;
+        checkFilesystemReadPermission(
+          visitor,
+          entity.path,
+          operation: 'resolve symbolic links',
+        );
+        return entity.resolveSymbolicLinksSync();
       },
     },
     getters: {

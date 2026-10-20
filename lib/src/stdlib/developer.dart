@@ -18,13 +18,27 @@ export 'developer/flow.dart';
 class DeveloperStdlib {
   static void register(Environment environment) {
     // Register Bridged Classes
-    environment.defineBridge(TimelineDeveloper.definition);
-    environment.defineBridge(TimelineTaskDeveloper.definition);
-    environment.defineBridge(UserTagDeveloper.definition);
-    environment.defineBridge(ServiceDeveloper.definition);
-    environment.defineBridge(ServiceExtensionResponseDeveloper.definition);
-    environment.defineBridge(ServiceProtocolInfoDeveloper.definition);
-    environment.defineBridge(FlowDeveloper.definition);
+    environment.defineBridge(
+      guardDeveloperToolsBridge(TimelineDeveloper.definition),
+    );
+    environment.defineBridge(
+      guardDeveloperToolsBridge(TimelineTaskDeveloper.definition),
+    );
+    environment.defineBridge(
+      guardDeveloperToolsBridge(UserTagDeveloper.definition),
+    );
+    environment.defineBridge(
+      guardDeveloperToolsBridge(ServiceDeveloper.definition),
+    );
+    environment.defineBridge(
+      guardDeveloperToolsBridge(ServiceExtensionResponseDeveloper.definition),
+    );
+    environment.defineBridge(
+      guardDeveloperToolsBridge(ServiceProtocolInfoDeveloper.definition),
+    );
+    environment.defineBridge(
+      guardDeveloperToolsBridge(FlowDeveloper.definition),
+    );
 
     // Register Global Functions
     environment.define(

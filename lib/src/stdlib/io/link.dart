@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
+import 'package:path/path.dart' as p;
 
 import 'filesystem_permission_helper.dart';
 
@@ -68,6 +69,12 @@ class LinkIo {
           link.path,
           operation: 'create link',
         );
+        _checkLinkTargetPermission(
+          visitor,
+          link,
+          targetPath,
+          operation: 'create link target',
+        );
         return link.create(
           targetPath,
           recursive: namedArgs['recursive'] as bool? ?? false,
@@ -85,6 +92,12 @@ class LinkIo {
           visitor,
           link.path,
           operation: 'create link',
+        );
+        _checkLinkTargetPermission(
+          visitor,
+          link,
+          targetPath,
+          operation: 'create link target',
         );
         link.createSync(
           targetPath,
@@ -105,6 +118,12 @@ class LinkIo {
           link.path,
           operation: 'update link',
         );
+        _checkLinkTargetPermission(
+          visitor,
+          link,
+          targetPath,
+          operation: 'update link target',
+        );
         return link.update(targetPath);
       },
       'updateSync': (visitor, target, positionalArgs, namedArgs) {
@@ -119,6 +138,12 @@ class LinkIo {
           visitor,
           link.path,
           operation: 'update link',
+        );
+        _checkLinkTargetPermission(
+          visitor,
+          link,
+          targetPath,
+          operation: 'update link target',
         );
         link.updateSync(targetPath);
         return null;
@@ -248,4 +273,18 @@ class LinkIo {
       'runtimeType': (visitor, target) => (target as Link).runtimeType,
     },
   );
+}
+
+/// Prevents a scoped write from planting a symlink that points outside the
+/// writable area.
+void _checkLinkTargetPermission(
+  InterpreterVisitor visitor,
+  Link link,
+  String targetPath, {
+  required String operation,
+}) {
+  final resolvedTarget = p.isAbsolute(targetPath)
+      ? targetPath
+      : p.join(p.dirname(link.path), targetPath);
+  checkFilesystemWritePermission(visitor, resolvedTarget, operation: operation);
 }

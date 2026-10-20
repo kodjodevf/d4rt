@@ -64,10 +64,14 @@ class ModuleLoader {
   void _checkModulePermissions(Uri uri) {
     if (d4rt == null) return; // No permission checking if no D4rt instance
 
-    final uriString = uri.toString();
+    if (uri.scheme != 'dart') return;
+
+    // Use uri.path rather than the raw URI string so query strings and
+    // fragments cannot bypass the check for a dangerous standard library.
+    final libraryName = uri.path;
 
     // Define dangerous modules that require permissions
-    if (uriString == 'dart:io') {
+    if (libraryName == 'io') {
       if (!d4rt!.checkPermission({
         'type': 'filesystem',
         'pathAgnostic': true,
@@ -77,14 +81,14 @@ class ModuleLoader {
           'Use d4rt.grant(FilesystemPermission.any) to allow filesystem access.',
         );
       }
-    } else if (uriString == 'dart:isolate') {
+    } else if (libraryName == 'isolate') {
       if (!d4rt!.checkPermission({'type': 'isolate'})) {
         throw RuntimeError(
           'Access to dart:isolate requires IsolatePermission. '
           'Use d4rt.grant(IsolatePermission.any) to allow isolate operations.',
         );
       }
-    } else if (uriString == 'dart:developer') {
+    } else if (libraryName == 'developer') {
       if (!d4rt!.checkPermission({
         'type': 'dangerous',
         'operation': 'developer tools',

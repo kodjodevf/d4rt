@@ -3,6 +3,8 @@ import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
 
+import 'isolate_permission.dart';
+
 /// Thrown when an isolate cannot be created.
 class IsolateSpawnExceptionIsolate {
   static BridgedClass get definition => BridgedClass(
@@ -42,6 +44,7 @@ class IsolateIsolate {
     isSubtypeOfFunc: (value) => value is Isolate,
     constructors: {
       '': (visitor, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final controlPort = positionalArgs[0] as SendPort;
         final pauseCapability = namedArgs.get<Capability?>('pauseCapability');
         final terminateCapability = namedArgs.get<Capability?>(
@@ -56,6 +59,7 @@ class IsolateIsolate {
     },
     staticMethods: {
       'run': (visitor, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final computation = positionalArgs[0];
         final debugName = namedArgs.get<String?>('debugName');
         return Isolate.run(() {
@@ -72,6 +76,7 @@ class IsolateIsolate {
         }, debugName: debugName);
       },
       'spawn': (visitor, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final entryPoint = positionalArgs[0];
         positionalArgs[1]; // message (ignored in this stub implementation)
         if (entryPoint is! InterpretedFunction &&
@@ -84,6 +89,7 @@ class IsolateIsolate {
         throw RuntimeError('Isolate.spawn not fully implemented in D4rt');
       },
       'spawnUri': (visitor, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final uri = positionalArgs[0] as Uri;
         final args = positionalArgs[1] as List<String>;
         final message = positionalArgs[2];
@@ -114,6 +120,7 @@ class IsolateIsolate {
         );
       },
       'exit': (visitor, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final finalMessagePort = positionalArgs.get<SendPort?>(0);
         final message = positionalArgs.get<Object?>(1);
         Isolate.exit(finalMessagePort, message);
@@ -147,37 +154,44 @@ class IsolateIsolate {
     },
     methods: {
       'pause': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final resumeCapability = positionalArgs.get<Capability?>(0);
         return (target as Isolate).pause(resumeCapability);
       },
       'resume': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final resumeCapability = positionalArgs[0] as Capability;
         (target as Isolate).resume(resumeCapability);
         return null;
       },
       'addOnExitListener': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final responsePort = positionalArgs[0] as SendPort;
         final response = namedArgs.get<Object?>('response');
         (target as Isolate).addOnExitListener(responsePort, response: response);
         return null;
       },
       'removeOnExitListener': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final responsePort = positionalArgs[0] as SendPort;
         (target as Isolate).removeOnExitListener(responsePort);
         return null;
       },
       'setErrorsFatal': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final errorsAreFatal = positionalArgs[0] as bool;
         (target as Isolate).setErrorsFatal(errorsAreFatal);
         return null;
       },
       'kill': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final priority =
             namedArgs.get<int?>('priority') ?? Isolate.beforeNextEvent;
         (target as Isolate).kill(priority: priority);
         return null;
       },
       'ping': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final responsePort = positionalArgs[0] as SendPort;
         final response = namedArgs.get<Object?>('response');
         final priority = namedArgs.get<int?>('priority') ?? Isolate.immediate;
@@ -189,11 +203,13 @@ class IsolateIsolate {
         return null;
       },
       'addErrorListener': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final port = positionalArgs[0] as SendPort;
         (target as Isolate).addErrorListener(port);
         return null;
       },
       'removeErrorListener': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateSpawnPermission(visitor);
         final port = positionalArgs[0] as SendPort;
         (target as Isolate).removeErrorListener(port);
         return null;
@@ -211,6 +227,7 @@ class SendPortIsolate {
     isSubtypeOfFunc: (value) => value is SendPort,
     methods: {
       'send': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateCommunicationPermission(visitor);
         final message = positionalArgs[0];
         (target as SendPort).send(message);
         return null;
@@ -232,10 +249,12 @@ class ReceivePortIsolate {
     isSubtypeOfFunc: (value) => value is ReceivePort || value is Stream,
     constructors: {
       '': (visitor, positionalArgs, namedArgs) {
+        checkIsolateCommunicationPermission(visitor);
         final debugName = positionalArgs.get<String>(0) ?? '';
         return ReceivePort(debugName);
       },
       'fromRawReceivePort': (visitor, positionalArgs, namedArgs) {
+        checkIsolateCommunicationPermission(visitor);
         final rawPort = positionalArgs[0] as RawReceivePort;
         return ReceivePort.fromRawReceivePort(rawPort);
       },
@@ -253,6 +272,7 @@ class ReceivePortIsolate {
     },
     methods: {
       'listen': (visitor, target, positionalArgs, namedArgs) {
+        checkIsolateCommunicationPermission(visitor);
         final onData = positionalArgs.get<dynamic>(0);
         final onError = namedArgs['onError'];
         final onDone = namedArgs['onDone'];
@@ -363,6 +383,9 @@ class RawReceivePortIsolate {
     constructors: {
       '': (visitor, positionalArgs, namedArgs) {
         final handler = positionalArgs.get<dynamic>(0);
+        if (handler != null) {
+          checkIsolateCommunicationPermission(visitor);
+        }
         final debugName = positionalArgs.get<String>(1) ?? '';
         final rawPort = RawReceivePort(null, debugName);
         if (handler != null) {
@@ -392,11 +415,12 @@ class RawReceivePortIsolate {
         if (value == null) {
           (target as RawReceivePort).handler = null;
         } else {
+          checkIsolateCommunicationPermission(visitor!);
           (target as RawReceivePort).handler = (message) {
             if (value is InterpretedFunction) {
-              value.call(visitor!, [message]);
+              value.call(visitor, [message]);
             } else if (value is Callable) {
-              value.call(visitor!, [message], {});
+              value.call(visitor, [message], {});
             } else if (value is Function) {
               (value as dynamic)(message);
             }
