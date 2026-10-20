@@ -28,12 +28,13 @@ void main() {
         }
       ''');
       expect(
-          result,
-          equals([
-            'a',
-            'B',
-            ['a', 'B', 'c']
-          ]));
+        result,
+        equals([
+          'a',
+          'B',
+          ['a', 'B', 'c'],
+        ]),
+      );
     });
 
     test('List add and addAll', () {
@@ -95,11 +96,12 @@ void main() {
         }
       ''');
       expect(
-          result,
-          equals([
-            [1, 2, 3],
-            [3, 4, 5]
-          ]));
+        result,
+        equals([
+          [1, 2, 3],
+          [3, 4, 5],
+        ]),
+      );
     });
 
     group('List methods', () {
@@ -504,11 +506,12 @@ void main() {
       }
       ''';
         expect(
-            execute(source),
-            equals([
-              [1, 2, 3],
-              [1, 2, 3, 4]
-            ]));
+          execute(source),
+          equals([
+            [1, 2, 3],
+            [1, 2, 3, 4],
+          ]),
+        );
       });
     });
 

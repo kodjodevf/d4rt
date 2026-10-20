@@ -159,9 +159,10 @@ void main() {
       expect(result, 30);
     });
 
-    test('Interpreted Async/Await Tests await in try/catch (success)',
-        () async {
-      final code = '''
+    test(
+      'Interpreted Async/Await Tests await in try/catch (success)',
+      () async {
+        final code = '''
         Future<String> successfulFuture() async {
           await Future.delayed(Duration(milliseconds: 1));
           return "Success";
@@ -176,13 +177,15 @@ void main() {
           return result;
         }
       ''';
-      final result = await execute(code);
-      expect(result, 'Success');
-    });
+        final result = await execute(code);
+        expect(result, 'Success');
+      },
+    );
 
-    test('Interpreted Async/Await Tests await Future.error in try/catch',
-        () async {
-      final code = '''
+    test(
+      'Interpreted Async/Await Tests await Future.error in try/catch',
+      () async {
+        final code = '''
         Future<String> failingFuture() async {
           await Future.delayed(Duration(milliseconds: 1));
           throw 'Future Failed';
@@ -198,13 +201,15 @@ void main() {
           return result;
         }
       ''';
-      final result = await execute(code);
-      expect(result, 'Caught: Future Failed');
-    });
+        final result = await execute(code);
+        expect(result, 'Caught: Future Failed');
+      },
+    );
 
-    test('Interpreted Async/Await Tests await Future.error without try/catch',
-        () async {
-      final code = '''
+    test(
+      'Interpreted Async/Await Tests await Future.error without try/catch',
+      () async {
+        final code = '''
         Future<void> failingFuture() async {
           await Future.delayed(Duration(milliseconds: 1));
           throw 'Deliberate Error';
@@ -213,13 +218,14 @@ void main() {
            await failingFuture();
         }
       ''';
-      try {
-        await execute(code);
-        fail('Expected execute to throw an error');
-      } catch (e) {
-        expect(e.toString().contains('Deliberate Error'), isTrue);
-      }
-    });
+        try {
+          await execute(code);
+          fail('Expected execute to throw an error');
+        } catch (e) {
+          expect(e.toString().contains('Deliberate Error'), isTrue);
+        }
+      },
+    );
   });
   group('Async Control Flow Tests', () {
     test('async while loop with await in body', () async {
@@ -458,10 +464,7 @@ void main() {
         }
       ''');
 
-      expect(
-        result,
-        equals(60),
-      );
+      expect(result, equals(60));
     });
 
     test('async try-catch-finally with await throwing error', () async {
@@ -493,10 +496,7 @@ void main() {
         }
       ''');
 
-      expect(
-        result,
-        equals("Caught Error:Finally Executed"),
-      );
+      expect(result, equals("Caught Error:Finally Executed"));
     });
 
     test('async if statement with await in condition', () async {
@@ -554,8 +554,13 @@ void main() {
 
       expect(
         () async => await execute(sourceCode),
-        throwsA(isA<Exception>().having((e) => e.toString(), 'toString()',
-            'Exception: Something went wrong asynchronously')),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'toString()',
+            'Exception: Something went wrong asynchronously',
+          ),
+        ),
       );
     });
 
@@ -579,9 +584,10 @@ void main() {
       expect(await execute(source), equals([1, 2, 3, 4, 5, 6, 7, 8]));
     });
 
-    test('nested for loops with list processing using indexed access',
-        () async {
-      const source = '''
+    test(
+      'nested for loops with list processing using indexed access',
+      () async {
+        const source = '''
       main() async {
         List resultList = [];
         final dddd = [
@@ -597,7 +603,8 @@ void main() {
         return resultList;
       }
       ''';
-      expect(await execute(source), equals([1, 2, 3, 4, 5, 6, 7, 8]));
-    });
+        expect(await execute(source), equals([1, 2, 3, 4, 5, 6, 7, 8]));
+      },
+    );
   });
 }

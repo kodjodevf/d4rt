@@ -5,7 +5,8 @@ void main() {
   group('DateTime.copyWith tests', () {
     test('copyWith modifies specific fields', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         main() {
@@ -13,14 +14,16 @@ void main() {
           final updated = dt.copyWith(year: 2024, day: 25);
           return [updated.year, updated.month, updated.day, updated.hour, updated.minute];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([2024, 5, 25, 14, 30]));
     });
 
     test('Uri constructor and replace with dynamic collections', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         main() {
@@ -38,12 +41,16 @@ void main() {
 
           return [uri.toString(), replaced.toString()];
         }
-      ''');
+      ''',
+      );
 
-      expect(result, equals([
-        'https://example.com/api/v1/users?page=1&limit=10',
-        'https://example.com/api/v2/items?filter=active',
-      ]));
+      expect(
+        result,
+        equals([
+          'https://example.com/api/v1/users?page=1&limit=10',
+          'https://example.com/api/v2/items?filter=active',
+        ]),
+      );
     });
   });
 }

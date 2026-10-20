@@ -39,7 +39,8 @@ RuntimeType resolveRuntimeTypeAnnotation(
     final resolved = env.get(typeName);
     if (resolved is! RuntimeType) {
       throw RuntimeError(
-          "Symbol '$typeName' resolved to non-type value: $resolved");
+        "Symbol '$typeName' resolved to non-type value: $resolved",
+      );
     }
 
     if (typeNode.typeArguments != null &&
@@ -97,8 +98,10 @@ RuntimeType resolveRuntimeTypeAnnotation(
 
     if (namedFields != null) {
       for (final field in namedFields.fields) {
-        namedTypes[field.name.lexeme] =
-            resolveRuntimeTypeAnnotation(field.type, env);
+        namedTypes[field.name.lexeme] = resolveRuntimeTypeAnnotation(
+          field.type,
+          env,
+        );
       }
     }
 
@@ -106,48 +109,21 @@ RuntimeType resolveRuntimeTypeAnnotation(
   }
 
   throw RuntimeError(
-      'Unsupported type annotation for constraint: ${typeNode.runtimeType}');
+    'Unsupported type annotation for constraint: ${typeNode.runtimeType}',
+  );
 }
 
 RuntimeType _resolveFormalParameterType(
-    FormalParameter parameter, Environment env) {
-  FormalParameter actualParameter = parameter;
-  if (parameter is DefaultFormalParameter) {
-    actualParameter = parameter.parameter;
-  }
-
-  if (actualParameter is SimpleFormalParameter) {
-    return resolveRuntimeTypeAnnotation(actualParameter.type, env);
-  }
-
-  if (actualParameter is FieldFormalParameter) {
-    return resolveRuntimeTypeAnnotation(actualParameter.type, env);
-  }
-
-  if (actualParameter is FunctionTypedFormalParameter) {
+  FormalParameter parameter,
+  Environment env,
+) {
+  if (parameter.functionTypedSuffix != null) {
     return FunctionRuntimeType.untyped();
   }
 
-  return const NamedRuntimeType('dynamic');
+  return resolveRuntimeTypeAnnotation(parameter.type, env);
 }
 
 String? _resolveFormalParameterName(FormalParameter parameter) {
-  FormalParameter actualParameter = parameter;
-  if (parameter is DefaultFormalParameter) {
-    actualParameter = parameter.parameter;
-  }
-
-  if (actualParameter is SimpleFormalParameter) {
-    return actualParameter.name?.lexeme;
-  }
-
-  if (actualParameter is FieldFormalParameter) {
-    return actualParameter.name.lexeme;
-  }
-
-  if (actualParameter is FunctionTypedFormalParameter) {
-    return actualParameter.name.lexeme;
-  }
-
-  return null;
+  return parameter.name?.lexeme;
 }

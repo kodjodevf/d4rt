@@ -4,9 +4,10 @@ import 'package:test/test.dart';
 dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt()..setDebug(false);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -47,11 +48,13 @@ void main() {
 
       expect(
         () => execute(source),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains("can't be returned"),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("can't be returned"),
+          ),
+        ),
       );
     });
 
@@ -83,11 +86,13 @@ void main() {
 
       expect(
         () => execute(source),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains("can't be returned"),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("can't be returned"),
+          ),
+        ),
       );
     });
     test('Issue #6 - Int return type in functions', () {

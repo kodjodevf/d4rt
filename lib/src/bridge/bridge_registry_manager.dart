@@ -23,7 +23,7 @@ class BridgeRegistryManager {
 
   /// Constructor with optional custom registry.
   BridgeRegistryManager([LibraryRegistry? customRegistry])
-      : registry = customRegistry ?? LibraryRegistry();
+    : registry = customRegistry ?? LibraryRegistry();
 
   /// Registers a bridged class with automatic deduplication.
   ///
@@ -153,10 +153,7 @@ class RegistrationContext {
   /// Number of duplicate registrations skipped.
   int _duplicatesSkipped = 0;
 
-  RegistrationContext({
-    required this.sourceUri,
-    required this.manager,
-  });
+  RegistrationContext({required this.sourceUri, required this.manager});
 
   /// Registers a class with source context.
   void addClass(BridgedClass bridgedClass, String libraryPath) {

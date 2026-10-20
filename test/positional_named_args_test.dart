@@ -144,10 +144,11 @@ void main() {
         expect(result, equals('[content]'));
       });
 
-      test('should handle multiple positional and multiple named arguments',
-          () {
-        final result = d4rt.execute(
-          source: '''
+      test(
+        'should handle multiple positional and multiple named arguments',
+        () {
+          final result = d4rt.execute(
+            source: '''
             String buildQuery(
               String table,
               String column,
@@ -164,15 +165,16 @@ void main() {
               return query;
             }
           ''',
-          name: 'buildQuery',
-          positionalArgs: ['users', 'name'],
-          namedArgs: {'where': 'active = true', 'limit': 50},
-        );
-        expect(
-          result,
-          equals('SELECT name FROM users WHERE active = true LIMIT 50'),
-        );
-      });
+            name: 'buildQuery',
+            positionalArgs: ['users', 'name'],
+            namedArgs: {'where': 'active = true', 'limit': 50},
+          );
+          expect(
+            result,
+            equals('SELECT name FROM users WHERE active = true LIMIT 50'),
+          );
+        },
+      );
 
       test('should handle complex business logic with mixed args', () {
         final result = d4rt.execute(
@@ -205,11 +207,7 @@ void main() {
           ''',
           name: 'processOrder',
           positionalArgs: ['PROD-001', 3],
-          namedArgs: {
-            'discount': 0.1,
-            'express': true,
-            'couponCode': 'SAVE10',
-          },
+          namedArgs: {'discount': 0.1, 'express': true, 'couponCode': 'SAVE10'},
         );
 
         expect(result['productId'], equals('PROD-001'));
@@ -234,7 +232,7 @@ void main() {
           ''',
           name: 'sumList',
           positionalArgs: [
-            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
           ],
         );
         expect(result, equals(55));
@@ -258,8 +256,8 @@ void main() {
             [
               [1, 2, 3],
               [4, 5, 6],
-              [7, 8, 9]
-            ]
+              [7, 8, 9],
+            ],
           ],
         );
         expect(result, equals([1, 2, 3, 4, 5, 6, 7, 8, 9]));
@@ -274,7 +272,7 @@ void main() {
           ''',
           name: 'getKeys',
           positionalArgs: [
-            {'a': 1, 'b': 2, 'c': 3}
+            {'a': 1, 'b': 2, 'c': 3},
           ],
         );
         expect(result, containsAll(['a', 'b', 'c']));
@@ -300,11 +298,11 @@ void main() {
             {
               'user': {
                 'profile': {
-                  'settings': {'theme': 'dark'}
-                }
-              }
+                  'settings': {'theme': 'dark'},
+                },
+              },
             },
-            ['user', 'profile', 'settings', 'theme']
+            ['user', 'profile', 'settings', 'theme'],
           ],
         );
         expect(result, equals('dark'));
@@ -324,7 +322,7 @@ void main() {
           name: 'mapNumbers',
           positionalArgs: [
             [1, 2, 3, 4],
-            [10, 100]
+            [10, 100],
           ],
         );
         expect(result, equals([10, 200, 30, 400]));
@@ -333,21 +331,22 @@ void main() {
 
     group('Optional positional arguments', () {
       test(
-          'should handle optional positional arguments with defaults via named args',
-          () {
-        // Note: Optional positional parameters [...] are best handled via named args
-        // or by using required positional parameters
-        final result = d4rt.execute(
-          source: '''
+        'should handle optional positional arguments with defaults via named args',
+        () {
+          // Note: Optional positional parameters [...] are best handled via named args
+          // or by using required positional parameters
+          final result = d4rt.execute(
+            source: '''
             String greet({String name = "Guest", String greeting = "Hello"}) {
               return "\$greeting, \$name!";
             }
           ''',
-          name: 'greet',
-          namedArgs: {'name': 'Alice'},
-        );
-        expect(result, equals('Hello, Alice!'));
-      });
+            name: 'greet',
+            namedArgs: {'name': 'Alice'},
+          );
+          expect(result, equals('Hello, Alice!'));
+        },
+      );
 
       test('should handle all optional parameters via named args', () {
         final result = d4rt.execute(
@@ -381,33 +380,37 @@ void main() {
     });
 
     group('Error handling', () {
-      test('should throw error when required positional argument is missing',
-          () {
-        expect(
-          () => d4rt.execute(
-            source: '''
+      test(
+        'should throw error when required positional argument is missing',
+        () {
+          expect(
+            () => d4rt.execute(
+              source: '''
               int add(int a, int b) => a + b;
             ''',
-            name: 'add',
-            positionalArgs: [1], // Missing second argument
-          ),
-          throwsA(isA<RuntimeError>()),
-        );
-      });
+              name: 'add',
+              positionalArgs: [1], // Missing second argument
+            ),
+            throwsA(isA<RuntimeError>()),
+          );
+        },
+      );
 
-      test('should throw error when too many positional arguments provided',
-          () {
-        expect(
-          () => d4rt.execute(
-            source: '''
+      test(
+        'should throw error when too many positional arguments provided',
+        () {
+          expect(
+            () => d4rt.execute(
+              source: '''
               int add(int a, int b) => a + b;
             ''',
-            name: 'add',
-            positionalArgs: [1, 2, 3], // Too many arguments
-          ),
-          throwsA(isA<RuntimeError>()),
-        );
-      });
+              name: 'add',
+              positionalArgs: [1, 2, 3], // Too many arguments
+            ),
+            throwsA(isA<RuntimeError>()),
+          );
+        },
+      );
 
       test('should throw error when required named argument is missing', () {
         expect(

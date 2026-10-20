@@ -5,9 +5,7 @@ import 'package:test/test.dart';
 void main() {
   group('BridgeOverride Annotation', () {
     test('stores library path', () {
-      const annotation = BridgeOverride(
-        library: 'package:my_pkg/src/api.dart',
-      );
+      const annotation = BridgeOverride(library: 'package:my_pkg/src/api.dart');
 
       expect(annotation.library, equals('package:my_pkg/src/api.dart'));
       expect(annotation.targetClass, isNull);
@@ -90,8 +88,10 @@ void main() {
     });
 
     test('stores optional reason', () {
-      const annotation =
-          OverrideConstructor('create', 'Factory needs special handling');
+      const annotation = OverrideConstructor(
+        'create',
+        'Factory needs special handling',
+      );
 
       expect(annotation.reason, contains('Factory'));
     });
@@ -154,10 +154,9 @@ void main() {
     });
 
     test('stores optional reason', () {
-      const annotation = ExcludeMembers(
-        ['debugOnly'],
-        reason: 'Not needed in production bridges',
-      );
+      const annotation = ExcludeMembers([
+        'debugOnly',
+      ], reason: 'Not needed in production bridges');
 
       expect(annotation.reason, contains('production'));
     });
@@ -171,10 +170,7 @@ void main() {
     });
 
     test('custom mapping overrides types', () {
-      const annotation = UseTypeErasure({
-        'T': 'Object',
-        'E': 'num',
-      });
+      const annotation = UseTypeErasure({'T': 'Object', 'E': 'num'});
 
       expect(annotation.typeMapping, isNotNull);
       expect(annotation.typeMapping!['T'], equals('Object'));
@@ -239,10 +235,7 @@ void main() {
     });
 
     test('stores optional since version', () {
-      const annotation = DeprecatedBridge(
-        'Old API.',
-        since: '2.0.0',
-      );
+      const annotation = DeprecatedBridge('Old API.', since: '2.0.0');
 
       expect(annotation.since, equals('2.0.0'));
     });
@@ -260,7 +253,9 @@ void main() {
 
       expect(config.hasOverrides('package:test/test.dart'), isTrue);
       expect(
-          config.getOverrides('package:test/test.dart'), contains(_TestBridge));
+        config.getOverrides('package:test/test.dart'),
+        contains(_TestBridge),
+      );
     });
 
     test('returns empty list for unregistered library', () {
@@ -283,8 +278,10 @@ void main() {
       config.register<_TestBridge>('package:a/a.dart');
       config.register<_TestBridge>('package:b/b.dart');
 
-      expect(config.libraries,
-          containsAll(['package:a/a.dart', 'package:b/b.dart']));
+      expect(
+        config.libraries,
+        containsAll(['package:a/a.dart', 'package:b/b.dart']),
+      );
     });
   });
 

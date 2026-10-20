@@ -18,7 +18,9 @@ void main() {
       }
       ''';
       expect(
-          execute(source), equals([1, 26, 1590, 95445, 95445500, 95445500250]));
+        execute(source),
+        equals([1, 26, 1590, 95445, 95445500, 95445500250]),
+      );
     });
 
     test('Duration.fromMilliseconds and fromMicroseconds', () {

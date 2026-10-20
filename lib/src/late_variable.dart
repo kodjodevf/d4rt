@@ -9,7 +9,7 @@ class LateVariable {
   final bool _isFinal;
 
   LateVariable(this._name, this._initializer, {bool isFinal = false})
-      : _isFinal = isFinal;
+    : _isFinal = isFinal;
 
   /// Gets the value of the late variable, initializing it if necessary
   Object? get value {
@@ -19,11 +19,13 @@ class LateVariable {
         _value = _initializer();
         _isInitialized = true;
         Logger.debug(
-            "[LateVariable] Lazy initialized '$_name' with value: $_value");
+          "[LateVariable] Lazy initialized '$_name' with value: $_value",
+        );
       } else {
         // Late variable without initializer accessed before assignment
         throw LateInitializationError(
-            "LateInitializationError: Late variable '$_name' without initializer is accessed before being assigned.");
+          "LateInitializationError: Late variable '$_name' without initializer is accessed before being assigned.",
+        );
       }
     }
     return _value;
@@ -33,7 +35,8 @@ class LateVariable {
   void assign(Object? value) {
     if (_isFinal && _isInitialized) {
       throw LateInitializationError(
-          "LateInitializationError: Late final variable '$_name' has already been assigned.");
+        "LateInitializationError: Late final variable '$_name' has already been assigned.",
+      );
     }
     _value = value;
     _isInitialized = true;
@@ -44,7 +47,8 @@ class LateVariable {
   set value(Object? newValue) {
     if (_isInitialized && _isFinal) {
       throw LateInitializationError(
-          "LateInitializationError: Field '$_name' has already been initialized.");
+        "LateInitializationError: Field '$_name' has already been initialized.",
+      );
     }
     _value = newValue;
     _isInitialized = true;

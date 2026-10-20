@@ -5,7 +5,9 @@ void main() {
   group('TypedData stdlib tests', () {
     test('TypedData supertype check and property access', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:typed_data';
 
         main() {
@@ -24,7 +26,9 @@ void main() {
             f64.lengthInBytes,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);

@@ -5,7 +5,8 @@ void main() {
   group('WeakReference and Finalizer stdlib tests', () {
     test('WeakReference basic usage', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         class Data {
@@ -18,14 +19,16 @@ void main() {
           final ref = WeakReference(data);
           return [ref.target != null, (ref.target as Data).name];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([true, 'secret']));
     });
 
     test('Finalizer attach and detach methods', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         class Resource {
@@ -48,7 +51,8 @@ void main() {
 
           return [finalizer != null, finalizer.hashCode != 0];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([true, true]));
     });

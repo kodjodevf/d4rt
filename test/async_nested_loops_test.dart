@@ -5,9 +5,10 @@ dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt();
 
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -399,9 +400,9 @@ void main() {
 
     final result = await execute(source);
     expect(
-        result,
-        equals(
-            5)); // start:item1, start:item2, middle:item3, middle:item4, middle:item5
+      result,
+      equals(5),
+    ); // start:item1, start:item2, middle:item3, middle:item4, middle:item5
   });
 
   test('Async nested for-in loops with exception handling', () async {

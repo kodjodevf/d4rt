@@ -5,7 +5,8 @@ void main() {
   group('Extended TypedData stdlib tests', () {
     test('Int8List basic operations', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:typed_data';
 
         main() {
@@ -15,14 +16,16 @@ void main() {
           list[2] = 42;
           return list.toList();
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([127, -128, 42]));
     });
 
     test('Uint8ClampedList clamping behavior', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:typed_data';
 
         main() {
@@ -32,14 +35,16 @@ void main() {
           list[2] = 100;
           return list.toList();
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([255, 0, 100]));
     });
 
     test('Uint16List and Int32List', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:typed_data';
 
         main() {
@@ -47,17 +52,22 @@ void main() {
           final i32 = Int32List.fromList([2147483647, -2147483648]);
           return [u16.toList(), i32.toList()];
         }
-      ''');
+      ''',
+      );
 
-      expect(result, equals([
-        [65535, 1000],
-        [2147483647, -2147483648],
-      ]));
+      expect(
+        result,
+        equals([
+          [65535, 1000],
+          [2147483647, -2147483648],
+        ]),
+      );
     });
 
     test('Uint32List and Float64List', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:typed_data';
 
         main() {
@@ -68,12 +78,16 @@ void main() {
           final f64 = Float64List.fromList([3.141592653589793, 2.718281828459045]);
           return [u32.toList(), f64.toList()];
         }
-      ''');
+      ''',
+      );
 
-      expect(result, equals([
-        [4294967295, 100],
-        [3.141592653589793, 2.718281828459045],
-      ]));
+      expect(
+        result,
+        equals([
+          [4294967295, 100],
+          [3.141592653589793, 2.718281828459045],
+        ]),
+      );
     });
   });
 }

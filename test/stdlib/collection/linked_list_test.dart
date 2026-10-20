@@ -6,7 +6,8 @@ void main() {
   const String testLibPath = 'd4rt-mem:/linked_list_test.dart';
 
   dynamic executeTestScript(String scriptBody) {
-    final fullScript = '''
+    final fullScript =
+        '''
       import 'dart:collection';
 
       main() {
@@ -176,7 +177,8 @@ void main() {
       // Unlinking an entry that was never added
       expect(
         () => executeTestScript(
-            'var entry = LinkedListEntry(0); entry.unlink();'),
+          'var entry = LinkedListEntry(0); entry.unlink();',
+        ),
         throwsA(isA<RuntimeError>()),
       );
 

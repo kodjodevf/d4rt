@@ -102,8 +102,10 @@ void main() {
         ];
       }
       ''';
-      expect(execute(source),
-          equals([2023, 10, 1, 12, 30, 45, 123, 456, 7, false]));
+      expect(
+        execute(source),
+        equals([2023, 10, 1, 12, 30, 45, 123, 456, 7, false]),
+      );
     });
 
     test('DateTime.toUtc and toLocal', () {

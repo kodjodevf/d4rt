@@ -96,12 +96,12 @@ main() async {
       try {
         final result = await execute(source);
         expect(
-            result,
-            anyOf([
-              equals('Echo: Hello Server'),
-              startsWith(
-                  'Error:') // Accept errors as network tests can be flaky
-            ]));
+          result,
+          anyOf([
+            equals('Echo: Hello Server'),
+            startsWith('Error:'), // Accept errors as network tests can be flaky
+          ]),
+        );
       } catch (e) {
         // Skip test if networking is not available
         print('Skipping socket server test: $e');

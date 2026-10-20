@@ -22,8 +22,12 @@ class Logger {
 
   static final String _resetColor = '\x1B[0m';
 
-  static void log(String message,
-      {LogLevel level = LogLevel.info, Object? error, StackTrace? stackTrace}) {
+  static void log(
+    String message, {
+    LogLevel level = LogLevel.info,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     if (!_shouldLog(level)) return;
     final now = DateTime.now();
     final timestamp = now

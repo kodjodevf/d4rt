@@ -4,9 +4,10 @@ import 'package:d4rt/d4rt.dart';
 dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt()..setDebug(false);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -27,11 +28,12 @@ void main() {
       // This should now work with our implementation
       final result = execute(code);
       expect(
-          result,
-          equals([
-            1,
-            [2, 3, 4, 5]
-          ]));
+        result,
+        equals([
+          1,
+          [2, 3, 4, 5],
+        ]),
+      );
     });
 
     test('Rest elements in map patterns', () {
@@ -50,11 +52,12 @@ void main() {
       // This should now work with our implementation
       final result = execute(code);
       expect(
-          result,
-          equals([
-            1,
-            {'b': 2, 'c': 3}
-          ]));
+        result,
+        equals([
+          1,
+          {'b': 2, 'c': 3},
+        ]),
+      );
     });
 
     test('Object patterns with complex matching', () {

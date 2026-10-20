@@ -100,16 +100,17 @@ void main() {
     });
 
     test(
-        'double.toStringAsFixed, toStringAsExponential, and toStringAsPrecision',
-        () {
-      const source = '''
+      'double.toStringAsFixed, toStringAsExponential, and toStringAsPrecision',
+      () {
+        const source = '''
       main() {
         double value = 123.456789;
         return [value.toStringAsFixed(2), value.toStringAsExponential(2), value.toStringAsPrecision(4)];
       }
       ''';
-      expect(execute(source), equals(['123.46', '1.23e+2', '123.5']));
-    });
+        expect(execute(source), equals(['123.46', '1.23e+2', '123.5']));
+      },
+    );
 
     test('double.hashCode', () {
       const source = '''

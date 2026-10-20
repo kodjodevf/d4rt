@@ -10,7 +10,9 @@ void main() {
     });
 
     test('Point operators, distances, and is-checks', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:math';
 
         main() {
@@ -32,7 +34,9 @@ void main() {
             isPt,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(3));
       expect(result[1], equals(4));
@@ -44,7 +48,9 @@ void main() {
     });
 
     test('Rectangle.fromPoints, intersection, and is-checks', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:math';
 
         main() {
@@ -73,7 +79,9 @@ void main() {
             isMutRect,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(10));
       expect(result[1], equals(20));

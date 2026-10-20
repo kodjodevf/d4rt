@@ -6,15 +6,17 @@ void main() {
 
   group('ListQueue Tests', () {
     test('ListQueue() constructor and basic properties', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue();
             return [queue.length, queue.isEmpty, queue.isNotEmpty];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], 0);
       expect(result[1], true);
       expect(result[2], false);
@@ -23,8 +25,9 @@ void main() {
     test('ListQueue(initialCapacity) constructor', () {
       // Note: Testing initialCapacity is tricky without exposing internal details.
       // We mainly test that it doesn't crash and basic operations work.
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue(5);
@@ -32,14 +35,16 @@ void main() {
             return [queue.length, queue.first];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], 1);
       expect(result[1], 1);
     });
 
     test('ListQueue.from() constructor', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final sourceList = [1, 2, 3];
@@ -47,7 +52,8 @@ void main() {
             return [queue.length, queue.first, queue.last, queue.toList()];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], 3, reason: "Length from list");
       expect(result[1], 1, reason: "First element");
       expect(result[2], 3, reason: "Last element");
@@ -55,8 +61,9 @@ void main() {
     });
 
     test('add, addFirst, addLast, length, first, last', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue();
@@ -77,7 +84,8 @@ void main() {
             return [l1, f1, la1, l2, f2, la2, l3, f3, la3, queue.toList()];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], 1, reason: "l1");
       expect(result[1], 10, reason: "f1");
       expect(result[2], 10, reason: "la1");
@@ -91,8 +99,9 @@ void main() {
     });
 
     test('removeFirst, removeLast', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue.from([1, 2, 3, 4]);
@@ -107,7 +116,8 @@ void main() {
             return [rf1, rl1, rf2, l, f, la, rf3, isEmpty, queue.toList()];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], 1, reason: "rf1");
       expect(result[1], 4, reason: "rl1");
       expect(result[2], 2, reason: "rf2");
@@ -121,32 +131,37 @@ void main() {
 
     test('removeFirst/removeLast on empty queue throws error', () {
       expect(
-        () => d4rt.execute(source: '''
+        () => d4rt.execute(
+          source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue();
             queue.removeFirst();
           }
-        '''),
+        ''',
+        ),
         throwsA(isA<RuntimeError>()),
         reason: "removeFirst on empty queue",
       );
       expect(
-        () => d4rt.execute(source: '''
+        () => d4rt.execute(
+          source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue();
             queue.removeLast();
           }
-        '''),
+        ''',
+        ),
         throwsA(isA<RuntimeError>()),
         reason: "removeLast on empty queue",
       );
     });
 
     test('clear() and isEmpty', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue.from([1, 2, 3]);
@@ -155,15 +170,17 @@ void main() {
             return [initialLength, queue.length, queue.isEmpty];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], 3, reason: "Initial length");
       expect(result[1], 0, reason: "Length after clear");
       expect(result[2], true, reason: "isEmpty after clear");
     });
 
     test('remove() specific element', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue.from([10, 20, 30, 20, 40]);
@@ -173,18 +190,23 @@ void main() {
             return [r1, r2, r3, queue.toList(), queue.length];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], true, reason: "remove first 20");
       expect(result[1], false, reason: "remove non-existent 50");
       expect(result[2], true, reason: "remove second 20");
-      expect(result[3], orderedEquals([10, 30, 40]),
-          reason: "toList after removes");
+      expect(
+        result[3],
+        orderedEquals([10, 30, 40]),
+        reason: "toList after removes",
+      );
       expect(result[4], 3, reason: "length after removes");
     });
 
     test('addAll()', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue.from([1, 2]);
@@ -192,13 +214,15 @@ void main() {
             return queue.toList();
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result, orderedEquals([1, 2, 3, 4, 5]));
     });
 
     test('forEach() and iterator', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue.from(['a', 'b', 'c']);
@@ -213,43 +237,71 @@ void main() {
             return [forEachElements, iteratorElements];
           }
         ''',
-      ) as List;
-      expect(result[0], orderedEquals(['a', 'b', 'c']),
-          reason: "forEachElements");
-      expect(result[1], orderedEquals(['a', 'b', 'c']),
-          reason: "iteratorElements");
+              )
+              as List;
+      expect(
+        result[0],
+        orderedEquals(['a', 'b', 'c']),
+        reason: "forEachElements",
+      );
+      expect(
+        result[1],
+        orderedEquals(['a', 'b', 'c']),
+        reason: "iteratorElements",
+      );
     });
 
     test('single getter', () {
-      d4rt.execute(source: '''
+      d4rt.execute(
+        source: '''
           import 'dart:collection';
           main() {
             final q = ListQueue.from([77]);
             return q.single;
           }
-      ''', name: 'main');
-      expect(d4rt.execute(source: '''
+      ''',
+        name: 'main',
+      );
+      expect(
+        d4rt.execute(
+          source: '''
           import 'dart:collection';
           main() {
             final q = ListQueue.from([77]);
             return q.single;
           }
-      ''', name: 'main'), 77);
+      ''',
+          name: 'main',
+        ),
+        77,
+      );
 
-      expect(() => d4rt.execute(source: '''
+      expect(
+        () => d4rt.execute(
+          source: '''
             import 'dart:collection';
             main() { ListQueue().single; }
-        '''), throwsA(isA<RuntimeError>()), reason: "single on empty queue");
-      expect(() => d4rt.execute(source: '''
+        ''',
+        ),
+        throwsA(isA<RuntimeError>()),
+        reason: "single on empty queue",
+      );
+      expect(
+        () => d4rt.execute(
+          source: '''
             import 'dart:collection';
             main() { ListQueue.from([1,2]).single; }
-        '''), throwsA(isA<RuntimeError>()),
-          reason: "single on multi-element queue");
+        ''',
+        ),
+        throwsA(isA<RuntimeError>()),
+        reason: "single on multi-element queue",
+      );
     });
 
     test('toList() growable', () {
-      final result = d4rt.execute(
-        source: '''
+      final result =
+          d4rt.execute(
+                source: '''
           import 'dart:collection';
           main() {
             final queue = ListQueue.from([1,2,3]);
@@ -266,7 +318,8 @@ void main() {
             return [list1, error];
           }
         ''',
-      ) as List;
+              )
+              as List;
       expect(result[0], orderedEquals([1, 2, 3, 4]));
       expect(result[1], true, reason: "Error adding to non-growable list");
     });

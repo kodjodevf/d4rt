@@ -5,57 +5,63 @@ import 'bridged_enum.dart';
 // and type conversion.
 
 /// Calls a native constructor.
-typedef BridgedConstructorCallable = Object? Function(
-    InterpreterVisitor
-        visitor, // For potential evaluation of args or access env
-    List<Object?> positionalArgs, // Interpretted arguments
-    Map<String, Object?> namedArgs // Interpretted arguments
+typedef BridgedConstructorCallable =
+    Object? Function(
+      InterpreterVisitor
+      visitor, // For potential evaluation of args or access env
+      List<Object?> positionalArgs, // Interpretted arguments
+      Map<String, Object?> namedArgs, // Interpretted arguments
     );
 
 /// Calls a native method/getter/setter.
-typedef BridgedMethodCallable = Object? Function(
-    InterpreterVisitor visitor,
-    Object
-        target, // The native target object (for instance methods/getters/setters)
-    List<Object?> positionalArgs,
-    Map<String, Object?> namedArgs);
+typedef BridgedMethodCallable =
+    Object? Function(
+      InterpreterVisitor visitor,
+      Object
+      target, // The native target object (for instance methods/getters/setters)
+      List<Object?> positionalArgs,
+      Map<String, Object?> namedArgs,
+    );
 
-typedef BridgedMethodAdapter = Object? Function(
-    InterpreterVisitor visitor, // The current visitor
-    Object target, // The native target object to call the method on
-    List<Object?> positionalArguments, // Interpretted arguments
-    Map<String, Object?> namedArguments // Interpretted arguments
+typedef BridgedMethodAdapter =
+    Object? Function(
+      InterpreterVisitor visitor, // The current visitor
+      Object target, // The native target object to call the method on
+      List<Object?> positionalArguments, // Interpretted arguments
+      Map<String, Object?> namedArguments, // Interpretted arguments
     );
 
 /// Adapter for bridged static methods.
 /// Takes interpreter context, positional args, named args.
 /// Returns the result of the native static method call.
-typedef BridgedStaticMethodAdapter = Object? Function(
-    InterpreterVisitor visitor,
-    List<Object?> positionalArguments,
-    Map<String, Object?> namedArguments);
+typedef BridgedStaticMethodAdapter =
+    Object? Function(
+      InterpreterVisitor visitor,
+      List<Object?> positionalArguments,
+      Map<String, Object?> namedArguments,
+    );
 
 /// Adapter for bridged static getters.
 /// Takes interpreter context.
 /// Returns the result of the native static getter.
-typedef BridgedStaticGetterAdapter = Object? Function(
-    InterpreterVisitor visitor);
+typedef BridgedStaticGetterAdapter =
+    Object? Function(InterpreterVisitor visitor);
 
 /// Adapter for bridged static setters.
 /// Takes interpreter context, the value to set.
-typedef BridgedStaticSetterAdapter = void Function(
-    InterpreterVisitor visitor, Object? value);
+typedef BridgedStaticSetterAdapter =
+    void Function(InterpreterVisitor visitor, Object? value);
 
 /// Adapter for bridged instance getters.
 /// Takes interpreter context, the native target object.
 /// Returns the result of the native instance getter.
-typedef BridgedInstanceGetterAdapter = Object? Function(
-    InterpreterVisitor? visitor, Object target);
+typedef BridgedInstanceGetterAdapter =
+    Object? Function(InterpreterVisitor? visitor, Object target);
 
 /// Adapter for bridged instance setters.
 /// Takes interpreter context, the native target object, the value to set.
-typedef BridgedInstanceSetterAdapter = void Function(
-    InterpreterVisitor? visitor, Object target, Object? value);
+typedef BridgedInstanceSetterAdapter =
+    void Function(InterpreterVisitor? visitor, Object target, Object? value);
 
 class BridgedEnumDefinition<T extends Enum> {
   /// The name under which the enum will be known in the interpreter.

@@ -27,10 +27,13 @@ class DeveloperStdlib {
 
     // Register Global Functions
     environment.define(
-        'log',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'log',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty || arguments[0] is! String) {
-            throw RuntimeError("log requires at least one String message argument.");
+            throw RuntimeError(
+              "log requires at least one String message argument.",
+            );
           }
           final message = arguments[0] as String;
           final time = namedArguments['time'] as DateTime?;
@@ -52,47 +55,68 @@ class DeveloperStdlib {
             stackTrace: stackTrace,
           );
           return null;
-        }, arity: 1, name: 'log'));
+        },
+        arity: 1,
+        name: 'log',
+      ),
+    );
 
     environment.define(
-        'debugger',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'debugger',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           final when = namedArguments['when'] as bool? ?? true;
           final message = namedArguments['message'] as String?;
           return debugger(when: when, message: message);
-        }, arity: 0, name: 'debugger'));
+        },
+        arity: 0,
+        name: 'debugger',
+      ),
+    );
 
     environment.define(
-        'inspect',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'inspect',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty) {
             throw RuntimeError("inspect requires one object argument.");
           }
           return inspect(arguments[0]);
-        }, arity: 1, name: 'inspect'));
+        },
+        arity: 1,
+        name: 'inspect',
+      ),
+    );
 
     environment.define(
-        'postEvent',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'postEvent',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.length < 2 ||
               arguments[0] is! String ||
               arguments[1] is! Map) {
             throw RuntimeError(
-                "postEvent requires a String eventKind and a Map eventData.");
+              "postEvent requires a String eventKind and a Map eventData.",
+            );
           }
           final eventKind = arguments[0] as String;
           final eventData = (arguments[1] as Map).cast<String, dynamic>();
           postEvent(eventKind, eventData);
           return null;
-        }, arity: 2, name: 'postEvent'));
+        },
+        arity: 2,
+        name: 'postEvent',
+      ),
+    );
 
     environment.define(
-        'registerExtension',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
-          if (arguments.length < 2 ||
-              arguments[0] is! String) {
+      'registerExtension',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
+          if (arguments.length < 2 || arguments[0] is! String) {
             throw RuntimeError(
-                "registerExtension requires a String method and a function handler.");
+              "registerExtension requires a String method and a function handler.",
+            );
           }
           final method = arguments[0] as String;
           final handler = arguments[1];
@@ -109,9 +133,15 @@ class DeveloperStdlib {
             if (resolvedResult is ServiceExtensionResponse) {
               return resolvedResult;
             }
-            throw RuntimeError("Service extension handler must return a ServiceExtensionResponse.");
+            throw RuntimeError(
+              "Service extension handler must return a ServiceExtensionResponse.",
+            );
           });
           return null;
-        }, arity: 2, name: 'registerExtension'));
+        },
+        arity: 2,
+        name: 'registerExtension',
+      ),
+    );
   }
 }

@@ -45,7 +45,7 @@ class AppliedRuntimeType implements RuntimeType {
   final List<RuntimeType> typeArguments;
 
   AppliedRuntimeType(this.baseType, List<RuntimeType> typeArguments)
-      : typeArguments = List.unmodifiable(typeArguments);
+    : typeArguments = List.unmodifiable(typeArguments);
 
   @override
   String get name =>
@@ -54,7 +54,8 @@ class AppliedRuntimeType implements RuntimeType {
   @override
   bool isSubtypeOf(RuntimeType other, {Object? value}) {
     if (other is AppliedRuntimeType) {
-      final baseMatches = identical(baseType, other.baseType) ||
+      final baseMatches =
+          identical(baseType, other.baseType) ||
           baseType.name == other.baseType.name ||
           baseType.isSubtypeOf(other.baseType, value: value);
       if (!baseMatches || typeArguments.length != other.typeArguments.length) {
@@ -67,8 +68,10 @@ class AppliedRuntimeType implements RuntimeType {
           continue;
         }
 
-        if (!typeArguments[index]
-            .isSubtypeOf(other.typeArguments[index], value: value)) {
+        if (!typeArguments[index].isSubtypeOf(
+          other.typeArguments[index],
+          value: value,
+        )) {
           return false;
         }
       }
@@ -103,12 +106,14 @@ class FunctionRuntimeType implements RuntimeType {
     Set<String>? requiredNamedParameters,
     this.typeParameterCount = 0,
     this.isUntyped = false,
-  })  : returnType = returnType ?? _dynamicType,
-        positionalParameterTypes =
-            List.unmodifiable(positionalParameterTypes ?? const []),
-        namedParameterTypes = Map.unmodifiable(namedParameterTypes ?? const {}),
-        requiredNamedParameters =
-            Set.unmodifiable(requiredNamedParameters ?? const {});
+  }) : returnType = returnType ?? _dynamicType,
+       positionalParameterTypes = List.unmodifiable(
+         positionalParameterTypes ?? const [],
+       ),
+       namedParameterTypes = Map.unmodifiable(namedParameterTypes ?? const {}),
+       requiredNamedParameters = Set.unmodifiable(
+         requiredNamedParameters ?? const {},
+       );
 
   factory FunctionRuntimeType.untyped() => FunctionRuntimeType(isUntyped: true);
 
@@ -214,15 +219,19 @@ class FunctionRuntimeType implements RuntimeType {
     }
 
     for (int index = 0; index < positionalParameterTypes.length; index++) {
-      if (!_isParameterTypeCompatible(positionalParameterTypes[index],
-          other.positionalParameterTypes[index])) {
+      if (!_isParameterTypeCompatible(
+        positionalParameterTypes[index],
+        other.positionalParameterTypes[index],
+      )) {
         return false;
       }
     }
 
     for (final entry in namedParameterTypes.entries) {
       if (!_isParameterTypeCompatible(
-          entry.value, other.namedParameterTypes[entry.key]!)) {
+        entry.value,
+        other.namedParameterTypes[entry.key]!,
+      )) {
         return false;
       }
     }
@@ -258,8 +267,8 @@ class RecordRuntimeType implements RuntimeType {
   RecordRuntimeType(
     List<RuntimeType> positionalFieldTypes,
     Map<String, RuntimeType> namedFieldTypes,
-  )   : positionalFieldTypes = List.unmodifiable(positionalFieldTypes),
-        namedFieldTypes = Map.unmodifiable(namedFieldTypes);
+  ) : positionalFieldTypes = List.unmodifiable(positionalFieldTypes),
+      namedFieldTypes = Map.unmodifiable(namedFieldTypes);
 
   @override
   String get name {
@@ -320,14 +329,18 @@ class RecordRuntimeType implements RuntimeType {
 
     for (int index = 0; index < positionalFieldTypes.length; index++) {
       if (!_isFieldTypeCompatible(
-          positionalFieldTypes[index], other.positionalFieldTypes[index])) {
+        positionalFieldTypes[index],
+        other.positionalFieldTypes[index],
+      )) {
         return false;
       }
     }
 
     for (final entry in namedFieldTypes.entries) {
       if (!_isFieldTypeCompatible(
-          entry.value, other.namedFieldTypes[entry.key]!)) {
+        entry.value,
+        other.namedFieldTypes[entry.key]!,
+      )) {
         return false;
       }
     }

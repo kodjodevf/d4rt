@@ -53,11 +53,14 @@ void main() {
       });
 
       test('should evaluate null-aware expressions', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           String? nullableValue;
           String nonNullValue = "hello";
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('nullableValue ?? "default"'), equals('default'));
         expect(d4rt.eval('nonNullValue ?? "default"'), equals('hello'));
@@ -77,12 +80,15 @@ void main() {
 
     group('Variable access and modification', () {
       test('should access existing variables', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var counter = 42;
           final name = "Alice";
           const pi = 3.14159;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('counter'), equals(42));
         expect(d4rt.eval('name'), equals('Alice'));
@@ -90,11 +96,14 @@ void main() {
       });
 
       test('should modify mutable variables', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var x = 10;
           var y = 20;
           int getSum() => x + y;
-        ''', name: 'getSum');
+        ''',
+          name: 'getSum',
+        );
 
         expect(d4rt.eval('getSum()'), equals(30));
 
@@ -120,10 +129,13 @@ void main() {
       });
 
       test('should handle variable shadowing in new scope', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var x = 10;
           int getX() => x;
-        ''', name: 'getX');
+        ''',
+          name: 'getX',
+        );
 
         expect(d4rt.eval('getX()'), equals(10));
 
@@ -133,10 +145,13 @@ void main() {
       });
 
       test('should handle list variables', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var numbers = [1, 2, 3];
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('numbers'), equals([1, 2, 3]));
         expect(d4rt.eval('numbers.length'), equals(3));
@@ -150,10 +165,13 @@ void main() {
       });
 
       test('should handle map variables', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var user = {'name': 'John', 'age': 30};
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('user["name"]'), equals('John'));
         expect(d4rt.eval('user["age"]'), equals(30));
@@ -168,12 +186,15 @@ void main() {
 
     group('Function calls', () {
       test('should call existing functions', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           int add(int a, int b) => a + b;
           int multiply(int a, int b) => a * b;
           String greet(String name) => "Hello, \$name!";
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('add(3, 4)'), equals(7));
         expect(d4rt.eval('multiply(5, 6)'), equals(30));
@@ -181,35 +202,40 @@ void main() {
       });
 
       test('should call functions with named arguments', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           String format({required String name, int age = 0}) {
             return "\$name is \$age years old";
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(
           d4rt.eval('format(name: "Alice", age: 25)'),
           equals('Alice is 25 years old'),
         );
-        expect(
-          d4rt.eval('format(name: "Bob")'),
-          equals('Bob is 0 years old'),
-        );
+        expect(d4rt.eval('format(name: "Bob")'), equals('Bob is 0 years old'));
       });
 
       test('should call chained functions', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           int double(int x) => x * 2;
           int addOne(int x) => x + 1;
           int square(int x) => x * x;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('double(addOne(5))'), equals(12)); // (5+1)*2
         expect(d4rt.eval('square(double(3))'), equals(36)); // (3*2)^2
         expect(
-            d4rt.eval('addOne(square(double(2)))'), equals(17)); // ((2*2)^2)+1
+          d4rt.eval('addOne(square(double(2)))'),
+          equals(17),
+        ); // ((2*2)^2)+1
       });
 
       test('should define and call new functions', () {
@@ -219,7 +245,8 @@ void main() {
         expect(d4rt.eval('cube(3)'), equals(27));
 
         d4rt.eval(
-            'String repeat(String s, int times) { String r = ""; for (int i = 0; i < times; i++) r += s; return r; }');
+          'String repeat(String s, int times) { String r = ""; for (int i = 0; i < times; i++) r += s; return r; }',
+        );
         expect(d4rt.eval('repeat("ab", 3)'), equals('ababab'));
       });
 
@@ -239,10 +266,13 @@ void main() {
       });
 
       test('should call async functions', () async {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           Future<int> asyncDouble(int x) async => x * 2;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         final result = await d4rt.eval('asyncDouble(21)');
         expect(result, equals(42));
@@ -251,7 +281,8 @@ void main() {
 
     group('Class interaction', () {
       test('should access existing classes', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           class Point {
             int x;
             int y;
@@ -259,7 +290,9 @@ void main() {
             int distanceSquared() => x * x + y * y;
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         d4rt.eval('var p = Point(3, 4);');
         expect(d4rt.eval('p.x'), equals(3));
@@ -268,7 +301,8 @@ void main() {
       });
 
       test('should modify class instance properties', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           class Counter {
             int value = 0;
             void increment() { value++; }
@@ -276,7 +310,9 @@ void main() {
             void add(int n) { value += n; }
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         d4rt.eval('var counter = Counter();');
         expect(d4rt.eval('counter.value'), equals(0));
@@ -293,7 +329,8 @@ void main() {
       });
 
       test('should work with multiple class instances', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           class Account {
             String name;
             double balance;
@@ -306,7 +343,9 @@ void main() {
             }
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         d4rt.eval('var alice = Account("Alice", 1000.0);');
         d4rt.eval('var bob = Account("Bob", 500.0);');
@@ -338,7 +377,8 @@ void main() {
       });
 
       test('should work with class inheritance', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           class Animal {
             String name;
             Animal(this.name);
@@ -356,7 +396,9 @@ void main() {
             String speak() => "Meow!";
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         d4rt.eval('var dog = Dog("Rex");');
         d4rt.eval('var cat = Cat("Whiskers");');
@@ -370,7 +412,8 @@ void main() {
       });
 
       test('should work with static members', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           class MathUtils {
             static const double pi = 3.14159;
             static int square(int x) => x * x;
@@ -380,7 +423,9 @@ void main() {
             }
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('MathUtils.pi'), closeTo(3.14159, 0.00001));
         expect(d4rt.eval('MathUtils.square(5)'), equals(25));
@@ -390,28 +435,34 @@ void main() {
 
     group('Complex control flow', () {
       test('should handle if expressions in eval', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var score = 75;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         // Using ternary operator
         expect(
           d4rt.eval(
-              'score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "F"'),
+            'score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "F"',
+          ),
           equals('C'),
         );
 
         d4rt.eval('score = 95;');
         expect(
           d4rt.eval(
-              'score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "F"'),
+            'score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "F"',
+          ),
           equals('A'),
         );
       });
 
       test('should handle loops through function calls', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           int sumRange(int start, int end) {
             int sum = 0;
             for (int i = start; i <= end; i++) {
@@ -420,14 +471,17 @@ void main() {
             return sum;
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('sumRange(1, 10)'), equals(55));
         expect(d4rt.eval('sumRange(1, 100)'), equals(5050));
       });
 
       test('should handle while loops in functions', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           int countDigits(int n) {
             int count = 0;
             while (n > 0) {
@@ -437,7 +491,9 @@ void main() {
             return count == 0 ? 1 : count;
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('countDigits(0)'), equals(1));
         expect(d4rt.eval('countDigits(5)'), equals(1));
@@ -448,13 +504,16 @@ void main() {
 
     group('State persistence', () {
       test('should persist state across multiple eval calls', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var history = <String>[];
           void addEntry(String entry) {
             history.add(entry);
           }
           List<String> getHistory() => history;
-        ''', name: 'getHistory');
+        ''',
+          name: 'getHistory',
+        );
 
         d4rt.eval('addEntry("First");');
         d4rt.eval('addEntry("Second");');
@@ -465,7 +524,8 @@ void main() {
       });
 
       test('should build complex state over multiple calls', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           class ShoppingCart {
             List<Map<String, dynamic>> items = [];
             
@@ -486,7 +546,9 @@ void main() {
           
           var cart = ShoppingCart();
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         d4rt.eval('cart.addItem("Apple", 1.50, 5);');
         d4rt.eval('cart.addItem("Bread", 2.00, 2);');
@@ -512,10 +574,7 @@ void main() {
       test('should throw error when called before execute', () {
         final freshD4rt = D4rt();
 
-        expect(
-          () => freshD4rt.eval('1 + 1'),
-          throwsA(isA<RuntimeError>()),
-        );
+        expect(() => freshD4rt.eval('1 + 1'), throwsA(isA<RuntimeError>()));
       });
 
       test('should throw error for undefined variables', () {
@@ -537,10 +596,13 @@ void main() {
       });
 
       test('should throw error for type mismatches', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           int add(int a, int b) => a + b;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         // Note: d4rt uses duck typing, so string concatenation with + works
         // This tests that calling a function with wrong types can still work
@@ -555,10 +617,7 @@ void main() {
         d4rt.execute(source: 'void init() {}', name: 'init');
 
         // Integer division by zero throws error
-        expect(
-          () => d4rt.eval('10 ~/ 0'),
-          throwsA(anything),
-        );
+        expect(() => d4rt.eval('10 ~/ 0'), throwsA(anything));
 
         // Double division by zero returns Infinity (IEEE 754 behavior)
         final result = d4rt.eval('10.0 / 0.0');
@@ -566,22 +625,23 @@ void main() {
       });
 
       test('should throw error for null pointer on non-nullable', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           String? nullable;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         // Calling method on null should throw
-        expect(
-          () => d4rt.eval('nullable!.length'),
-          throwsA(anything),
-        );
+        expect(() => d4rt.eval('nullable!.length'), throwsA(anything));
       });
     });
 
     group('Collection operations', () {
       test('should work with list comprehensions through functions', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           List<int> getSquares(int n) {
             List<int> result = [];
             for (int i = 1; i <= n; i++) {
@@ -590,16 +650,21 @@ void main() {
             return result;
           }
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('getSquares(5)'), equals([1, 4, 9, 16, 25]));
       });
 
       test('should use list methods', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var numbers = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3];
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt.eval('numbers.first'), equals(3));
         expect(d4rt.eval('numbers.last'), equals(3));
@@ -612,10 +677,13 @@ void main() {
       });
 
       test('should use map methods', () {
-        d4rt.execute(source: '''
+        d4rt.execute(
+          source: '''
           var data = <String, int>{};
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         d4rt.eval('data["one"] = 1;');
         d4rt.eval('data["two"] = 2;');
@@ -624,8 +692,10 @@ void main() {
         expect(d4rt.eval('data.length'), equals(3));
         expect(d4rt.eval('data.containsKey("two")'), isTrue);
         expect(d4rt.eval('data.containsValue(2)'), isTrue);
-        expect(d4rt.eval('data.keys.toList()'),
-            containsAll(['one', 'two', 'three']));
+        expect(
+          d4rt.eval('data.keys.toList()'),
+          containsAll(['one', 'two', 'three']),
+        );
       });
     });
 
@@ -634,15 +704,21 @@ void main() {
         final d4rt1 = D4rt();
         final d4rt2 = D4rt();
 
-        d4rt1.execute(source: '''
+        d4rt1.execute(
+          source: '''
           var x = 100;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
-        d4rt2.execute(source: '''
+        d4rt2.execute(
+          source: '''
           var x = 200;
           void init() {}
-        ''', name: 'init');
+        ''',
+          name: 'init',
+        );
 
         expect(d4rt1.eval('x'), equals(100));
         expect(d4rt2.eval('x'), equals(200));

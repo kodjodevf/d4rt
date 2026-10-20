@@ -213,7 +213,9 @@ void main() {
       );
 
       interpreter.registerBridgedClass(
-          bridgedClass, 'package:test/native_parent.dart');
+        bridgedClass,
+        'package:test/native_parent.dart',
+      );
 
       final source = '''
         import 'package:test/native_parent.dart';
@@ -279,7 +281,9 @@ void main() {
       );
 
       interpreter.registerBridgedClass(
-          bridgedClass, 'package:test/native_base.dart');
+        bridgedClass,
+        'package:test/native_base.dart',
+      );
 
       final source = '''
         import 'package:test/native_base.dart';
@@ -332,7 +336,9 @@ void main() {
       );
 
       interpreter.registerBridgedClass(
-          bridgedClass, 'package:test/native_number.dart');
+        bridgedClass,
+        'package:test/native_number.dart',
+      );
 
       final source = '''
         import 'package:test/native_number.dart';
@@ -384,7 +390,9 @@ void main() {
       );
 
       interpreter.registerBridgedClass(
-          bridgedClass, 'package:test/bridged_grand_parent.dart');
+        bridgedClass,
+        'package:test/bridged_grand_parent.dart',
+      );
 
       final source = '''
         import 'package:test/bridged_grand_parent.dart';
@@ -443,7 +451,9 @@ void main() {
       );
 
       interpreter.registerBridgedClass(
-          bridgedClass, 'package:test/native_mixed.dart');
+        bridgedClass,
+        'package:test/native_mixed.dart',
+      );
 
       final source = '''
         import 'package:test/native_mixed.dart';

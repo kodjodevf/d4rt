@@ -6,7 +6,8 @@ void main() {
   const String testLibPath = 'd4rt-mem:/uint8_list_test.dart';
 
   dynamic executeTestScript(String scriptBody) {
-    final fullScript = '''
+    final fullScript =
+        '''
       import 'dart:typed_data';
       main() {
         $scriptBody

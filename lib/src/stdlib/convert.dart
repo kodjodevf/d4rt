@@ -54,67 +54,99 @@ class ConvertStdlib {
 
     // Register global functions
     environment.define(
-        'jsonEncode',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'jsonEncode',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty) {
             throw RuntimeError(
-                'jsonEncode requires at least one positional argument (object).');
+              'jsonEncode requires at least one positional argument (object).',
+            );
           }
-          final toEncodableArg = namedArguments['toEncodable'] ??
+          final toEncodableArg =
+              namedArguments['toEncodable'] ??
               (arguments.length > 1 ? arguments[1] : null);
           return jsonEncode(
             arguments[0],
             toEncodable: wrapJsonToEncodable(visitor, toEncodableArg),
           );
-        }, arity: 1, name: 'jsonEncode'));
+        },
+        arity: 1,
+        name: 'jsonEncode',
+      ),
+    );
 
     environment.define(
-        'jsonDecode',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'jsonDecode',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty || arguments[0] is! String) {
             throw RuntimeError(
-                'jsonDecode requires one positional argument (String source).');
+              'jsonDecode requires one positional argument (String source).',
+            );
           }
-          final reviverArg = namedArguments['reviver'] ??
+          final reviverArg =
+              namedArguments['reviver'] ??
               (arguments.length > 1 ? arguments[1] : null);
           return jsonDecode(
             arguments[0] as String,
             reviver: wrapJsonReviver(visitor, reviverArg),
           );
-        }, arity: 1, name: 'jsonDecode'));
+        },
+        arity: 1,
+        name: 'jsonDecode',
+      ),
+    );
     environment.define(
-        'base64Encode',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'base64Encode',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.length != 1 || arguments[0] is! List) {
             throw RuntimeError(
-                'base64Encode requires one positional argument (List<int> source).');
+              'base64Encode requires one positional argument (List<int> source).',
+            );
           }
 
           return base64Encode(
             (arguments[0] as List).toNativeList().cast<int>(),
           );
-        }, arity: 1, name: 'base64Encode'));
+        },
+        arity: 1,
+        name: 'base64Encode',
+      ),
+    );
     environment.define(
-        'base64UrlEncode',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'base64UrlEncode',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.length != 1 || arguments[0] is! List) {
             throw RuntimeError(
-                'base64UrlEncode requires one positional argument (List<int> source).');
+              'base64UrlEncode requires one positional argument (List<int> source).',
+            );
           }
 
           return base64UrlEncode(
             (arguments[0] as List).toNativeList().cast<int>(),
           );
-        }, arity: 1, name: 'base64UrlEncode'));
+        },
+        arity: 1,
+        name: 'base64UrlEncode',
+      ),
+    );
     environment.define(
-        'base64Decode',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'base64Decode',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.length != 1 || arguments[0] is! String) {
             throw RuntimeError(
-                'base64Decode requires one positional argument (String source).');
+              'base64Decode requires one positional argument (String source).',
+            );
           }
           return base64Decode(arguments[0] as String);
-        }, arity: 1, name: 'base64Decode'));
+        },
+        arity: 1,
+        name: 'base64Decode',
+      ),
+    );
 
     // Register global instances
     environment.define('json', json);

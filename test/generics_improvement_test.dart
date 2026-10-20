@@ -4,9 +4,10 @@ import 'package:d4rt/d4rt.dart';
 dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt()..setDebug(false);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -44,11 +45,13 @@ void main() {
 
       expect(
         () => execute(invalidCode),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains('does not satisfy bound'),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('does not satisfy bound'),
+          ),
+        ),
       );
     });
 
@@ -77,11 +80,13 @@ void main() {
 
       expect(
         () => execute(invalidCode),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains('does not satisfy bound'),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('does not satisfy bound'),
+          ),
+        ),
       );
     });
 
@@ -116,11 +121,13 @@ void main() {
 
       expect(
         () => execute(invalidCode),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains('does not satisfy bound'),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('does not satisfy bound'),
+          ),
+        ),
       );
     });
 
@@ -151,17 +158,20 @@ void main() {
 
       expect(
         () => execute(invalidCode),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains('does not satisfy bound'),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('does not satisfy bound'),
+          ),
+        ),
       );
     });
 
-    test('Applied generic runtime type is preserved for user-defined classes',
-        () {
-      final code = '''
+    test(
+      'Applied generic runtime type is preserved for user-defined classes',
+      () {
+        final code = '''
         class Box<T> {
           T value;
           Box(this.value);
@@ -173,8 +183,9 @@ void main() {
         }
       ''';
 
-      expect(execute(code), equals([true, true, false]));
-    });
+        expect(execute(code), equals([true, true, false]));
+      },
+    );
 
     test('Generic return type validation uses applied runtime types', () {
       final validCode = '''
@@ -211,11 +222,13 @@ void main() {
 
       expect(
         () => execute(invalidCode),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains("can't be returned"),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("can't be returned"),
+          ),
+        ),
       );
     });
 
@@ -248,11 +261,13 @@ void main() {
 
       expect(
         () => execute(invalidCode),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains("can't be returned"),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("can't be returned"),
+          ),
+        ),
       );
     });
 

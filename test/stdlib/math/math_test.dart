@@ -83,19 +83,20 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            0,
-            0,
-            10,
-            20,
-            10,
-            20,
-            true,
-            true,
-            true,
-            [5, 5, 5, 10]
-          ]));
+        execute(source),
+        equals([
+          0,
+          0,
+          10,
+          20,
+          10,
+          20,
+          true,
+          true,
+          true,
+          [5, 5, 5, 10],
+        ]),
+      );
     });
   });
 

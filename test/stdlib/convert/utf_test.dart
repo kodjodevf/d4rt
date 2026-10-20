@@ -15,11 +15,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [72, 101, 108, 108, 111, 44, 32, 85, 84, 70, 45, 56, 33],
-            'Hello, UTF-8!'
-          ]));
+        execute(source),
+        equals([
+          [72, 101, 108, 108, 111, 44, 32, 85, 84, 70, 45, 56, 33],
+          'Hello, UTF-8!',
+        ]),
+      );
     });
 
     test('Utf8Encoder convert', () {
@@ -32,8 +33,10 @@ void main() {
         return encoded;
       }
       ''';
-      expect(execute(source),
-          equals([69, 110, 99, 111, 100, 101, 32, 116, 104, 105, 115, 33]));
+      expect(
+        execute(source),
+        equals([69, 110, 99, 111, 100, 101, 32, 116, 104, 105, 115, 33]),
+      );
     });
 
     test('Utf8Decoder convert', () {

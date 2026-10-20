@@ -577,8 +577,11 @@ void main() {
           return 'hello'.length;
         }
       ''';
-        expect(execute(source1), equals(5),
-            reason: 'Native String.length should override extension');
+        expect(
+          execute(source1),
+          equals(5),
+          reason: 'Native String.length should override extension',
+        );
 
         // Test with interpreted class
         const source2 = '''
@@ -598,8 +601,11 @@ void main() {
         }
       ''';
 
-        expect(execute(source2), equals(['instance', 'From Instance']),
-            reason: 'Instance members should override extension members');
+        expect(
+          execute(source2),
+          equals(['instance', 'From Instance']),
+          reason: 'Instance members should override extension members',
+        );
       });
 
       test('Correct extension selected based on type', () {
@@ -623,8 +629,10 @@ void main() {
           return [s.identify(), i.identify(), l.identify()];
         }
       ''';
-        expect(execute(source),
-            equals(['String Extension', 'Int Extension', 'List Extension']));
+        expect(
+          execute(source),
+          equals(['String Extension', 'Int Extension', 'List Extension']),
+        );
       });
 
       test('Extension applies to subtype', () {
@@ -793,8 +801,11 @@ void main() {
           return 'hello'.length;
         }
       ''';
-        expect(execute(source1), equals(5),
-            reason: 'Native String.length should override extension');
+        expect(
+          execute(source1),
+          equals(5),
+          reason: 'Native String.length should override extension',
+        );
 
         // Test with interpreted class
         const source2 = '''
@@ -814,8 +825,11 @@ void main() {
         }
       ''';
 
-        expect(execute(source2), equals(['instance', 'From Instance']),
-            reason: 'Instance members should override extension members');
+        expect(
+          execute(source2),
+          equals(['instance', 'From Instance']),
+          reason: 'Instance members should override extension members',
+        );
       });
 
       test('Correct extension selected based on type', () {
@@ -839,8 +853,10 @@ void main() {
           return [s.identify(), i.identify(), l.identify()];
         }
       ''';
-        expect(execute(source),
-            equals(['String Extension', 'Int Extension', 'List Extension']));
+        expect(
+          execute(source),
+          equals(['String Extension', 'Int Extension', 'List Extension']),
+        );
       });
 
       test('Extension applies to subtype', () {
@@ -894,7 +910,7 @@ void main() {
         }
       ''';
 
-// Définir une extension sur cette classe
+      // Définir une extension sur cette classe
       const sourceExtension = '''
         extension CounterExtension on MyCounter {
           // Getter d'extension
@@ -905,8 +921,9 @@ void main() {
         }
       ''';
 
-// Code to evaluate that uses the class and the extension
-      const sourceEval = '''
+      // Code to evaluate that uses the class and the extension
+      const sourceEval =
+          '''
         $sourceClass
         $sourceExtension
        main() {

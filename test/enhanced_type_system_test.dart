@@ -4,9 +4,10 @@ import 'package:d4rt/d4rt.dart';
 dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt()..setDebug(false);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -33,8 +34,10 @@ void main() {
           }
         ''';
 
-        expect(execute(code),
-            equals([42, 3.14, 42, 3.14, "hello", "hello", null, "test"]));
+        expect(
+          execute(code),
+          equals([42, 3.14, 42, 3.14, "hello", "hello", null, "test"]),
+        );
       });
 
       test('Failed type casting throws RuntimeError', () {
@@ -46,9 +49,15 @@ void main() {
         ''';
 
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-                contains("Cast failed with 'as'"))));
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains("Cast failed with 'as'"),
+            ),
+          ),
+        );
       });
 
       test('Type casting with custom classes', () {
@@ -199,8 +208,10 @@ void main() {
           }
         ''';
 
-        expect(execute(code),
-            equals([true, true, true, true, true, true, true, true]));
+        expect(
+          execute(code),
+          equals([true, true, true, true, true, true, true, true]),
+        );
       });
 
       test('Type checking with generics', () {
@@ -240,12 +251,19 @@ void main() {
         ''';
 
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having(
-                (e) => e.message,
-                'message',
-                allOf(contains("can't be returned"), contains("int"),
-                    contains("String")))));
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains("can't be returned"),
+                contains("int"),
+                contains("String"),
+              ),
+            ),
+          ),
+        );
       });
 
       test('Clear error message for invalid cast', () {
@@ -257,9 +275,15 @@ void main() {
         ''';
 
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>()
-                .having((e) => e.message, 'message', contains("Cast failed"))));
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains("Cast failed"),
+            ),
+          ),
+        );
       });
     });
 

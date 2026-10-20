@@ -24,31 +24,44 @@ class AsyncStdlib {
 
     // Register scheduleMicrotask
     environment.define(
-        'scheduleMicrotask',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'scheduleMicrotask',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty || arguments[0] is! InterpretedFunction) {
-            throw RuntimeError('scheduleMicrotask requires a callback function.');
+            throw RuntimeError(
+              'scheduleMicrotask requires a callback function.',
+            );
           }
           final callback = arguments[0] as InterpretedFunction;
           scheduleMicrotask(() => callback.call(visitor, []));
           return null;
-        }, arity: 1, name: 'scheduleMicrotask'));
+        },
+        arity: 1,
+        name: 'scheduleMicrotask',
+      ),
+    );
 
     // Register unawaited
     environment.define(
-        'unawaited',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'unawaited',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty || arguments[0] is! Future) {
             throw RuntimeError('unawaited requires a Future argument.');
           }
           unawaited(arguments[0] as Future);
           return null;
-        }, arity: 1, name: 'unawaited'));
+        },
+        arity: 1,
+        name: 'unawaited',
+      ),
+    );
 
     // Register runZoned
     environment.define(
-        'runZoned',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'runZoned',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.isEmpty || arguments[0] is! InterpretedFunction) {
             throw RuntimeError('runZoned requires a callback function body.');
           }
@@ -59,32 +72,41 @@ class AsyncStdlib {
             () => body.call(visitor, []),
             zoneValues: zoneValues != null ? Map.from(zoneValues) : null,
           );
-        }, arity: 1, name: 'runZoned'));
+        },
+        arity: 1,
+        name: 'runZoned',
+      ),
+    );
 
     // Register runZonedGuarded
     environment.define(
-        'runZonedGuarded',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'runZonedGuarded',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           if (arguments.length < 2 ||
               arguments[0] is! InterpretedFunction ||
               arguments[1] is! InterpretedFunction) {
             throw RuntimeError(
-                'runZonedGuarded requires a body function and an onError handler.');
+              'runZonedGuarded requires a body function and an onError handler.',
+            );
           }
           final body = arguments[0] as InterpretedFunction;
           final onError = arguments[1] as InterpretedFunction;
           final zoneValues = namedArguments['zoneValues'] as Map?;
 
-          return runZonedGuarded<Object?>(
-            () => body.call(visitor, []),
-            (error, stackTrace) {
-              final unwrappedError = error is InternalInterpreterException
-                  ? error.originalThrownValue
-                  : error;
-              onError.call(visitor, [unwrappedError, stackTrace]);
-            },
-            zoneValues: zoneValues != null ? Map.from(zoneValues) : null,
-          );
-        }, arity: 2, name: 'runZonedGuarded'));
+          return runZonedGuarded<Object?>(() => body.call(visitor, []), (
+            error,
+            stackTrace,
+          ) {
+            final unwrappedError = error is InternalInterpreterException
+                ? error.originalThrownValue
+                : error;
+            onError.call(visitor, [unwrappedError, stackTrace]);
+          }, zoneValues: zoneValues != null ? Map.from(zoneValues) : null);
+        },
+        arity: 2,
+        name: 'runZonedGuarded',
+      ),
+    );
   }
 }

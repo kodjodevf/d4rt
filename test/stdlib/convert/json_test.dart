@@ -133,8 +133,10 @@ void main() {
       }
       ''';
       final result = execute(source) as List;
-      expect(result[0],
-          equals('{"key":"value","date":"2023-01-01T00:00:00.000Z"}'));
+      expect(
+        result[0],
+        equals('{"key":"value","date":"2023-01-01T00:00:00.000Z"}'),
+      );
       final decodedMap = result[1] as Map;
       expect(decodedMap['key'], equals('value'));
       expect(decodedMap['date'], isA<DateTime>());

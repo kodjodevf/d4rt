@@ -21,4 +21,3 @@ class MathStdlib {
     environment.defineBridge(MutableRectangleMath.definition);
   }
 }
-

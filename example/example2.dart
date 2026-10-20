@@ -27,7 +27,9 @@ final statusEnumBridge = BridgedEnumDefinition<Status>(
 void main() {
   final interpreter = D4rt();
   interpreter.registerBridgedEnum(
-      statusEnumBridge, 'package:d4rt_example/example2.dart');
+    statusEnumBridge,
+    'package:d4rt_example/example2.dart',
+  );
 
   final code = '''
     import 'package:d4rt_example/example2.dart';

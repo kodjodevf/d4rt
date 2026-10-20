@@ -99,11 +99,12 @@ void main() {
       ''';
       final result = execute(source);
       expect(
-          result,
-          equals([
-            [42, 42, 42],
-            100
-          ]));
+        result,
+        equals([
+          [42, 42, 42],
+          100,
+        ]),
+      );
     });
 
     test('Static method calling another static method', () {

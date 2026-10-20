@@ -7,13 +7,15 @@ void main() {
       final logs = <String>[];
       final d4rt = D4rt(onPrint: (msg) => logs.add(msg));
 
-      d4rt.execute(source: '''
+      d4rt.execute(
+        source: '''
         main() {
           print('Hello World');
           print(12345);
           print([1, 2, 3]);
         }
-      ''');
+      ''',
+      );
 
       expect(logs, equals(['Hello World', '12345', '[1, 2, 3]']));
     });
@@ -40,11 +42,13 @@ void main() {
     test('d4rt.executeCompiled with onPrint', () {
       final compiledLogs = <String>[];
       final d4rt = D4rt();
-      final script = d4rt.compile(source: '''
+      final script = d4rt.compile(
+        source: '''
         main() {
           print('Compiled print: ok');
         }
-      ''');
+      ''',
+      );
 
       d4rt.executeCompiled(script, onPrint: (msg) => compiledLogs.add(msg));
       expect(compiledLogs, equals(['Compiled print: ok']));
@@ -54,8 +58,10 @@ void main() {
       final evalLogs = <String>[];
       final d4rt = D4rt();
       d4rt.execute(source: 'var count = 0; main() {}');
-      d4rt.eval('print("Eval print: \${++count}");',
-          onPrint: (msg) => evalLogs.add(msg));
+      d4rt.eval(
+        'print("Eval print: \${++count}");',
+        onPrint: (msg) => evalLogs.add(msg),
+      );
 
       expect(evalLogs, equals(['Eval print: 1']));
     });

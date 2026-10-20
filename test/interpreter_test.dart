@@ -3,7 +3,8 @@ import 'package:d4rt/d4rt.dart';
 
 Matcher throwsRuntimeError(dynamic messageMatcher) {
   return throwsA(
-      isA<RuntimeError>().having((e) => e.message, 'message', messageMatcher));
+    isA<RuntimeError>().having((e) => e.message, 'message', messageMatcher),
+  );
 }
 
 dynamic execute(String source, {List<Object?>? args}) {
@@ -14,9 +15,10 @@ dynamic execute(String source, {List<Object?>? args}) {
   d4rt.grant(ProcessRunPermission.any);
   d4rt.grant(IsolatePermission.any);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 // Async version that awaits Future results for complex await tests
@@ -28,9 +30,10 @@ Future<dynamic> executeAsync(String source, {List<Object?>? args}) async {
   d4rt.grant(ProcessRunPermission.any);
   d4rt.grant(IsolatePermission.any);
   final result = d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 
   // If the result is a Future, await it
   if (result is Future) {
@@ -113,12 +116,15 @@ void main() {
       ''';
       // expect(execute(code), isA<RuntimeError>());
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains('Undefined variable: nonDefini'),
-          )));
+          ),
+        ),
+      );
     });
 
     test('Undefined variable (assign)', () {
@@ -129,12 +135,15 @@ void main() {
       ''';
       // expect(execute(code), isA<RuntimeError>());
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains("Assigning to undefined variable 'nonDefini'"),
-          )));
+          ),
+        ),
+      );
     });
 
     test('String concatenation', () {
@@ -157,7 +166,7 @@ void main() {
       final result = execute(
         source,
         args: [
-          ['arg1', 'test', 'more']
+          ['arg1', 'test', 'more'],
         ], // Pass arguments
       );
       expect(result, equals('3:arg1')); // Length 3, first argument 'arg1'
@@ -174,22 +183,24 @@ void main() {
           source,
           args: ['fail'], // Passer des arguments quand même
         ),
-        throwsRuntimeError(contains(
-            "'main' function accepts at most 0 positional argument(s)")),
+        throwsRuntimeError(
+          contains("'main' function accepts at most 0 positional argument(s)"),
+        ),
       );
     });
 
     test(
-        'Main function with arguments called without args (should pass empty list)',
-        () {
-      final source = '''
+      'Main function with arguments called without args (should pass empty list)',
+      () {
+        final source = '''
         main(List<String> args) { // Prend des arguments
           return args.length; // Doit être 0
         }
       ''';
-      final result = execute(source);
-      expect(result, equals(0));
-    });
+        final result = execute(source);
+        expect(result, equals(0));
+      },
+    );
   });
 
   group('Gestion des portées (Scopes)', () {
@@ -204,12 +215,15 @@ void main() {
       ''';
       // expect(execute(code), isA<RuntimeError>());
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains('Undefined variable: a'),
-          )));
+          ),
+        ),
+      );
     });
 
     test('Variable interne masque variable externe', () {
@@ -343,13 +357,17 @@ void main() {
         }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                "The condition of an 'if' must be a boolean, but was int."),
-          )));
+              "The condition of an 'if' must be a boolean, but was int.",
+            ),
+          ),
+        ),
+      );
     });
   });
 
@@ -403,13 +421,17 @@ void main() {
       ''';
       // expect(execute(code), isA<RuntimeError>());
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                "The condition of a 'while' loop must be a boolean, but was int."),
-          )));
+              "The condition of a 'while' loop must be a boolean, but was int.",
+            ),
+          ),
+        ),
+      );
     });
   });
 
@@ -452,13 +474,17 @@ void main() {
       ''';
       // expect(execute(code), isA<RuntimeError>());
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                "The condition of a 'do-while' loop must be a boolean, but was null."),
-          )));
+              "The condition of a 'do-while' loop must be a boolean, but was null.",
+            ),
+          ),
+        ),
+      );
     });
   });
 
@@ -821,13 +847,17 @@ void main() {
         ''';
         // expect(execute(code), isA<RuntimeError>());
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having(
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
               (e) => e.message,
               'message',
               contains(
-                  "Class 'Foo' has no static method or named constructor named 'bar'."),
-            )));
+                "Class 'Foo' has no static method or named constructor named 'bar'.",
+              ),
+            ),
+          ),
+        );
       });
     }); // End Named Constructors group
 
@@ -877,9 +907,10 @@ void main() {
         expect(execute(code), equals("Waddle waddle"));
       });
 
-      test('Accessing overridden method via base type reference (polymorphism)',
-          () {
-        final code = '''
+      test(
+        'Accessing overridden method via base type reference (polymorphism)',
+        () {
+          final code = '''
           class Shape {
             String draw() { return "Drawing shape"; }
           }
@@ -892,8 +923,9 @@ void main() {
             return myShape.draw(); // Should call Circle's draw() due to runtime type
           }
         ''';
-        expect(execute(code), equals("Drawing circle"));
-      });
+          expect(execute(code), equals("Drawing circle"));
+        },
+      );
 
       test('Inherited field initialization', () {
         final code = '''
@@ -931,12 +963,15 @@ void main() {
          ''';
 
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having(
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
               (e) => e.message,
               'message',
               contains("Superclass 'NonExistent' not found for class 'Bad'."),
-            )));
+            ),
+          ),
+        );
       });
     }); // End Inheritance group
 
@@ -1023,12 +1058,15 @@ void main() {
         ''';
         // expect(execute(code), isA<RuntimeError>());
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having(
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
               (e) => e.message,
               'message',
               contains("'super' can only be used within an instance method."),
-            )));
+            ),
+          ),
+        );
       });
     }); // End Super Calls group
 
@@ -1111,12 +1149,13 @@ void main() {
         ''';
         // Expected order: Child field init -> Parent constructor -> Child constructor
         expect(
-            execute(code),
-            equals([
-              "Child field init",
-              "Parent constructor: Value was 123",
-              "Child constructor"
-            ]));
+          execute(code),
+          equals([
+            "Child field init",
+            "Parent constructor: Value was 123",
+            "Child constructor",
+          ]),
+        );
       });
 
       test('this.field initializer runs before super constructor call', () {
@@ -1151,32 +1190,41 @@ void main() {
            main() { Child(); }
          ''';
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having(
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
               (e) => e.message,
               'message',
               contains(
-                  "Superclass 'Parent' does not have a constructor named 'unnamed'."),
-            )));
+                "Superclass 'Parent' does not have a constructor named 'unnamed'.",
+              ),
+            ),
+          ),
+        );
       });
 
       test(
-          'Implicit super() call fails if no default constructor in superclass',
-          () {
-        final code = '''
+        'Implicit super() call fails if no default constructor in superclass',
+        () {
+          final code = '''
             class Parent { Parent.named(); }
             class Child extends Parent { Child(); } // Implicit super()
            main() { Child(); }
          ''';
-        expect(
+          expect(
             () => execute(code),
-            throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  "Implicit call to superclass 'Parent' default constructor failed: No default constructor found."),
-            )));
-      });
+            throwsA(
+              isA<RuntimeError>().having(
+                (e) => e.message,
+                'message',
+                contains(
+                  "Implicit call to superclass 'Parent' default constructor failed: No default constructor found.",
+                ),
+              ),
+            ),
+          );
+        },
+      );
 
       test('Calling super() on class with no superclass fails', () {
         final code = '''
@@ -1184,13 +1232,17 @@ void main() {
            main() { Orphan(); }
           ''';
         expect(
-            () => execute(code),
-            throwsA(isA<RuntimeError>().having(
+          () => execute(code),
+          throwsA(
+            isA<RuntimeError>().having(
               (e) => e.message,
               'message',
               contains(
-                  "Cannot call 'super' in constructor of class 'Orphan' because it has no superclass."),
-            )));
+                "Cannot call 'super' in constructor of class 'Orphan' because it has no superclass.",
+              ),
+            ),
+          ),
+        );
       });
     }); // End Super Constructor Calls group
   }); // End Classes and Instances group
@@ -1207,13 +1259,16 @@ void main() {
         }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             // Check for the specific error message within the potential wrapper error
             contains('Cannot instantiate abstract class \'Shape\'.'),
-          )));
+          ),
+        ),
+      );
     });
 
     test('Concrete class must implement abstract method', () {
@@ -1227,13 +1282,17 @@ void main() {
         main() { Car(); }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for inherited abstract method \'move\' in class \'Car\'.'),
-          )));
+              'Missing concrete implementation for inherited abstract method \'move\' in class \'Car\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Concrete class implements abstract method successfully', () {
@@ -1283,13 +1342,16 @@ void main() {
       // Let's refine the expectation later if needed based on how the parser handles this.
       // For now, keeping the RuntimeError check as initially generated.
       expect(
-          () => execute(code),
-          throwsA(isA<Exception>().having(
+        () => execute(code),
+        throwsA(
+          isA<Exception>().having(
             (e) => e.toString(), // Check toString() for Exception message
             'toString()',
             // Expecting the parser error
             contains("Members of classes can't be declared to be 'abstract'"),
-          )));
+          ),
+        ),
+      );
     });
 
     test('Abstract method cannot have a body', () {
@@ -1301,13 +1363,16 @@ void main() {
         }
       ''';
       expect(
-          () => execute(codeWithError),
-          throwsA(isA<Exception>().having(
+        () => execute(codeWithError),
+        throwsA(
+          isA<Exception>().having(
             (e) => e.toString(), // Check toString() for Exception message
             'toString()',
             // Expecting the parser error (likely flags the modifier first)
             contains("Members of classes can't be declared to be 'abstract'"),
-          )));
+          ),
+        ),
+      );
     });
 
     test('Concrete class must implement abstract getter', () {
@@ -1326,13 +1391,17 @@ void main() {
         }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for inherited abstract getter \'description\' in class \'Item\'.'),
-          )));
+              'Missing concrete implementation for inherited abstract getter \'description\' in class \'Item\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Concrete class implements abstract getter successfully', () {
@@ -1374,13 +1443,17 @@ void main() {
         }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for inherited abstract setter \'config\' in class \'Device\'.'),
-          )));
+              'Missing concrete implementation for inherited abstract setter \'config\' in class \'Device\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Concrete class implements abstract setter successfully', () {
@@ -1446,13 +1519,17 @@ void main() {
        main() { var t = Task(); }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for interface method \'run\' in class \'Task\'.'),
-          )));
+              'Missing concrete implementation for interface method \'run\' in class \'Task\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Missing interface getter implementation fails', () {
@@ -1466,13 +1543,17 @@ void main() {
        main() { var b = Button(); }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for interface getter \'label\' in class \'Button\'.'),
-          )));
+              'Missing concrete implementation for interface getter \'label\' in class \'Button\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Missing interface setter implementation fails', () {
@@ -1486,13 +1567,17 @@ void main() {
        main() { var b = Box(); }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for interface setter \'value\' in class \'Box\'.'),
-          )));
+              'Missing concrete implementation for interface setter \'value\' in class \'Box\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Multiple interfaces implementation success', () {
@@ -1543,13 +1628,17 @@ void main() {
           }
         ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                'Missing concrete implementation for interface method \'drag\' in class \'Icon\'.'),
-          )));
+              'Missing concrete implementation for interface method \'drag\' in class \'Icon\'.',
+            ),
+          ),
+        ),
+      );
     });
 
     test('Implementing non-class fails', () {
@@ -1559,12 +1648,15 @@ void main() {
          main() {}
         ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains("Interface 'notAClass' not found for class 'MyClass'"),
-          )));
+          ),
+        ),
+      );
     });
 
     test('Implementing non-existent fails', () {
@@ -1573,17 +1665,21 @@ void main() {
           main() {}
         ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains("Interface 'NonExistent' not found for class 'MyClass'."),
-          )));
+          ),
+        ),
+      );
     });
 
-    test('Abstract class implementing interface does not need implementation',
-        () {
-      final code = '''
+    test(
+      'Abstract class implementing interface does not need implementation',
+      () {
+        final code = '''
           abstract class Doer { void doIt(); }
           abstract class MyAbstract implements Doer { // OK
              MyAbstract();
@@ -1592,13 +1688,14 @@ void main() {
           // We just check that the class definition itself doesn't throw.
          main() { return "OK"; } 
         ''';
-      expect(execute(code), equals("OK"));
-    });
+        expect(execute(code), equals("OK"));
+      },
+    );
 
     test(
-        'Concrete class extending abstract class implementing interface must implement',
-        () {
-      final code = '''
+      'Concrete class extending abstract class implementing interface must implement',
+      () {
+        final code = '''
           abstract class Doer { void doIt(); }
           abstract class MyAbstract implements Doer {
              MyAbstract();
@@ -1608,17 +1705,22 @@ void main() {
           }
          main() { var x = MyConcrete(); }
         ''';
-      expect(
+        expect(
           () => execute(code),
-          throwsA(isA<RuntimeError>().having(
-            (e) => e.message,
-            'message',
-            // The check for interface members happens after abstract member check.
-            // Depending on the order, the message might vary. Let's check for doIt.
-            contains(
-                "Missing concrete implementation for interface method 'doIt' in class 'MyConcrete'"),
-          )));
-    });
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              // The check for interface members happens after abstract member check.
+              // Depending on the order, the message might vary. Let's check for doIt.
+              contains(
+                "Missing concrete implementation for interface method 'doIt' in class 'MyConcrete'",
+              ),
+            ),
+          ),
+        );
+      },
+    );
 
     test('Implementation includes members from super-interfaces', () {
       final code = '''
@@ -1630,13 +1732,16 @@ void main() {
          main() { var x = C(); }
         ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             // Check for one of the missing methods (order might vary)
             contains("Missing concrete implementation for interface method"),
-          )));
+          ),
+        ),
+      );
       // More specific check for methodA might be needed if order is guaranteed
       // expect(() => execute(code), throwsA(isA<RuntimeError>().having(
       //    (e) => e.message, 'message', contains("method 'methodA'"),
@@ -1743,13 +1848,17 @@ void main() {
        main() {}
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
             (e) => e.message,
             'message',
             contains(
-                "Class 'NotAMixin' cannot be used as a mixin because it's not declared with 'mixin' or 'class mixin'"), // Message d'erreur réel
-          )));
+              "Class 'NotAMixin' cannot be used as a mixin because it's not declared with 'mixin' or 'class mixin'",
+            ), // Message d'erreur réel
+          ),
+        ),
+      );
     });
 
     test('Mixin cannot declare constructor', () {
@@ -1760,12 +1869,15 @@ void main() {
        main() {}
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<Exception>().having(
+        () => execute(code),
+        throwsA(
+          isA<Exception>().having(
             (e) => e.toString(), // Use toString for generic Exception
             'toString()',
             contains("Mixins can't declare constructors"), // Match parser error
-          )));
+          ),
+        ),
+      );
     });
   });
 
@@ -1803,13 +1915,10 @@ void main() {
       ''';
       // Expect a RuntimeError, and finally must execute
       // var resultLog = []; // Removed
-      expect(
-        () {
-          // execute(code, externalLog: resultLog); // Modified
-          execute(code);
-        },
-        throwsA(equals("Oops")),
-      );
+      expect(() {
+        // execute(code, externalLog: resultLog); // Modified
+        execute(code);
+      }, throwsA(equals("Oops")));
       // Check that the log was modified as expected (1 then 2)
       // expect(resultLog, equals([1, 2])); // Removed as not verifiable
     });
@@ -1877,10 +1986,7 @@ void main() {
           }
         }
       ''';
-      expect(
-        () => execute(code),
-        throwsA(equals('Secondary')),
-      );
+      expect(() => execute(code), throwsA(equals('Secondary')));
     });
 
     test('Exception in finally block propagates and overrides', () {
@@ -1893,10 +1999,7 @@ void main() {
           }
         }
       ''';
-      expect(
-        () => execute(code),
-        throwsA(equals('FinallyException')),
-      );
+      expect(() => execute(code), throwsA(equals('FinallyException')));
     });
 
     test('Exception in finally block propagates even if try/catch handles', () {
@@ -1911,10 +2014,7 @@ void main() {
           }
         }
       ''';
-      expect(
-        () => execute(code),
-        throwsA(equals('FinallyException')),
-      );
+      expect(() => execute(code), throwsA(equals('FinallyException')));
     });
   }); // Fin groupe Error Handling
 
@@ -1933,14 +2033,15 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            true, true, true, true, true,
-            true, // int, double, String, bool, List, Null
-            true, true, // i is num, d is num
-            false, false, // i is String, n is Object (n is null)
-            true // s is Object
-          ]));
+        execute(code),
+        equals([
+          true, true, true, true, true,
+          true, // int, double, String, bool, List, Null
+          true, true, // i is num, d is num
+          false, false, // i is String, n is Object (n is null)
+          true, // s is Object
+        ]),
+      );
     });
 
     test('is! negation with built-in types', () {
@@ -2030,7 +2131,9 @@ void main() {
         }
       ''';
       expect(
-          execute(code), equals([true, true, true, true, false, true, true]));
+        execute(code),
+        equals([true, true, true, true, false, true, true]),
+      );
     });
 
     test('catch on Type (specific built-in)', () {
@@ -2181,9 +2284,15 @@ void main() {
         }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains("'rethrow' can only be used within a catch block."))));
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("'rethrow' can only be used within a catch block."),
+          ),
+        ),
+      );
     });
   });
 
@@ -2290,12 +2399,17 @@ void main() {
         }
       ''';
       expect(
-          () => execute(code),
-          throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  'Class \'Box\' does not have a constructor named \'nonExistent\''))));
+        () => execute(code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains(
+              'Class \'Box\' does not have a constructor named \'nonExistent\'',
+            ),
+          ),
+        ),
+      );
     });
   });
 
@@ -2398,9 +2512,11 @@ void main() {
           }
         ''';
       expect(
-          () => execute(code),
-          throwsRuntimeError(contains(
-              'Spread element in a List literal requires an Iterable'))); // Use contains and updated message
+        () => execute(code),
+        throwsRuntimeError(
+          contains('Spread element in a List literal requires an Iterable'),
+        ),
+      ); // Use contains and updated message
     });
 
     test('Set spread operator (...)', () {
@@ -2439,9 +2555,11 @@ void main() {
           }
         ''';
       expect(
-          () => execute(code),
-          throwsRuntimeError(contains(
-              'Spread element in a Set literal requires an Iterable'))); // Use contains
+        () => execute(code),
+        throwsRuntimeError(
+          contains('Spread element in a Set literal requires an Iterable'),
+        ),
+      ); // Use contains
     });
 
     test('Map spread operator (...)', () {
@@ -2579,7 +2697,9 @@ void main() {
       final result = execute(code);
       expect(result is Set, isTrue);
       expect(
-          result, equals({1, 12, 13})); // 2+10=12, 3+10=13, 2+10=12 (ignored)
+        result,
+        equals({1, 12, 13}),
+      ); // 2+10=12, 3+10=13, 2+10=12 (ignored)
     });
 
     test('Map with if and for', () {
@@ -2598,14 +2718,15 @@ void main() {
       final result = execute(code);
       expect(result is Map, isTrue);
       expect(
-          result,
-          equals({
-            'entry': 0,
-            'admin_key': true,
-            'user_a': 'aa',
-            'user_b': 'bb',
-            'exit': 1
-          }));
+        result,
+        equals({
+          'entry': 0,
+          'admin_key': true,
+          'user_a': 'aa',
+          'user_b': 'bb',
+          'exit': 1,
+        }),
+      );
     });
     test('Map for element must be MapEntry', () {
       final code = '''
@@ -2618,9 +2739,11 @@ void main() {
           }
         ''';
       expect(
-          () => execute(code),
-          throwsRuntimeError(
-              contains("Expected a MapLiteralEntry ('key: value')")));
+        () => execute(code),
+        throwsRuntimeError(
+          contains("Expected a MapLiteralEntry ('key: value')"),
+        ),
+      );
     });
 
     test('Map if element must be MapEntry', () {
@@ -2634,9 +2757,11 @@ void main() {
           }
         ''';
       expect(
-          () => execute(code),
-          throwsRuntimeError(
-              contains("Expected a MapLiteralEntry ('key: value')")));
+        () => execute(code),
+        throwsRuntimeError(
+          contains("Expected a MapLiteralEntry ('key: value')"),
+        ),
+      );
     });
 
     test('If condition not boolean fails', () {
@@ -2646,9 +2771,11 @@ void main() {
           }
         ''';
       expect(
-          () => execute(code),
-          throwsRuntimeError(
-              contains("Condition in collection 'if' must be a boolean")));
+        () => execute(code),
+        throwsRuntimeError(
+          contains("Condition in collection 'if' must be a boolean"),
+        ),
+      );
     });
 
     test('For iterable not iterable fails', () {
@@ -2658,8 +2785,10 @@ void main() {
             return [for (var i in notIterable) i];
           }
         ''';
-      expect(() => execute(code),
-          throwsRuntimeError(contains("must be an Iterable")));
+      expect(
+        () => execute(code),
+        throwsRuntimeError(contains("must be an Iterable")),
+      );
     });
   });
 
@@ -2699,11 +2828,13 @@ void main() {
             return int.parse('abc');
           }
         '''),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains('FormatException'),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('FormatException'),
+          ),
+        ),
       );
     });
 
@@ -2805,8 +2936,10 @@ void main() {
 
     test('FunctionExpressionInvocation', () {
       expect(execute('main() { return (() => 10)(); }'), equals(10));
-      expect(execute('main() { var f = (int x) => x * 2; return f(5); }'),
-          equals(10));
+      expect(
+        execute('main() { var f = (int x) => x * 2; return f(5); }'),
+        equals(10),
+      );
       const sourceComplex = '''
        class MyClass { Function fn; MyClass(this.fn); }
        main() {
@@ -2840,15 +2973,29 @@ void main() {
     test('AssertStatement', () {
       expect(() => execute('main() { assert(true); }'), returnsNormally);
       expect(
-          () => execute('main() { assert(false); }'),
-          throwsA(isA<RuntimeError>()
-              .having((e) => e.message, 'message', 'Assertion failed')));
+        () => execute('main() { assert(false); }'),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            'Assertion failed',
+          ),
+        ),
+      );
       expect(
-          () => execute('main() { assert(1 == 2, "Math is broken"); }'),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              'Assertion failed: Math is broken')));
-      expect(() => execute('main() { var x = 5; assert(x > 0); }'),
-          returnsNormally);
+        () => execute('main() { assert(1 == 2, "Math is broken"); }'),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            'Assertion failed: Math is broken',
+          ),
+        ),
+      );
+      expect(
+        () => execute('main() { var x = 5; assert(x > 0); }'),
+        returnsNormally,
+      );
     });
 
     test('EmptyStatement', () {
@@ -2857,39 +3004,53 @@ void main() {
     });
 
     test('NullAwareElement (?element)', () {
-      expect(execute('main() { int? x = 5; int? y; return [?x, ?y, 10]; }'),
-          equals([5, 10]));
+      expect(
+        execute('main() { int? x = 5; int? y; return [?x, ?y, 10]; }'),
+        equals([5, 10]),
+      );
       expect(execute('main() { int? y; return [?y]; }'), equals([]));
       // Test in set literal
-      expect(execute('main() { int? x = 5; int? y; return {?x, ?y, 10}; }'),
-          equals({5, 10}));
+      expect(
+        execute('main() { int? x = 5; int? y; return {?x, ?y, 10}; }'),
+        equals({5, 10}),
+      );
     });
 
     test('SetOrMapLiteral edge cases', () {
       // Spread only - Map
-      expect(execute('main() { var m1 = {"a":1}; return {...m1}; }'),
-          equals({'a': 1}));
+      expect(
+        execute('main() { var m1 = {"a":1}; return {...m1}; }'),
+        equals({'a': 1}),
+      );
       // Spread only - Set
       expect(execute('main() { var s1 = {1}; return {...s1}; }'), equals({1}));
       // Spread only - List (should become Set)
-      expect(execute('main() { var l1 = [1, 2]; return {...l1}; }'),
-          equals({1, 2}));
+      expect(
+        execute('main() { var l1 = [1, 2]; return {...l1}; }'),
+        equals({1, 2}),
+      );
 
       expect(
-          () => execute(
-              'main() { var s1 = {1}; var m1 = {"b":2}; return {...s1, ...m1}; }'),
-          throwsA(isA<
-              RuntimeError>())); // Dart behavior: Cannot mix Map and Set spreads
+        () => execute(
+          'main() { var s1 = {1}; var m1 = {"b":2}; return {...s1, ...m1}; }',
+        ),
+        throwsA(isA<RuntimeError>()),
+      ); // Dart behavior: Cannot mix Map and Set spreads
       expect(
-          () => execute(
-              'main() { var s1 = {1}; var m1 = {"b":2}; return {...m1, ...s1}; }'),
-          throwsA(isA<RuntimeError>()));
+        () => execute(
+          'main() { var s1 = {1}; var m1 = {"b":2}; return {...m1, ...s1}; }',
+        ),
+        throwsA(isA<RuntimeError>()),
+      );
 
-      expect(execute('main() { var s1 = {1, 2}; return <int>{...s1}; }'),
-          equals({1, 2}));
       expect(
-          execute('main() { var m1 = {"a":1}; return <String, int>{...m1}; }'),
-          equals({'a': 1}));
+        execute('main() { var s1 = {1, 2}; return <int>{...s1}; }'),
+        equals({1, 2}),
+      );
+      expect(
+        execute('main() { var m1 = {"a":1}; return <String, int>{...m1}; }'),
+        equals({'a': 1}),
+      );
     });
   });
 
@@ -2943,9 +3104,11 @@ void main() {
         }
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(
-              contains('List pattern expected 2 elements, but List has 1')));
+        () => execute(source),
+        throwsRuntimeError(
+          contains('List pattern expected 2 elements, but List has 1'),
+        ),
+      );
     });
 
     test('List Pattern - Mismatch Type', () {
@@ -2954,8 +3117,10 @@ void main() {
           var [a] = "not a list";
         }
       ''';
-      expect(() => execute(source),
-          throwsRuntimeError(contains('Expected a List, but got String')));
+      expect(
+        () => execute(source),
+        throwsRuntimeError(contains('Expected a List, but got String')),
+      );
     });
 
     test('Map Pattern - Simple', () {
@@ -2985,8 +3150,10 @@ void main() {
           var {'a': x, 'b': y} = {'a': 1}; // Missing key 'b'
         }
       ''';
-      expect(() => execute(source),
-          throwsRuntimeError(contains("Map pattern key 'b' not found")));
+      expect(
+        () => execute(source),
+        throwsRuntimeError(contains("Map pattern key 'b' not found")),
+      );
     });
 
     test('Map Pattern - Mismatch Type', () {
@@ -2995,8 +3162,10 @@ void main() {
           var {'a': x} = [1, 2]; // Not a map
         }
       ''';
-      expect(() => execute(source),
-          throwsRuntimeError(contains('Expected a Map, but got List')));
+      expect(
+        () => execute(source),
+        throwsRuntimeError(contains('Expected a Map, but got List')),
+      );
     });
 
     test('Record Pattern - Positional', () {
@@ -3026,9 +3195,13 @@ void main() {
         }
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              'Record pattern expected at least 2 positional fields, but Record only has 1')));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            'Record pattern expected at least 2 positional fields, but Record only has 1',
+          ),
+        ),
+      );
     });
 
     test('Record Pattern - Named Mismatch Name', () {
@@ -3038,9 +3211,13 @@ void main() {
         }
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "Record pattern named field 'value' not found in the record.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "Record pattern named field 'value' not found in the record.",
+          ),
+        ),
+      );
     });
 
     test('Record Pattern - Mismatch Type', () {
@@ -3050,9 +3227,9 @@ void main() {
         }
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "Expected a Record, but got int"))); // Assuming InterpretedRecord is not int
+        () => execute(source),
+        throwsRuntimeError(contains("Expected a Record, but got int")),
+      ); // Assuming InterpretedRecord is not int
     });
 
     test('Combined Pattern - List of Records', () {
@@ -3134,9 +3311,11 @@ void main() {
         }
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              'Switch expression was not exhaustive for value: 3'))); // Message d'erreur attendu
+        () => execute(source),
+        throwsRuntimeError(
+          contains('Switch expression was not exhaustive for value: 3'),
+        ),
+      ); // Message d'erreur attendu
     });
 
     test('Pattern binding (Record)', () {
@@ -3206,8 +3385,10 @@ void main() {
           return result;
         }
       ''';
-      expect(() => execute(source),
-          throwsRuntimeError(contains('must evaluate to a boolean')));
+      expect(
+        () => execute(source),
+        throwsRuntimeError(contains('must evaluate to a boolean')),
+      );
     });
   });
 
@@ -3217,20 +3398,21 @@ void main() {
     setUp(() {
       interpreter = D4rt();
       interpreter.registerBridgedClass(
-          BridgedClass(
-            nativeType: DummyNative,
-            name: 'Dummy',
-            constructors: {'': (v, p, n) => DummyNative()},
-            methods: {
-              'nativeMethod': (v, t, p, n) => (t as DummyNative).nativeMethod(),
-            },
-            getters: {},
-            setters: {},
-            staticGetters: {},
-            staticSetters: {},
-            staticMethods: {},
-          ),
-          'package:test/dummy.dart');
+        BridgedClass(
+          nativeType: DummyNative,
+          name: 'Dummy',
+          constructors: {'': (v, p, n) => DummyNative()},
+          methods: {
+            'nativeMethod': (v, t, p, n) => (t as DummyNative).nativeMethod(),
+          },
+          getters: {},
+          setters: {},
+          staticGetters: {},
+          staticSetters: {},
+          staticMethods: {},
+        ),
+        'package:test/dummy.dart',
+      );
     });
 
     test('Correct return type (int)', () {
@@ -3261,9 +3443,13 @@ void main() {
         main() => getNumber();
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "A value of type 'String' can't be returned from the function 'getNumber' because it has a return type of 'int'.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'String' can't be returned from the function 'getNumber' because it has a return type of 'int'.",
+          ),
+        ),
+      );
     });
 
     test('Incorrect return type (int instead of String)', () {
@@ -3274,9 +3460,13 @@ void main() {
         main() => getText();
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "A value of type 'int' can't be returned from the function 'getText' because it has a return type of 'String'.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'int' can't be returned from the function 'getText' because it has a return type of 'String'.",
+          ),
+        ),
+      );
     });
 
     test('Correct return type (void, implicit)', () {
@@ -3313,9 +3503,13 @@ void main() {
         main() => doNothingWrong();
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "A value of type 'int' can't be returned from the function 'doNothingWrong' because it has a return type of 'void'.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'int' can't be returned from the function 'doNothingWrong' because it has a return type of 'void'.",
+          ),
+        ),
+      );
     });
 
     test('Correct return type (dynamic, any value)', () {
@@ -3354,9 +3548,13 @@ void main() {
         main() => getObjectWrong();
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "A value of type 'Null' can't be returned from the function 'getObjectWrong' because it has a return type of 'Object'.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'Null' can't be returned from the function 'getObjectWrong' because it has a return type of 'Object'.",
+          ),
+        ),
+      );
     });
 
     test('Correct return type (int? nullable, int value)', () {
@@ -3387,9 +3585,13 @@ void main() {
         main() => getNullableIntWrong();
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "A value of type 'String' can't be returned from the function 'getNullableIntWrong' because it has a return type of 'int?'.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'String' can't be returned from the function 'getNullableIntWrong' because it has a return type of 'int?'.",
+          ),
+        ),
+      );
     });
 
     test('Correct subtype (int for num)', () {
@@ -3420,9 +3622,13 @@ void main() {
         main() => getNumWrong();
       ''';
       expect(
-          () => execute(source),
-          throwsRuntimeError(contains(
-              "A value of type 'String' can't be returned from the function 'getNumWrong' because it has a return type of 'num'.")));
+        () => execute(source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'String' can't be returned from the function 'getNumWrong' because it has a return type of 'num'.",
+          ),
+        ),
+      );
     });
 
     test('Correct return type (Bridged type)', () {
@@ -3437,8 +3643,10 @@ void main() {
            return d.nativeMethod(); // Call method to ensure it's the right type
          }
        ''';
-      expect(interpreter.execute(source: source),
-          equals('DummyNative method result'));
+      expect(
+        interpreter.execute(source: source),
+        equals('DummyNative method result'),
+      );
     });
 
     test('Incorrect return type (int for Bridged type)', () {
@@ -3450,9 +3658,13 @@ void main() {
          main() => getDummyWrong();
        ''';
       expect(
-          () => interpreter.execute(source: source),
-          throwsRuntimeError(contains(
-              "A value of type 'int' can't be returned from the function 'getDummyWrong' because it has a return type of 'Dummy'.")));
+        () => interpreter.execute(source: source),
+        throwsRuntimeError(
+          contains(
+            "A value of type 'int' can't be returned from the function 'getDummyWrong' because it has a return type of 'Dummy'.",
+          ),
+        ),
+      );
     });
 
     test('Correct return type (null for Bridged type nullable)', () {

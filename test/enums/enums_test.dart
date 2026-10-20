@@ -270,8 +270,10 @@ void main() {
           ];
         }
       ''';
-      expect(execute(source),
-          equals(['♥', 'red', true, '♠', 'black', true, 'Hearts', 'Spades']));
+      expect(
+        execute(source),
+        equals(['♥', 'red', true, '♠', 'black', true, 'Hearts', 'Spades']),
+      );
     });
 
     test('Enum with static methods', () {
@@ -346,17 +348,18 @@ void main() {
         }
       ''';
       expect(
-          execute(source),
-          equals([
-            [
-              'Perfect round shape',
-              'Four equal sides',
-              'Three sides',
-              'Five sides'
-            ],
-            [4, 3, 5],
-            ['circle']
-          ]));
+        execute(source),
+        equals([
+          [
+            'Perfect round shape',
+            'Four equal sides',
+            'Three sides',
+            'Five sides',
+          ],
+          [4, 3, 5],
+          ['circle'],
+        ]),
+      );
     });
 
     test('Enum with complex business logic', () {
@@ -403,15 +406,16 @@ void main() {
         }
       ''';
       expect(
-          execute(source),
-          equals([
-            true,
-            false,
-            true,
-            false,
-            'moderator',
-            ['read']
-          ]));
+        execute(source),
+        equals([
+          true,
+          false,
+          true,
+          false,
+          'moderator',
+          ['read'],
+        ]),
+      );
     });
 
     test('Enum with complex state management', () {
@@ -501,11 +505,12 @@ void main() {
         }
       ''';
       expect(
-          execute(source),
-          equals([
-            ['playing', 'paused', 'playing', 'gameOver'],
-            [10, 10, 25, 25]
-          ]));
+        execute(source),
+        equals([
+          ['playing', 'paused', 'playing', 'gameOver'],
+          [10, 10, 25, 25],
+        ]),
+      );
     });
   });
 }

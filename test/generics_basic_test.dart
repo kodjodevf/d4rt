@@ -305,11 +305,12 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            [1, 2, 3],
-            ["num_1", "num_2", "num_3"]
-          ]));
+        execute(code),
+        equals([
+          [1, 2, 3],
+          ["num_1", "num_2", "num_3"],
+        ]),
+      );
     });
 
     test('Generic mixin support', () {
@@ -356,9 +357,10 @@ void main() {
   });
 
   group('Generic Error Handling', () {
-    test('Type mismatch should be caught (when bounds checking implemented)',
-        () {
-      final code = '''
+    test(
+      'Type mismatch should be caught (when bounds checking implemented)',
+      () {
+        final code = '''
         class NumberOnly<T extends num> {
           T value;
           NumberOnly(this.value);
@@ -374,8 +376,9 @@ void main() {
           return intContainer.value;
         }
       ''';
-      expect(execute(code), equals(42));
-    });
+        expect(execute(code), equals(42));
+      },
+    );
 
     test('Null safety with generics', () {
       final code = '''
@@ -487,7 +490,9 @@ void main() {
         }
       ''';
       expect(
-          execute(code), equals(["hello", "String", true, 100, "int", true]));
+        execute(code),
+        equals(["hello", "String", true, 100, "int", true]),
+      );
     });
 
     test('Generic method overloading and type resolution', () {
@@ -524,13 +529,14 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            2,
-            5.0,
-            "42",
-            ["1", "2.5", "3"]
-          ]));
+        execute(code),
+        equals([
+          2,
+          5.0,
+          "42",
+          ["1", "2.5", "3"],
+        ]),
+      );
     });
 
     test('Generic exception handling and type errors', () {
@@ -595,15 +601,16 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            true,
-            5,
-            true,
-            "Division by zero",
-            "Success: 5",
-            "Error: Division by zero"
-          ]));
+        execute(code),
+        equals([
+          true,
+          5,
+          true,
+          "Division by zero",
+          "Success: 5",
+          "Error: Division by zero",
+        ]),
+      );
     });
 
     test('Generic inheritance with type preservation', () {
@@ -729,8 +736,10 @@ void main() {
           ];
         }
       ''';
-      expect(execute(code),
-          equals([true, 42, true, 84, "Error: Invalid number: abc"]));
+      expect(
+        execute(code),
+        equals([true, 42, true, 84, "Error: Invalid number: abc"]),
+      );
     });
 
     test('Generic type bounds with multiple constraints', () {
@@ -792,8 +801,10 @@ void main() {
           ];
         }
       ''';
-      expect(execute(code),
-          equals([2, '{"id": "1", "name": "Alice"}', "Alice", "1"]));
+      expect(
+        execute(code),
+        equals([2, '{"id": "1", "name": "Alice"}', "Alice", "1"]),
+      );
     });
 
     test('Generic type variance and covariance simulation', () {
@@ -857,13 +868,14 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            ["Woof!", "Woof!"],
-            ["Meow!", "Meow!"],
-            2,
-            "Rex"
-          ]));
+        execute(code),
+        equals([
+          ["Woof!", "Woof!"],
+          ["Meow!", "Meow!"],
+          2,
+          "Rex",
+        ]),
+      );
     });
 
     test('Static method resolution within class context', () {
@@ -918,14 +930,15 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            3,
-            ["1", "2", "3"],
-            42,
-            "123",
-            [1.0, 2.0, 3.0]
-          ]));
+        execute(code),
+        equals([
+          3,
+          ["1", "2", "3"],
+          42,
+          "123",
+          [1.0, 2.0, 3.0],
+        ]),
+      );
     });
 
     test('Dynamic bounds resolution with custom types from environment', () {
@@ -967,12 +980,14 @@ void main() {
 
       var result = execute(code);
       expect(
-          result,
-          anyOf(
-              equals(["Alice", '{"name": "Alice"}']),
-              contains(
-                  "Error:") // If the resolution of custom types is not yet complete
-              ));
+        result,
+        anyOf(
+          equals(["Alice", '{"name": "Alice"}']),
+          contains(
+            "Error:",
+          ), // If the resolution of custom types is not yet complete
+        ),
+      );
     });
   });
 
@@ -1008,9 +1023,12 @@ void main() {
       // For now, d4rt might not catch this, but we test the structure
       var result = execute(code);
       expect(
-          result,
-          anyOf(equals("SUCCESS: Type error caught"),
-              equals("ERROR: Should have failed")));
+        result,
+        anyOf(
+          equals("SUCCESS: Type error caught"),
+          equals("ERROR: Should have failed"),
+        ),
+      );
     });
 
     test('Method call with wrong argument types should fail gracefully', () {
@@ -1083,11 +1101,12 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            43,
-            [2, 3, 4]
-          ]));
+        execute(code),
+        equals([
+          43,
+          [2, 3, 4],
+        ]),
+      );
     });
 
     test('Null safety violations with generics', () {
@@ -1262,13 +1281,14 @@ void main() {
         }
       ''';
       expect(
-          execute(code),
-          equals([
-            42,
-            "123",
-            true,
-            [1, 2, 3]
-          ]));
+        execute(code),
+        equals([
+          42,
+          "123",
+          true,
+          [1, 2, 3],
+        ]),
+      );
     });
 
     test('Inheritance type safety violations', () {
@@ -1544,12 +1564,13 @@ void main() {
       ''';
 
       expect(
-          execute(code),
-          equals([
-            "hello",
-            42,
-            ["a", "b", "c"]
-          ]));
+        execute(code),
+        equals([
+          "hello",
+          42,
+          ["a", "b", "c"],
+        ]),
+      );
     });
   });
 
@@ -1677,11 +1698,13 @@ void main() {
       ''';
       var result = execute(code);
       expect(
-          result,
-          anyOf(
-              equals([25, "bounds validation infrastructure working"]),
-              contains("bounds validation infrastructure working"),
-              contains("Bounds checking error:")));
+        result,
+        anyOf(
+          equals([25, "bounds validation infrastructure working"]),
+          contains("bounds validation infrastructure working"),
+          contains("Bounds checking error:"),
+        ),
+      );
     });
   });
 }

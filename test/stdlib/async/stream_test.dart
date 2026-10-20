@@ -6,7 +6,8 @@ void main() {
   group('Interpreted Stream Bindings Tests', () {
     // Helper to run Interpreted code that involves async operations
     Future<dynamic> runInterpretedStreamTest(String code) async {
-      final fullSource = '''
+      final fullSource =
+          '''
         import 'dart:async';
 
         Future<dynamic> main() async {
@@ -195,8 +196,10 @@ void main() {
                 Stream s = Stream.fromIterable([1, 2, 2, 3, 1, 3, 4, 2]);
                 return await s.distinct().toList();
             ''';
-        expect(await runInterpretedStreamTest(source),
-            equals([1, 2, 3, 1, 3, 4, 2]));
+        expect(
+          await runInterpretedStreamTest(source),
+          equals([1, 2, 3, 1, 3, 4, 2]),
+        );
 
         // With custom equals (based on first char for strings)
         const sourceCustom = '''
@@ -209,8 +212,10 @@ void main() {
                 Stream s = Stream.fromIterable(["apple", "apricot", "banana", "avocado", "berry"]);
                 return await s.distinct(firstCharEquals).toList();
             ''';
-        expect(await runInterpretedStreamTest(sourceCustom),
-            equals(["apple", "banana", "avocado", "berry"]));
+        expect(
+          await runInterpretedStreamTest(sourceCustom),
+          equals(["apple", "banana", "avocado", "berry"]),
+        );
       });
 
       test('stream.toList', () async {
@@ -491,9 +496,10 @@ void main() {
       expect(() => execute(code), returnsNormally);
     });
 
-    test('handleError respects test parameter with single-argument callback',
-        () {
-      final code = '''
+    test(
+      'handleError respects test parameter with single-argument callback',
+      () {
+        final code = '''
         import 'dart:async';
         
         void main() async {
@@ -513,8 +519,9 @@ void main() {
           }
         }
       ''';
-      // Should not throw an error about too many arguments
-      expect(() => execute(code), returnsNormally);
-    });
+        // Should not throw an error about too many arguments
+        expect(() => execute(code), returnsNormally);
+      },
+    );
   });
 }

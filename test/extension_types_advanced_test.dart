@@ -355,7 +355,9 @@ int main() {
 }
       ''';
       expect(
-          execute(code), equals(60)); // 5 * 2 = 10, 10 + 10 = 20, 20 * 3 = 60
+        execute(code),
+        equals(60),
+      ); // 5 * 2 = 10, 10 + 10 = 20, 20 * 3 = 60
     });
 
     test('Extension type with type validation', () {

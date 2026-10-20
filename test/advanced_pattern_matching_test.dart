@@ -4,9 +4,10 @@ import 'package:d4rt/d4rt.dart';
 dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt()..setDebug(false);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -43,26 +44,27 @@ void main() {
 
       final result = execute(code);
       expect(
-          result,
-          equals([
-            [
-              'end',
-              1,
-              2,
-              [3, 4, 5]
-            ],
-            [
-              'beginning',
-              [10, 20, 30],
-              40
-            ],
-            [
-              'middle',
-              100,
-              [200, 300, 400],
-              500
-            ]
-          ]));
+        result,
+        equals([
+          [
+            'end',
+            1,
+            2,
+            [3, 4, 5],
+          ],
+          [
+            'beginning',
+            [10, 20, 30],
+            40,
+          ],
+          [
+            'middle',
+            100,
+            [200, 300, 400],
+            500,
+          ],
+        ]),
+      );
     });
 
     test('Map patterns with rest elements', () {
@@ -80,12 +82,13 @@ void main() {
 
       final result = execute(code);
       expect(
-          result,
-          equals([
-            'John',
-            25,
-            {'city': 'NYC', 'country': 'USA'}
-          ]));
+        result,
+        equals([
+          'John',
+          25,
+          {'city': 'NYC', 'country': 'USA'},
+        ]),
+      );
     });
 
     test('Nested pattern matching with rest elements', () {
@@ -107,13 +110,14 @@ void main() {
 
       final result = execute(code);
       expect(
-          result,
-          equals([
-            'user',
-            1,
-            [2, 3, 4],
-            ['extra']
-          ]));
+        result,
+        equals([
+          'user',
+          1,
+          [2, 3, 4],
+          ['extra'],
+        ]),
+      );
     });
 
     test('Anonymous rest elements (no binding)', () {
@@ -184,11 +188,12 @@ void main() {
 
       final result = execute(code);
       expect(
-          result,
-          equals([
-            ['list', 1, 2, []],
-            ['map', 10, 20, {}]
-          ]));
+        result,
+        equals([
+          ['list', 1, 2, []],
+          ['map', 10, 20, {}],
+        ]),
+      );
     });
 
     test('Complex pattern matching with guards (when available)', () {

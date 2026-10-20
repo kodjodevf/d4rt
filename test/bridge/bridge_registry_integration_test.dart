@@ -163,10 +163,7 @@ void main() {
         getters: {},
       );
 
-      interpreter.registerBridgedClass(
-        bridgedClass,
-        'package:test/test.dart',
-      );
+      interpreter.registerBridgedClass(bridgedClass, 'package:test/test.dart');
 
       final tracked = interpreter.trackedClasses.first;
       expect(tracked.origin?.elementName, equals('TestClass'));
@@ -189,10 +186,16 @@ void main() {
       );
 
       final manager = interpreter.bridgeManager;
-      manager.registerClass(bridgedClass, 'package:test/test.dart',
-          sourceUri: 'package:test/src/bridges.dart');
-      manager.registerEnum(enumDef, 'package:test/test.dart',
-          sourceUri: 'package:test/src/bridges.dart');
+      manager.registerClass(
+        bridgedClass,
+        'package:test/test.dart',
+        sourceUri: 'package:test/src/bridges.dart',
+      );
+      manager.registerEnum(
+        enumDef,
+        'package:test/test.dart',
+        sourceUri: 'package:test/src/bridges.dart',
+      );
 
       expect(interpreter.trackedClasses, hasLength(1));
       expect(interpreter.trackedEnums, hasLength(1));
@@ -211,7 +214,9 @@ void main() {
       // Should not throw
       expect(
         () => interpreter.registerBridgedClass(
-            bridgedClass, 'package:test/test.dart'),
+          bridgedClass,
+          'package:test/test.dart',
+        ),
         returnsNormally,
       );
 

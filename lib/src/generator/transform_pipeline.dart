@@ -355,8 +355,10 @@ class TransformPipeline {
         .whereType<BridgeableClass>()
         .toList();
 
-    final enums =
-        metadata.enums.map(_transformEnum).whereType<BridgeableEnum>().toList();
+    final enums = metadata.enums
+        .map(_transformEnum)
+        .whereType<BridgeableEnum>()
+        .toList();
 
     final functions = metadata.functions
         .map(_transformFunction)
@@ -428,17 +430,21 @@ class TransformPipeline {
       if (field.name.startsWith('_') && !config.includePrivateMembers) {
         continue;
       }
-      getters.add(BridgeableGetter(
-        name: field.name,
-        returnType: _mapType(field.type.fullName),
-        accessTemplate: 'target.${field.name}',
-      ));
-      if (!field.isFinal) {
-        setters.add(BridgeableSetter(
+      getters.add(
+        BridgeableGetter(
           name: field.name,
-          parameterType: _mapType(field.type.fullName),
-          assignTemplate: 'target.${field.name} = value',
-        ));
+          returnType: _mapType(field.type.fullName),
+          accessTemplate: 'target.${field.name}',
+        ),
+      );
+      if (!field.isFinal) {
+        setters.add(
+          BridgeableSetter(
+            name: field.name,
+            parameterType: _mapType(field.type.fullName),
+            assignTemplate: 'target.${field.name} = value',
+          ),
+        );
       }
     }
 
@@ -460,17 +466,21 @@ class TransformPipeline {
         if (field.name.startsWith('_') && !config.includePrivateMembers) {
           continue;
         }
-        staticGetters.add(BridgeableGetter(
-          name: field.name,
-          returnType: _mapType(field.type.fullName),
-          accessTemplate: '${meta.name}.${field.name}',
-        ));
-        if (!field.isFinal && !field.isConst) {
-          staticSetters.add(BridgeableSetter(
+        staticGetters.add(
+          BridgeableGetter(
             name: field.name,
-            parameterType: _mapType(field.type.fullName),
-            assignTemplate: '${meta.name}.${field.name} = value',
-          ));
+            returnType: _mapType(field.type.fullName),
+            accessTemplate: '${meta.name}.${field.name}',
+          ),
+        );
+        if (!field.isFinal && !field.isConst) {
+          staticSetters.add(
+            BridgeableSetter(
+              name: field.name,
+              parameterType: _mapType(field.type.fullName),
+              assignTemplate: '${meta.name}.${field.name} = value',
+            ),
+          );
         }
       }
     }
@@ -497,19 +507,26 @@ class TransformPipeline {
   }
 
   BridgeableConstructor? _transformConstructor(
-      ConstructorMetadata meta, ClassMetadata classMeta) {
+    ConstructorMetadata meta,
+    ClassMetadata classMeta,
+  ) {
     if (classMeta.isAbstract && !meta.isFactory) {
       return null;
     }
     _positionalIndex = 0;
     final params = meta.parameters.map(_transformParameter).toList();
 
-    final positionalArgs =
-        params.where((p) => !p.isNamed).map((p) => p.extractionExpr).join(', ');
+    final positionalArgs = params
+        .where((p) => !p.isNamed)
+        .map((p) => p.extractionExpr)
+        .join(', ');
 
-    final namedArgs = params.where((p) => p.isNamed).map((p) {
-      return '${p.name}: ${p.extractionExpr}';
-    }).join(', ');
+    final namedArgs = params
+        .where((p) => p.isNamed)
+        .map((p) {
+          return '${p.name}: ${p.extractionExpr}';
+        })
+        .join(', ');
 
     final allArgs = [
       if (positionalArgs.isNotEmpty) positionalArgs,
@@ -544,12 +561,17 @@ class TransformPipeline {
 
     final params = meta.parameters.map(_transformParameter).toList();
 
-    final positionalArgs =
-        params.where((p) => !p.isNamed).map((p) => p.extractionExpr).join(', ');
+    final positionalArgs = params
+        .where((p) => !p.isNamed)
+        .map((p) => p.extractionExpr)
+        .join(', ');
 
-    final namedArgs = params.where((p) => p.isNamed).map((p) {
-      return '${p.name}: ${p.extractionExpr}';
-    }).join(', ');
+    final namedArgs = params
+        .where((p) => p.isNamed)
+        .map((p) {
+          return '${p.name}: ${p.extractionExpr}';
+        })
+        .join(', ');
 
     final allArgs = [
       if (positionalArgs.isNotEmpty) positionalArgs,
@@ -673,10 +695,7 @@ class TransformPipeline {
       if (inner[i] == '<') depth++;
       if (inner[i] == '>') depth--;
       if (inner[i] == ',' && depth == 0) {
-        return [
-          inner.substring(0, i).trim(),
-          inner.substring(i + 1).trim(),
-        ];
+        return [inner.substring(0, i).trim(), inner.substring(i + 1).trim()];
       }
     }
     return ['dynamic', 'dynamic'];
@@ -717,7 +736,9 @@ class TransformPipeline {
       if (meta.isRequired) {
         if (isFunctionType) {
           extractionExpr = _wrapFunctionType(
-              "namedArgs.required<Callable>('$paramName')", type);
+            "namedArgs.required<Callable>('$paramName')",
+            type,
+          );
         } else if (type == 'dynamic' || isGenericParam) {
           extractionExpr = "namedArgs.required<dynamic>('$paramName')";
         } else if (type.startsWith('List<')) {
@@ -787,7 +808,9 @@ class TransformPipeline {
       if (meta.isRequired) {
         if (isFunctionType) {
           extractionExpr = _wrapFunctionType(
-              "positionalArgs.required<Callable>($index, '$paramName')", type);
+            "positionalArgs.required<Callable>($index, '$paramName')",
+            type,
+          );
         } else if (type == 'dynamic' || isGenericParam) {
           extractionExpr =
               "positionalArgs.required<dynamic>($index, '$paramName')";
@@ -888,16 +911,22 @@ class TransformPipeline {
     } else if (normalizedType.startsWith('AsyncCallback')) {
       normalizedType = 'Future<void> Function()';
     } else if (normalizedType.startsWith('ValueChanged<')) {
-      final inner =
-          normalizedType.substring(13, normalizedType.lastIndexOf('>'));
+      final inner = normalizedType.substring(
+        13,
+        normalizedType.lastIndexOf('>'),
+      );
       normalizedType = 'void Function($inner)';
     } else if (normalizedType.startsWith('AsyncValueSetter<')) {
-      final inner =
-          normalizedType.substring(17, normalizedType.lastIndexOf('>'));
+      final inner = normalizedType.substring(
+        17,
+        normalizedType.lastIndexOf('>'),
+      );
       normalizedType = 'Future<void> Function($inner)';
     } else if (normalizedType.startsWith('AsyncValueGetter<')) {
-      final inner =
-          normalizedType.substring(17, normalizedType.lastIndexOf('>'));
+      final inner = normalizedType.substring(
+        17,
+        normalizedType.lastIndexOf('>'),
+      );
       normalizedType = 'Future<$inner> Function()';
     } else if (normalizedType.contains('ScrollNotificationPredicate')) {
       normalizedType = 'bool Function(ScrollNotification)';
@@ -938,7 +967,8 @@ class TransformPipeline {
           .toList();
 
       // Add cast to return type if not void or dynamic
-      final callExpr = (returnType != 'void' &&
+      final callExpr =
+          (returnType != 'void' &&
               returnType != 'dynamic' &&
               returnType.isNotEmpty)
           ? '($awaitKw $callableExpr.call(visitor, [%args%]) as $returnType)'
@@ -986,12 +1016,18 @@ class TransformPipeline {
       }
     }
 
-    final getters =
-        meta.getters.where((g) => !g.isStatic).map(_transformGetter).toList();
-    final staticGetters =
-        meta.getters.where((g) => g.isStatic).map(_transformGetter).toList();
-    final staticSetters =
-        meta.setters.where((s) => s.isStatic).map(_transformSetter).toList();
+    final getters = meta.getters
+        .where((g) => !g.isStatic)
+        .map(_transformGetter)
+        .toList();
+    final staticGetters = meta.getters
+        .where((g) => g.isStatic)
+        .map(_transformGetter)
+        .toList();
+    final staticSetters = meta.setters
+        .where((s) => s.isStatic)
+        .map(_transformSetter)
+        .toList();
 
     return BridgeableEnum(
       name: meta.name,
@@ -1019,12 +1055,17 @@ class TransformPipeline {
     _positionalIndex = 0;
     final params = meta.parameters.map(_transformParameter).toList();
 
-    final positionalArgs =
-        params.where((p) => !p.isNamed).map((p) => p.extractionExpr).join(', ');
+    final positionalArgs = params
+        .where((p) => !p.isNamed)
+        .map((p) => p.extractionExpr)
+        .join(', ');
 
-    final namedArgs = params.where((p) => p.isNamed).map((p) {
-      return '${p.name}: ${p.extractionExpr}';
-    }).join(', ');
+    final namedArgs = params
+        .where((p) => p.isNamed)
+        .map((p) {
+          return '${p.name}: ${p.extractionExpr}';
+        })
+        .join(', ');
 
     final allArgs = [
       if (positionalArgs.isNotEmpty) positionalArgs,

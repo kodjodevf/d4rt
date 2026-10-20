@@ -181,11 +181,12 @@ void main() {
       ''';
       final result = await execute(source);
       expect(
-          result,
-          anyOf([
-            equals('addError method works'),
-            equals('addError called successfully')
-          ]));
+        result,
+        anyOf([
+          equals('addError method works'),
+          equals('addError called successfully'),
+        ]),
+      );
     });
 
     test('IOSink encoding parameter', () async {

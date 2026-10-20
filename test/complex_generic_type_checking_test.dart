@@ -122,9 +122,9 @@ int main() {
     });
 
     test(
-        'triple nested generic Map<String, List<Map<String, int>>> type checking',
-        () {
-      const code = '''
+      'triple nested generic Map<String, List<Map<String, int>>> type checking',
+      () {
+        const code = '''
 int main() {
   var complexMap = {
     'group1': [
@@ -143,9 +143,10 @@ int main() {
   return 0;
 }
 ''';
-      final result = execute(code);
-      expect(result, equals(1));
-    });
+        final result = execute(code);
+        expect(result, equals(1));
+      },
+    );
 
     test('type checking with nullable generics', () {
       const code = '''

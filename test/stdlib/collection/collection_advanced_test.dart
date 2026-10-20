@@ -10,7 +10,9 @@ void main() {
     });
 
     test('HasNextIterator functionality and subtyping', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:collection';
 
         main() {
@@ -26,7 +28,9 @@ void main() {
 
           return [isHasNextIter, values, iter.hasNext];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], equals([10, 20, 30]));
@@ -34,7 +38,9 @@ void main() {
     });
 
     test('Queue.of, ListQueue.of, DoubleLinkedQueue.of constructors', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:collection';
 
         main() {
@@ -59,7 +65,9 @@ void main() {
             dlq.toList(),
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);
@@ -72,7 +80,9 @@ void main() {
     });
 
     test('Map, Set, and LinkedList subtyping in dart:collection', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:collection';
 
         main() {
@@ -96,7 +106,9 @@ void main() {
             ll is LinkedList,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);

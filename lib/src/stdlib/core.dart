@@ -112,18 +112,29 @@ class CoreStdlib {
     environment.defineBridge(FinalizerCore.definition);
     environment.defineBridge(RecordCore.definition);
     environment.define(
-        'dynamic',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'dynamic',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           return dynamic;
-        }, arity: 0, name: 'dynamic'));
+        },
+        arity: 0,
+        name: 'dynamic',
+      ),
+    );
     environment.define(
-        'identical',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'identical',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           return identical(arguments[0], arguments[1]);
-        }, arity: 2, name: 'identical'));
+        },
+        arity: 2,
+        name: 'identical',
+      ),
+    );
     environment.define(
-        'print',
-        NativeFunction((visitor, arguments, namedArguments, typeArguments) {
+      'print',
+      NativeFunction(
+        (visitor, arguments, namedArguments, typeArguments) {
           final message = visitor.valueToString(arguments[0]);
           if (visitor.onPrint != null) {
             visitor.onPrint!(message);
@@ -131,6 +142,10 @@ class CoreStdlib {
             print(message);
           }
           return null;
-        }, arity: 1, name: 'print'));
+        },
+        arity: 1,
+        name: 'print',
+      ),
+    );
   }
 }

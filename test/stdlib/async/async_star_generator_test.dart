@@ -98,11 +98,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            [1],
-            [1, 2, 3]
-          ]));
+        result,
+        equals([
+          [1],
+          [1, 2, 3],
+        ]),
+      );
     });
 
     test('Async* generator with exception handling', () async {
@@ -226,11 +227,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ['A1', 'A2', 'A3'],
-            ['B1', 'B2', 'B3']
-          ]));
+        result,
+        equals([
+          ['A1', 'A2', 'A3'],
+          ['B1', 'B2', 'B3'],
+        ]),
+      );
     });
 
     test('Async* generator yielding complex objects', () async {
@@ -253,12 +255,13 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            {'id': 1, 'name': 'First'},
-            {'id': 2, 'name': 'Second'},
-            {'id': 3, 'name': 'Third'}
-          ]));
+        result,
+        equals([
+          {'id': 1, 'name': 'First'},
+          {'id': 2, 'name': 'Second'},
+          {'id': 3, 'name': 'Third'},
+        ]),
+      );
     });
   });
 }

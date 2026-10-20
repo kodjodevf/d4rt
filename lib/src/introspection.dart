@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:analyzer/dart/ast/ast.dart';
+
+import 'ast_compat.dart';
 import 'package:d4rt/d4rt.dart';
 
 /// Represents information about a declaration in the executed code.
@@ -58,15 +60,15 @@ class FunctionInfo extends DeclarationInfo {
 
   @override
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'declarationType': declarationType,
-        'arity': arity,
-        'isAsync': isAsync,
-        'isGenerator': isGenerator,
-        if (returnType != null) 'returnType': returnType,
-        'parameterNames': parameterNames,
-        'namedParameterNames': namedParameterNames,
-      };
+    'name': name,
+    'declarationType': declarationType,
+    'arity': arity,
+    'isAsync': isAsync,
+    'isGenerator': isGenerator,
+    if (returnType != null) 'returnType': returnType,
+    'parameterNames': parameterNames,
+    'namedParameterNames': namedParameterNames,
+  };
 
   @override
   String toString() {
@@ -120,16 +122,16 @@ class ClassInfo extends DeclarationInfo {
 
   @override
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'declarationType': declarationType,
-        'superTypes': superTypes,
-        'interfaces': interfaces,
-        'mixins': mixins,
-        'methods': methods,
-        'fields': fields,
-        'constructors': constructors,
-        'isAbstract': isAbstract,
-      };
+    'name': name,
+    'declarationType': declarationType,
+    'superTypes': superTypes,
+    'interfaces': interfaces,
+    'mixins': mixins,
+    'methods': methods,
+    'fields': fields,
+    'constructors': constructors,
+    'isAbstract': isAbstract,
+  };
 
   @override
   String toString() {
@@ -187,15 +189,15 @@ class VariableInfo extends DeclarationInfo {
 
   @override
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'declarationType': declarationType,
-        if (declaredType != null) 'declaredType': declaredType,
-        'valueType': valueType,
-        'value': value?.toString(),
-        'isFinal': isFinal,
-        'isConst': isConst,
-        'isLate': isLate,
-      };
+    'name': name,
+    'declarationType': declarationType,
+    if (declaredType != null) 'declaredType': declaredType,
+    'valueType': valueType,
+    'value': value?.toString(),
+    'isFinal': isFinal,
+    'isConst': isConst,
+    'isLate': isLate,
+  };
 
   @override
   String toString() {
@@ -223,11 +225,11 @@ class EnumInfo extends DeclarationInfo {
 
   @override
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'declarationType': declarationType,
-        'values': values,
-        'methods': methods,
-      };
+    'name': name,
+    'declarationType': declarationType,
+    'values': values,
+    'methods': methods,
+  };
 
   @override
   String toString() => 'enum $name { ${values.join(', ')} }';
@@ -252,11 +254,11 @@ class ExtensionInfo extends DeclarationInfo {
 
   @override
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'declarationType': declarationType,
-        'onType': onType,
-        'methods': methods,
-      };
+    'name': name,
+    'declarationType': declarationType,
+    'onType': onType,
+    'methods': methods,
+  };
 
   @override
   String toString() => 'extension $name on $onType';
@@ -289,24 +291,24 @@ class IntrospectionResult {
 
   /// Converts this introspection result into a map representation.
   Map<String, dynamic> toMap() => {
-        'functions': functions.map((f) => f.toMap()).toList(),
-        'classes': classes.map((c) => c.toMap()).toList(),
-        'variables': variables.map((v) => v.toMap()).toList(),
-        'enums': enums.map((e) => e.toMap()).toList(),
-        'extensions': extensions.map((ext) => ext.toMap()).toList(),
-      };
+    'functions': functions.map((f) => f.toMap()).toList(),
+    'classes': classes.map((c) => c.toMap()).toList(),
+    'variables': variables.map((v) => v.toMap()).toList(),
+    'enums': enums.map((e) => e.toMap()).toList(),
+    'extensions': extensions.map((ext) => ext.toMap()).toList(),
+  };
 
   /// Converts this introspection result into a JSON string.
   String toJson() => jsonEncode(toMap());
 
   /// Get all declarations as a single list.
   List<DeclarationInfo> get all => [
-        ...functions,
-        ...classes,
-        ...variables,
-        ...enums,
-        ...extensions,
-      ];
+    ...functions,
+    ...classes,
+    ...variables,
+    ...enums,
+    ...extensions,
+  ];
 
   /// Get a declaration by name, returns null if not found.
   DeclarationInfo? getByName(String name) {
@@ -401,11 +403,13 @@ class IntrospectionBuilder {
 
           if (extName.isEmpty) {
             // Unnamed extension - create with generated name
-            extensions.add(ExtensionInfo(
-              name: '<unnamed extension on $onType>',
-              onType: onType,
-              methods: methodNames,
-            ));
+            extensions.add(
+              ExtensionInfo(
+                name: '<unnamed extension on $onType>',
+                onType: onType,
+                methods: methodNames,
+              ),
+            );
           }
           processedExtensions.add(extName);
         }
@@ -427,11 +431,13 @@ class IntrospectionBuilder {
         functions.add(_buildFunctionInfo(name, value));
       } else if (value is NativeFunction) {
         if (includeBuiltins) {
-          functions.add(FunctionInfo(
-            name: name,
-            arity: value.arity,
-            parameterNames: const [],
-          ));
+          functions.add(
+            FunctionInfo(
+              name: name,
+              arity: value.arity,
+              parameterNames: const [],
+            ),
+          );
         }
       } else if (value is InterpretedClass) {
         classes.add(_buildClassInfo(name, value));
@@ -442,8 +448,9 @@ class IntrospectionBuilder {
       } else {
         // It's a variable - use type metadata if available
         final declaredType = variableTypeMap[name];
-        variables
-            .add(_buildVariableInfo(name, value, declaredType: declaredType));
+        variables.add(
+          _buildVariableInfo(name, value, declaredType: declaredType),
+        );
       }
     }
 
@@ -486,7 +493,9 @@ class IntrospectionBuilder {
   }
 
   static FunctionInfo _buildFunctionInfo(
-      String name, InterpretedFunction func) {
+    String name,
+    InterpretedFunction func,
+  ) {
     // Extract parameter names using the new getters
     final paramNames = func.positionalParameterNames;
     final namedParamNames = func.namedParameterNames;
@@ -595,15 +604,13 @@ class IntrospectionBuilder {
       methods.add(methodName);
     }
 
-    return EnumInfo(
-      name: name,
-      values: values,
-      methods: methods,
-    );
+    return EnumInfo(name: name, values: values, methods: methods);
   }
 
   static ExtensionInfo _buildExtensionInfo(
-      String name, InterpretedExtension ext) {
+    String name,
+    InterpretedExtension ext,
+  ) {
     final methods = <String>[];
 
     // Extract methods
@@ -611,15 +618,14 @@ class IntrospectionBuilder {
       methods.add(methodName);
     }
 
-    return ExtensionInfo(
-      name: name,
-      onType: ext.onType.name,
-      methods: methods,
-    );
+    return ExtensionInfo(name: name, onType: ext.onType.name, methods: methods);
   }
 
-  static VariableInfo _buildVariableInfo(String name, Object? value,
-      {String? declaredType}) {
+  static VariableInfo _buildVariableInfo(
+    String name,
+    Object? value, {
+    String? declaredType,
+  }) {
     String valueType;
     if (value == null) {
       valueType = 'Null';

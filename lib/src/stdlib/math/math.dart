@@ -15,68 +15,112 @@ class MathMath {
 
     // Functions
     environment.define(
-        'sin',
-        NativeFunction((visitor, arguments, _, __) => sin(arguments[0] as num),
-            arity: 1, name: 'sin'));
+      'sin',
+      NativeFunction(
+        (visitor, arguments, _, _) => sin(arguments[0] as num),
+        arity: 1,
+        name: 'sin',
+      ),
+    );
     environment.define(
-        'cos',
-        NativeFunction((visitor, arguments, _, __) => cos(arguments[0] as num),
-            arity: 1, name: 'cos'));
+      'cos',
+      NativeFunction(
+        (visitor, arguments, _, _) => cos(arguments[0] as num),
+        arity: 1,
+        name: 'cos',
+      ),
+    );
     environment.define(
-        'tan',
-        NativeFunction((visitor, arguments, _, __) => tan(arguments[0] as num),
-            arity: 1, name: 'tan'));
+      'tan',
+      NativeFunction(
+        (visitor, arguments, _, _) => tan(arguments[0] as num),
+        arity: 1,
+        name: 'tan',
+      ),
+    );
     environment.define(
-        'asin',
-        NativeFunction((visitor, arguments, _, __) => asin(arguments[0] as num),
-            arity: 1, name: 'asin'));
+      'asin',
+      NativeFunction(
+        (visitor, arguments, _, _) => asin(arguments[0] as num),
+        arity: 1,
+        name: 'asin',
+      ),
+    );
     environment.define(
-        'acos',
-        NativeFunction((visitor, arguments, _, __) => acos(arguments[0] as num),
-            arity: 1, name: 'acos'));
+      'acos',
+      NativeFunction(
+        (visitor, arguments, _, _) => acos(arguments[0] as num),
+        arity: 1,
+        name: 'acos',
+      ),
+    );
     environment.define(
-        'atan',
-        NativeFunction((visitor, arguments, _, __) => atan(arguments[0] as num),
-            arity: 1, name: 'atan'));
+      'atan',
+      NativeFunction(
+        (visitor, arguments, _, _) => atan(arguments[0] as num),
+        arity: 1,
+        name: 'atan',
+      ),
+    );
     environment.define(
-        'atan2',
-        NativeFunction(
-            (visitor, arguments, _, __) =>
-                atan2(arguments[0] as num, arguments[1] as num),
-            arity: 2,
-            name: 'atan2'));
+      'atan2',
+      NativeFunction(
+        (visitor, arguments, _, _) =>
+            atan2(arguments[0] as num, arguments[1] as num),
+        arity: 2,
+        name: 'atan2',
+      ),
+    );
     environment.define(
-        'sqrt',
-        NativeFunction((visitor, arguments, _, __) => sqrt(arguments[0] as num),
-            arity: 1, name: 'sqrt'));
+      'sqrt',
+      NativeFunction(
+        (visitor, arguments, _, _) => sqrt(arguments[0] as num),
+        arity: 1,
+        name: 'sqrt',
+      ),
+    );
     environment.define(
-        'exp',
-        NativeFunction((visitor, arguments, _, __) => exp(arguments[0] as num),
-            arity: 1, name: 'exp'));
+      'exp',
+      NativeFunction(
+        (visitor, arguments, _, _) => exp(arguments[0] as num),
+        arity: 1,
+        name: 'exp',
+      ),
+    );
     environment.define(
-        'log',
-        NativeFunction((visitor, arguments, _, __) => log(arguments[0] as num),
-            arity: 1, name: 'log'));
+      'log',
+      NativeFunction(
+        (visitor, arguments, _, _) => log(arguments[0] as num),
+        arity: 1,
+        name: 'log',
+      ),
+    );
     environment.define(
-        'pow',
-        NativeFunction(
-            (visitor, arguments, _, __) =>
-                pow(arguments[0] as num, arguments[1] as num),
-            arity: 2,
-            name: 'pow'));
+      'pow',
+      NativeFunction(
+        (visitor, arguments, _, _) =>
+            pow(arguments[0] as num, arguments[1] as num),
+        arity: 2,
+        name: 'pow',
+      ),
+    );
     environment.define(
-        'max',
-        NativeFunction(
-            (visitor, arguments, _, __) =>
-                max(arguments[0] as num, arguments[1] as num),
-            arity: 2,
-            name: 'max'));
+      'max',
+      NativeFunction(
+        (visitor, arguments, _, _) =>
+            max(arguments[0] as num, arguments[1] as num),
+        arity: 2,
+        name: 'max',
+      ),
+    );
     environment.define(
-        'min',
-        NativeFunction(
-            (visitor, arguments, _, __) =>
-                min(arguments[0] as num, arguments[1] as num),
-            arity: 2,
-            name: 'min'));
+      'min',
+      NativeFunction(
+        (visitor, arguments, _, _) =>
+            min(arguments[0] as num, arguments[1] as num),
+        arity: 2,
+        name: 'min',
+      ),
+    );
   }
 }

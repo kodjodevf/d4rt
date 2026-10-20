@@ -10,7 +10,8 @@ void main() {
     });
 
     test('complex null safety scenario with chaining and coalescing', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         class User {
           String? name;
           Profile? profile;
@@ -50,13 +51,15 @@ void main() {
           
           return [street1, street2, street3, defaultStreet, knownStreet];
         }
-      ''');
+      ''',
+      );
 
       expect(result, [null, null, '123 Main St', 'Unknown', '123 Main St']);
     });
 
     test('null-aware method calls with complex return types', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         class Calculator {
           int? getValue() => 42;
           Calculator? getChild() => null;
@@ -72,12 +75,14 @@ void main() {
           
           return [result1, result2, result3];
         }
-      ''');
+      ''',
+      );
 
       expect(result, [null, 42, null]);
     });
     test('null-aware assignment with complex expressions', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         class Container {
           String? value = null;
         }
@@ -97,13 +102,15 @@ void main() {
           
           return [container.value, nullValue, nonNullValue];
         }
-      ''');
+      ''',
+      );
 
       expect(result, ['first', 'assigned', 'original']);
     });
 
     test('spread null-aware with nested collections', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         main() {
           List<int>? nullList = null;
           List<int>? validList = [4, 5];
@@ -113,13 +120,15 @@ void main() {
           
           return combined;
         }
-      ''');
+      ''',
+      );
 
       expect(result, [1, 2, 3, 4, 5, 6]);
     });
 
     test('mixed null safety operators in single expression', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         class Service {
           String? getData() => null;
           String? getBackup() => 'backup';
@@ -133,13 +142,15 @@ void main() {
           
           return data;
         }
-      ''');
+      ''',
+      );
 
       expect(result, 'backup');
     });
 
     test('null safety with method parameters and return values', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         class Processor {
           String? process(String? input) {
             if (input == null) return null;
@@ -159,13 +170,15 @@ void main() {
           
           return [result1, result2, final1, final2];
         }
-      ''');
+      ''',
+      );
 
       expect(result, [null, 'processed: test', 'default', 'processed: test']);
     });
 
     test('null safety with collection operations', () {
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         main() {
           List<String>? names1 = null;
           List<String>? names2 = ['Alice', 'Bob'];
@@ -185,7 +198,8 @@ void main() {
           
           return allNames;
         }
-      ''');
+      ''',
+      );
 
       expect(result, ['Start', 'Alice', 'Bob', 'Middle', 'Charlie', 'End']);
     });

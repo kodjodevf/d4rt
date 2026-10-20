@@ -87,7 +87,9 @@ class AsyncProcessor {
 
   // Returns an instance of another bridged class
   Future<NativeCounter> createCounterAsync(
-      int initialValue, String counterId) async {
+    int initialValue,
+    String counterId,
+  ) async {
     await Future.delayed(Duration(milliseconds: 15));
     return NativeCounter(initialValue, counterId);
   }
@@ -119,65 +121,80 @@ void main() {
         name: 'Counter', // Name in the interpreter
         constructors: {
           // Default constructor: Counter(value, [id])
-          '': (InterpreterVisitor visitor, List<Object?> positionalArgs,
-              Map<String, Object?> namedArgs) {
-            // Check the number of arguments
-            if (positionalArgs.isEmpty || positionalArgs.length > 2) {
-              throw ArgumentError(
-                  'Default constructor requires 1 or 2 positional arguments, got ${positionalArgs.length}');
-            }
-            // Check the type of the first argument (value)
-            if (positionalArgs[0] is! int) {
-              throw ArgumentError(
-                  'Default constructor first argument (value) must be an integer, got ${positionalArgs[0]?.runtimeType}');
-            }
-            final value = positionalArgs[0] as int;
+          '':
+              (
+                InterpreterVisitor visitor,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                // Check the number of arguments
+                if (positionalArgs.isEmpty || positionalArgs.length > 2) {
+                  throw ArgumentError(
+                    'Default constructor requires 1 or 2 positional arguments, got ${positionalArgs.length}',
+                  );
+                }
+                // Check the type of the first argument (value)
+                if (positionalArgs[0] is! int) {
+                  throw ArgumentError(
+                    'Default constructor first argument (value) must be an integer, got ${positionalArgs[0]?.runtimeType}',
+                  );
+                }
+                final value = positionalArgs[0] as int;
 
-            // Handle the optional argument (id)
-            String id = 'default';
-            if (positionalArgs.length > 1) {
-              // Check that the argument is a String or null
-              if (positionalArgs[1] != null && positionalArgs[1] is! String) {
-                throw ArgumentError(
-                    'Default constructor second argument (id) must be a string or null, got ${positionalArgs[1]?.runtimeType}');
-              }
-              // Assign if not null, otherwise keep 'default'
-              if (positionalArgs[1] != null) {
-                id = positionalArgs[1] as String;
-              }
-            }
-            // Call the native constructor
-            return NativeCounter(value, id);
-          },
+                // Handle the optional argument (id)
+                String id = 'default';
+                if (positionalArgs.length > 1) {
+                  // Check that the argument is a String or null
+                  if (positionalArgs[1] != null &&
+                      positionalArgs[1] is! String) {
+                    throw ArgumentError(
+                      'Default constructor second argument (id) must be a string or null, got ${positionalArgs[1]?.runtimeType}',
+                    );
+                  }
+                  // Assign if not null, otherwise keep 'default'
+                  if (positionalArgs[1] != null) {
+                    id = positionalArgs[1] as String;
+                  }
+                }
+                // Call the native constructor
+                return NativeCounter(value, id);
+              },
           // Named constructor: Counter.withId(id, initialValue: 0)
-          'withId': (InterpreterVisitor visitor, List<Object?> positionalArgs,
-              Map<String, Object?> namedArgs) {
-            // Check the positional argument (id)
-            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
-              throw ArgumentError(
-                  'Named constructor \'withId\' expects exactly 1 positional string argument (id), got ${positionalArgs.isNotEmpty ? positionalArgs[0]?.runtimeType : 'none'}');
-            }
-            final id = positionalArgs[0] as String;
+          'withId':
+              (
+                InterpreterVisitor visitor,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                // Check the positional argument (id)
+                if (positionalArgs.length != 1 ||
+                    positionalArgs[0] is! String) {
+                  throw ArgumentError(
+                    'Named constructor \'withId\' expects exactly 1 positional string argument (id), got ${positionalArgs.isNotEmpty ? positionalArgs[0]?.runtimeType : 'none'}',
+                  );
+                }
+                final id = positionalArgs[0] as String;
 
-            // Check the optional named argument (initialValue)
-            int initialValue = 0;
-            if (namedArgs.containsKey('initialValue')) {
-              if (namedArgs['initialValue'] is! int?) {
-                throw ArgumentError(
-                    'Named argument \'initialValue\' for constructor \'withId\' must be an int?, got ${namedArgs['initialValue']?.runtimeType}');
-              }
-              // Accept null as initialValue and treat it as 0
-              initialValue = namedArgs['initialValue'] as int? ?? 0;
-            }
-            // Call the native named constructor
-            return NativeCounter.withId(id, initialValue: initialValue);
-          }
+                // Check the optional named argument (initialValue)
+                int initialValue = 0;
+                if (namedArgs.containsKey('initialValue')) {
+                  if (namedArgs['initialValue'] is! int?) {
+                    throw ArgumentError(
+                      'Named argument \'initialValue\' for constructor \'withId\' must be an int?, got ${namedArgs['initialValue']?.runtimeType}',
+                    );
+                  }
+                  // Accept null as initialValue and treat it as 0
+                  initialValue = namedArgs['initialValue'] as int? ?? 0;
+                }
+                // Call the native named constructor
+                return NativeCounter.withId(id, initialValue: initialValue);
+              },
         },
         staticGetters: {
           // Counter.staticValue
           'staticValue': (InterpreterVisitor visitor) {
             return NativeCounter.staticValue;
-          }
+          },
         },
         staticSetters: {
           // Counter.staticValue = ...
@@ -186,17 +203,22 @@ void main() {
               throw ArgumentError('staticValue requires an integer');
             }
             NativeCounter.staticValue = value;
-          }
+          },
         },
         staticMethods: {
           // Counter.staticMethod(prefix)
-          'staticMethod': (InterpreterVisitor visitor,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
-              throw ArgumentError('staticMethod expects 1 string argument');
-            }
-            return NativeCounter.staticMethod(positionalArgs[0] as String);
-          }
+          'staticMethod':
+              (
+                InterpreterVisitor visitor,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (positionalArgs.length != 1 ||
+                    positionalArgs[0] is! String) {
+                  throw ArgumentError('staticMethod expects 1 string argument');
+                }
+                return NativeCounter.staticMethod(positionalArgs[0] as String);
+              },
         },
         getters: {
           // counter.value
@@ -213,7 +235,7 @@ void main() {
           'description': (InterpreterVisitor? visitor, Object target) {
             if (target is NativeCounter) return target.description;
             throw TypeError();
-          }
+          },
         },
         setters: {
           // counter.value = ...
@@ -222,91 +244,120 @@ void main() {
               target.value = value;
             } else {
               throw ArgumentError(
-                  'Instance setter $value requires NativeCounter target and int value');
+                'Instance setter $value requires NativeCounter target and int value',
+              );
             }
-          }
+          },
         },
         methods: {
           // counter.increment([amount])
-          'increment': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (target is NativeCounter) {
-              if (positionalArgs.isEmpty) {
-                target.increment();
-              } else if (positionalArgs.length == 1 &&
-                  positionalArgs[0] is int) {
-                target.increment(positionalArgs[0] as int);
-              } else {
-                throw ArgumentError(
-                    'increment expects 0 or 1 integer argument');
-              }
-            } else {
-              throw TypeError();
-            }
-            return null; // void method
-          },
+          'increment':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (target is NativeCounter) {
+                  if (positionalArgs.isEmpty) {
+                    target.increment();
+                  } else if (positionalArgs.length == 1 &&
+                      positionalArgs[0] is int) {
+                    target.increment(positionalArgs[0] as int);
+                  } else {
+                    throw ArgumentError(
+                      'increment expects 0 or 1 integer argument',
+                    );
+                  }
+                } else {
+                  throw TypeError();
+                }
+                return null; // void method
+              },
           // counter.add(otherValue)
-          'add': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (target is NativeCounter &&
-                positionalArgs.length == 1 &&
-                positionalArgs[0] is int) {
-              return target.add(positionalArgs[0] as int);
-            }
-            throw ArgumentError(
-                'add expects NativeCounter target and 1 integer argument');
-          },
+          'add':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (target is NativeCounter &&
+                    positionalArgs.length == 1 &&
+                    positionalArgs[0] is int) {
+                  return target.add(positionalArgs[0] as int);
+                }
+                throw ArgumentError(
+                  'add expects NativeCounter target and 1 integer argument',
+                );
+              },
           // counter.isSame(otherCounter)
-          'isSame': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            // Check the target and arguments
-            if (target is NativeCounter && positionalArgs.length == 1) {
-              final arg = positionalArgs[0];
-              NativeCounter? otherNative;
+          'isSame':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                // Check the target and arguments
+                if (target is NativeCounter && positionalArgs.length == 1) {
+                  final arg = positionalArgs[0];
+                  NativeCounter? otherNative;
 
-              // Accept either a BridgedInstance containing a NativeCounter,
-              // or a NativeCounter directly (due to possible unwrapping)
-              if (arg is BridgedInstance && arg.nativeObject is NativeCounter) {
-                otherNative = arg.nativeObject as NativeCounter;
-              } else if (arg is NativeCounter) {
-                otherNative = arg;
-              }
+                  // Accept either a BridgedInstance containing a NativeCounter,
+                  // or a NativeCounter directly (due to possible unwrapping)
+                  if (arg is BridgedInstance &&
+                      arg.nativeObject is NativeCounter) {
+                    otherNative = arg.nativeObject as NativeCounter;
+                  } else if (arg is NativeCounter) {
+                    otherNative = arg;
+                  }
 
-              if (otherNative != null) {
-                // Call the native isSame method
-                return target.isSame(otherNative);
-              }
-              // Error: Argument is neither a BridgedInstance<NativeCounter> nor a NativeCounter
-              throw ArgumentError(
-                  'Invalid argument for isSame: Expected BridgedInstance<NativeCounter> or NativeCounter, got ${arg?.runtimeType}.');
-            }
-            // Error: Wrong target type or wrong number of arguments
-            String errorDetails;
-            if (target is! NativeCounter) {
-              errorDetails =
-                  'Target must be NativeCounter, got ${target.runtimeType}.';
-            } else {
-              // Only other possibility here: wrong number of args
-              errorDetails =
-                  'Expected exactly 1 argument, got ${positionalArgs.length}.';
-            }
-            throw ArgumentError('Invalid arguments for isSame: $errorDetails');
-          },
+                  if (otherNative != null) {
+                    // Call the native isSame method
+                    return target.isSame(otherNative);
+                  }
+                  // Error: Argument is neither a BridgedInstance<NativeCounter> nor a NativeCounter
+                  throw ArgumentError(
+                    'Invalid argument for isSame: Expected BridgedInstance<NativeCounter> or NativeCounter, got ${arg?.runtimeType}.',
+                  );
+                }
+                // Error: Wrong target type or wrong number of arguments
+                String errorDetails;
+                if (target is! NativeCounter) {
+                  errorDetails =
+                      'Target must be NativeCounter, got ${target.runtimeType}.';
+                } else {
+                  // Only other possibility here: wrong number of args
+                  errorDetails =
+                      'Expected exactly 1 argument, got ${positionalArgs.length}.';
+                }
+                throw ArgumentError(
+                  'Invalid arguments for isSame: $errorDetails',
+                );
+              },
           // counter.dispose()
-          'dispose': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (target is NativeCounter && positionalArgs.isEmpty) {
-              target.dispose();
-              return null; // void
-            }
-            throw ArgumentError('Invalid arguments for dispose');
-          }
+          'dispose':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (target is NativeCounter && positionalArgs.isEmpty) {
+                  target.dispose();
+                  return null; // void
+                }
+                throw ArgumentError('Invalid arguments for dispose');
+              },
         },
       );
 
       // Register the bridged class
       interpreter.registerBridgedClass(
-          counterDefinition, 'package:test/counter.dart');
+        counterDefinition,
+        'package:test/counter.dart',
+      );
 
       // 3. Definition of the bridge for AsyncProcessor
       final asyncProcessorDefinition = BridgedClass(
@@ -319,8 +370,9 @@ void main() {
               return AsyncProcessor(positionalArgs[0] as String);
             }
             throw ArgumentError(
-                'AsyncProcessor constructor expects 1 string argument (id)');
-          }
+              'AsyncProcessor constructor expects 1 string argument (id)',
+            );
+          },
         },
         methods: {
           // processor.delayedSuccess(input, duration) -> Future<String>
@@ -331,7 +383,9 @@ void main() {
                 positionalArgs[1] is Duration) {
               // Assume that Duration is bridged or native
               return target.delayedSuccess(
-                  positionalArgs[0] as String, positionalArgs[1] as Duration);
+                positionalArgs[0] as String,
+                positionalArgs[1] as Duration,
+              );
             }
             throw ArgumentError('Invalid arguments for delayedSuccess');
           },
@@ -361,10 +415,12 @@ void main() {
               // The interpreter will handle the waiting and bridging of the NativeCounter result.
               return target
                   .createCounterAsync(
-                      positionalArgs[0] as int, positionalArgs[1] as String)
+                    positionalArgs[0] as int,
+                    positionalArgs[1] as String,
+                  )
                   .then((nativeCounter) {
-                return nativeCounter;
-              });
+                    return nativeCounter;
+                  });
             }
             throw ArgumentError('Invalid arguments for createCounterAsync');
           },
@@ -385,10 +441,12 @@ void main() {
                 positionalArgs[1] is String) {
               // Call the native synchronous method
               return target.createCounterSync(
-                  positionalArgs[0] as int, positionalArgs[1] as String);
+                positionalArgs[0] as int,
+                positionalArgs[1] as String,
+              );
             }
             throw ArgumentError('Invalid arguments for createCounterSync');
-          }
+          },
         },
         // No static members or getters/setters for this example
         staticGetters: {},
@@ -398,7 +456,9 @@ void main() {
 
       // Register AsyncProcessor
       interpreter.registerBridgedClass(
-          asyncProcessorDefinition, 'package:test/async_processor.dart');
+        asyncProcessorDefinition,
+        'package:test/async_processor.dart',
+      );
     });
 
     test('Call default constructor', () {
@@ -464,7 +524,9 @@ void main() {
       ''';
       expect(interpreter.execute(source: code), equals(123));
       expect(
-          NativeCounter.staticValue, equals(123)); // Verify native side effect
+        NativeCounter.staticValue,
+        equals(123),
+      ); // Verify native side effect
     });
 
     test('Call static method', () {
@@ -477,8 +539,10 @@ void main() {
           return [r1, r2, Counter.staticValue];
         }
       ''';
-      expect(interpreter.execute(source: code),
-          equals(['prefix1:static:1', 'prefix2:static:2', 2]));
+      expect(
+        interpreter.execute(source: code),
+        equals(['prefix1:static:1', 'prefix2:static:2', 2]),
+      );
     });
 
     test('Access instance getter', () {
@@ -489,8 +553,10 @@ void main() {
           return [c.value, c.id, c.description];
         }
       ''';
-      expect(interpreter.execute(source: code),
-          equals([7, 'getter-test', 'Counter(getter-test):7']));
+      expect(
+        interpreter.execute(source: code),
+        equals([7, 'getter-test', 'Counter(getter-test):7']),
+      );
     });
 
     test('Use instance setter', () {
@@ -550,12 +616,17 @@ void main() {
         main() { return Counter.nonExistent(); }
       ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  "Bridged class 'Counter' has no constructor or static method named 'nonExistent'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains(
+              "Bridged class 'Counter' has no constructor or static method named 'nonExistent'",
+            ),
+          ),
+        ),
+      );
     });
 
     test('Error: Call default constructor with wrong arg type', () {
@@ -564,12 +635,17 @@ void main() {
         main() { return Counter('wrong'); }
       '''; // Expects int
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  "Native error during default bridged constructor for 'Counter'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains(
+              "Native error during default bridged constructor for 'Counter'",
+            ),
+          ),
+        ),
+      );
     });
 
     test('Error: Call named constructor with wrong arg type', () {
@@ -578,9 +654,15 @@ void main() {
         main() { return Counter.withId(123); }
       '''; // Expects String
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains("Native error during bridged constructor"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("Native error during bridged constructor"),
+          ),
+        ),
+      );
     });
 
     test('Error: Access non-existent static member', () {
@@ -589,9 +671,15 @@ void main() {
         main() { return Counter.nonExistentStatic; }
       ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains("Undefined static member 'nonExistentStatic'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("Undefined static member 'nonExistentStatic'"),
+          ),
+        ),
+      );
     });
 
     test('Error: Call non-existent static method', () {
@@ -600,12 +688,17 @@ void main() {
         main() { return Counter.nonExistentStaticMethod(); }
       ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  "Bridged class 'Counter' has no constructor or static method named 'nonExistentStaticMethod'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains(
+              "Bridged class 'Counter' has no constructor or static method named 'nonExistentStaticMethod'",
+            ),
+          ),
+        ),
+      );
     });
 
     test('Error: Access non-existent instance member', () {
@@ -618,12 +711,17 @@ void main() {
        ''';
       // This error comes from the fallback mechanism after bridge check fails
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  "Undefined property or method 'nonExistentMember' on bridged instance of 'Counter'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains(
+              "Undefined property or method 'nonExistentMember' on bridged instance of 'Counter'",
+            ),
+          ),
+        ),
+      );
     });
 
     test('Error: Call non-existent instance method', () {
@@ -635,12 +733,17 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having(
-              (e) => e.message,
-              'message',
-              contains(
-                  "Bridged class 'Counter' has no instance method named 'nonExistentMethod'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains(
+              "Bridged class 'Counter' has no instance method named 'nonExistentMethod'",
+            ),
+          ),
+        ),
+      );
     });
 
     test('Error: Call instance method with wrong args', () {
@@ -652,9 +755,15 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains("Native error during bridged method call 'add'"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("Native error during bridged method call 'add'"),
+          ),
+        ),
+      );
     });
 
     test('Error: Call method on disposed instance', () {
@@ -667,9 +776,15 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains("Unexpected error: Bad state: Instance disposed"))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains("Unexpected error: Bad state: Instance disposed"),
+          ),
+        ),
+      );
     });
 
     test('Dart class inheriting from bridged class', () {
@@ -813,9 +928,11 @@ void main() {
        ''';
       final result = await interpreter.execute(source: code);
       expect(
-          result,
-          contains(
-              'Caught: Exception: Failure from AsyncProcessor (p5): something went wrong'));
+        result,
+        contains(
+          'Caught: Exception: Failure from AsyncProcessor (p5): something went wrong',
+        ),
+      );
     });
 
     test('Sync bridged method returning BridgedInstance', () {
@@ -930,19 +1047,29 @@ void main() {
           interpretedInstance.bridgedSuperObject as NativeCounter;
 
       // Call increment() DIRECTLY on the NativeCounter object
-      nativeCounter
-          .increment(2); // Must use NativeCounter.increment: 10 + 2 = 12
-      expect(nativeCounter.value, equals(12),
-          reason: 'Native increment(2) should result in 12');
+      nativeCounter.increment(
+        2,
+      ); // Must use NativeCounter.increment: 10 + 2 = 12
+      expect(
+        nativeCounter.value,
+        equals(12),
+        reason: 'Native increment(2) should result in 12',
+      );
 
       // Call add() DIRECTLY on the NativeCounter object
-      final addResult =
-          nativeCounter.add(5); // Must use NativeCounter.add: 12 + 5 = 17
-      expect(addResult, equals(17),
-          reason: 'Native add(5) should result in 17');
-      expect(nativeCounter.value,
-          equals(12), // The value should not change with native add()
-          reason: 'Value should still be 12 after native add()');
+      final addResult = nativeCounter.add(
+        5,
+      ); // Must use NativeCounter.add: 12 + 5 = 17
+      expect(
+        addResult,
+        equals(17),
+        reason: 'Native add(5) should result in 17',
+      );
+      expect(
+        nativeCounter.value,
+        equals(12), // The value should not change with native add()
+        reason: 'Value should still be 12 after native add()',
+      );
     });
 
     test('Invoke overridden methods via interpreter.invoke', () {
@@ -972,8 +1099,11 @@ void main() {
 
       // Get the interpreted instance
       final result = interpreter.execute(source: source);
-      expect(result, isA<InterpretedInstance>(),
-          reason: 'Interpreter should return InterpretedInstance');
+      expect(
+        result,
+        isA<InterpretedInstance>(),
+        reason: 'Interpreter should return InterpretedInstance',
+      );
       final interpretedInstance = result as InterpretedInstance;
       final nativeObject = result.getNativeObject<NativeCounter>();
       if (nativeObject != null) {
@@ -992,8 +1122,11 @@ void main() {
         'value', // Call the getter as a method with no arguments
         [], // No arguments for a getter
       );
-      expect(valueAfterIncrement, equals(30),
-          reason: 'Value should be 30 after overridden increment(2)');
+      expect(
+        valueAfterIncrement,
+        equals(30),
+        reason: 'Value should be 30 after overridden increment(2)',
+      );
 
       // Call 'add(5)' via invoke - MUST use the overload
       // Current value = 30. Logic: (30 + 5) * 2 = 70
@@ -1001,16 +1134,19 @@ void main() {
         'add',
         [5], // Positional argument
       );
-      expect(addResult, equals(70),
-          reason: 'add(5) should return 70 based on overridden logic');
+      expect(
+        addResult,
+        equals(70),
+        reason: 'add(5) should return 70 based on overridden logic',
+      );
 
       // Re-check the value - it should not change due to add()
-      final valueAfterAdd = interpreter.invoke(
-        'value',
-        [],
+      final valueAfterAdd = interpreter.invoke('value', []);
+      expect(
+        valueAfterAdd,
+        equals(30),
+        reason: 'Value should remain 30 after overridden add(5)',
       );
-      expect(valueAfterAdd, equals(30),
-          reason: 'Value should remain 30 after overridden add(5)');
     });
 
     test('invoke on simple interpreted instance method', () {
@@ -1092,16 +1228,17 @@ void main() {
 
       expect(
         () => interpreter.invoke('nonExistent', []),
-        throwsA(isA<RuntimeError>().having(
-          (e) => e.message,
-          'message',
-          contains('Method or getter "nonExistent" not found'),
-        )),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('Method or getter "nonExistent" not found'),
+          ),
+        ),
       );
     });
 
-    test('Invoke overridden methods on instance with extra field via invoke',
-        () {
+    test('Invoke overridden methods on instance with extra field via invoke', () {
       final source = '''
         import 'package:test/counter.dart';
         class OverridenCounter extends Counter {
@@ -1148,32 +1285,44 @@ void main() {
       // 10 + 10 * 2 = 30
       interpreter.invoke('increment', [2]);
       currentValue = interpreter.invoke('value', []);
-      expect(currentValue, equals(30),
-          reason: "Value should be 30 after overridden increment(2)");
+      expect(
+        currentValue,
+        equals(30),
+        reason: "Value should be 30 after overridden increment(2)",
+      );
 
       // 3. Call the overloaded 'add'
       // The logic is: (super.value + otherValue) * 2
       // (30 + 5) * 2 = 70
       final addResult = interpreter.invoke('add', [5]);
-      expect(addResult, equals(70),
-          reason: "Result of overridden add(5) should be 70");
+      expect(
+        addResult,
+        equals(70),
+        reason: "Result of overridden add(5) should be 70",
+      );
 
       // Check that 'value' has not been modified by 'add' (since add does not do super.value = ...)
       currentValue = interpreter.invoke('value', []);
-      expect(currentValue, equals(30),
-          reason:
-              "Value should still be 30 after add(), as add is non-mutating for value");
+      expect(
+        currentValue,
+        equals(30),
+        reason:
+            "Value should still be 30 after add(), as add is non-mutating for value",
+      );
 
       // 4. Check the access to the 'stock' field via the 'myStock' getter
       final stockValue = interpreter.invoke('myStock', []);
-      expect(stockValue, equals('stockXYZ'),
-          reason: "Stock value should be 'stockXYZ'");
+      expect(
+        stockValue,
+        equals('stockXYZ'),
+        reason: "Stock value should be 'stockXYZ'",
+      );
     });
 
     test(
-        'Invoke bridged superclass members through interpreted intermediate class',
-        () {
-      final source = '''
+      'Invoke bridged superclass members through interpreted intermediate class',
+      () {
+        final source = '''
         import 'package:test/counter.dart';
 
         class IntermediateCounter extends Counter {
@@ -1190,15 +1339,16 @@ void main() {
         }
       ''';
 
-      interpreter.execute(source: source);
+        interpreter.execute(source: source);
 
-      expect(interpreter.invoke('value', []), equals(10));
+        expect(interpreter.invoke('value', []), equals(10));
 
-      interpreter.invoke('increment', [5]);
-      expect(interpreter.invoke('value', []), equals(15));
+        interpreter.invoke('increment', [5]);
+        expect(interpreter.invoke('value', []), equals(15));
 
-      expect(interpreter.invoke('add', [4]), equals(19));
-    });
+        expect(interpreter.invoke('add', [4]), equals(19));
+      },
+    );
 
     test('Invoke static method on instance with extra field via invoke', () {
       final source = '''

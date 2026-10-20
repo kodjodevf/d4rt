@@ -28,7 +28,6 @@ class BridgedClass implements RuntimeType {
   final Type nativeType; // Keep nativeType for bridge logic
 
   @override
-
   /// The name of this class as it appears in interpreted code.
   final String name;
 
@@ -79,20 +78,21 @@ class BridgedClass implements RuntimeType {
   Map<String, BridgedInstanceGetterAdapter> getters = {};
   Map<String, BridgedInstanceSetterAdapter> setters = {};
 
-  BridgedClass(
-      {required this.nativeType,
-      required this.name,
-      this.nativeNames,
-      this.typeParameterCount = 0,
-      this.canBeUsedAsMixin = false,
-      this.constructors = const {},
-      this.staticMethods = const {},
-      this.staticGetters = const {},
-      this.staticSetters = const {},
-      this.methods = const {},
-      this.getters = const {},
-      this.setters = const {},
-      this.isSubtypeOfFunc});
+  BridgedClass({
+    required this.nativeType,
+    required this.name,
+    this.nativeNames,
+    this.typeParameterCount = 0,
+    this.canBeUsedAsMixin = false,
+    this.constructors = const {},
+    this.staticMethods = const {},
+    this.staticGetters = const {},
+    this.staticSetters = const {},
+    this.methods = const {},
+    this.getters = const {},
+    this.setters = const {},
+    this.isSubtypeOfFunc,
+  });
 
   @override
   bool isSubtypeOf(RuntimeType? other, {Object? value}) {
@@ -121,7 +121,8 @@ class BridgedClass implements RuntimeType {
         return true;
       }
 
-      final isNumericSubtype = nativeType == int ||
+      final isNumericSubtype =
+          nativeType == int ||
           nativeType == double ||
           name == 'int' ||
           name == 'double';
@@ -181,8 +182,11 @@ class BridgedInstance<T extends Object> implements RuntimeValue {
   final List<RuntimeType> typeArguments;
 
   // Main constructor
-  BridgedInstance(this.bridgedClass, this.nativeObject,
-      {this.typeArguments = const []}); // Removed local initialization
+  BridgedInstance(
+    this.bridgedClass,
+    this.nativeObject, {
+    this.typeArguments = const [],
+  }); // Removed local initialization
 
   @override
   RuntimeType get valueType => typeArguments.isEmpty
@@ -205,14 +209,16 @@ class BridgedInstance<T extends Object> implements RuntimeValue {
 
     // 3. If neither method nor getter found, throw an error
     throw RuntimeError(
-        "Undefined property or method '$name' on bridged instance of '${bridgedClass.name}'");
+      "Undefined property or method '$name' on bridged instance of '${bridgedClass.name}'",
+    );
   }
 
   @override
   void set(String name, Object? value, [InterpreterVisitor? visitor]) {
     // Visitor is optional
     throw UnimplementedError(
-        "set('$name', ...) not implemented for BridgedInstance of '${bridgedClass.name}'");
+      "set('$name', ...) not implemented for BridgedInstance of '${bridgedClass.name}'",
+    );
   }
 
   @override
@@ -231,7 +237,7 @@ class TypeParameter implements RuntimeType {
   @override
   final String name;
   final RuntimeType?
-      bound; // The extends clause if any (e.g., T extends Object)
+  bound; // The extends clause if any (e.g., T extends Object)
 
   TypeParameter(this.name, {this.bound});
 

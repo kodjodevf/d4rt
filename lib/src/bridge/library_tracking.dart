@@ -40,10 +40,7 @@ class SourceOrigin implements Comparable<SourceOrigin> {
   final String elementName;
 
   /// Creates a source origin.
-  const SourceOrigin({
-    required this.canonicalUri,
-    required this.elementName,
-  });
+  const SourceOrigin({required this.canonicalUri, required this.elementName});
 
   /// Creates from a full URI string.
   factory SourceOrigin.fromUri(String uri, String elementName) {
@@ -167,12 +164,7 @@ class TrackedFunction with SourceTracked {
   /// Optional function signature for documentation.
   final String? signature;
 
-  TrackedFunction(
-    this.name,
-    this.function, {
-    this.origin,
-    this.signature,
-  });
+  TrackedFunction(this.name, this.function, {this.origin, this.signature});
 
   void addImportPath(String path) => importPaths.add(path);
 
@@ -311,8 +303,12 @@ class LibraryRegistry {
       return false;
     }
 
-    final tracked =
-        TrackedFunction(name, function, origin: origin, signature: signature);
+    final tracked = TrackedFunction(
+      name,
+      function,
+      origin: origin,
+      signature: signature,
+    );
     tracked.addImportPath(importPath);
     _functions[key] = tracked;
     _stats._functionsRegistered++;

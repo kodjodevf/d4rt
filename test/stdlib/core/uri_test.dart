@@ -10,8 +10,10 @@ void main() {
         return uri.toString();
       }
       ''';
-      expect(execute(source),
-          equals('https://example.com/path?query=value#fragment'));
+      expect(
+        execute(source),
+        equals('https://example.com/path?query=value#fragment'),
+      );
     });
 
     test('host', () {
@@ -116,8 +118,10 @@ void main() {
         return Uri.encodeFull("https://example.com/path?query=value#fragment");
       }
       ''';
-      expect(execute(source),
-          equals('https://example.com/path?query=value#fragment'));
+      expect(
+        execute(source),
+        equals('https://example.com/path?query=value#fragment'),
+      );
     });
 
     test('decodeFull', () {
@@ -126,8 +130,10 @@ void main() {
         return Uri.decodeFull("https%3A%2F%2Fexample.com%2Fpath%3Fquery%3Dvalue%23fragment");
       }
       ''';
-      expect(execute(source),
-          equals('https://example.com/path?query=value#fragment'));
+      expect(
+        execute(source),
+        equals('https://example.com/path?query=value#fragment'),
+      );
     });
 
     test('splitQueryString', () {
@@ -148,10 +154,11 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals({
-            'key': ['value', 'value2']
-          }));
+        execute(source),
+        equals({
+          'key': ['value', 'value2'],
+        }),
+      );
     });
 
     test('https', () {
@@ -201,8 +208,10 @@ void main() {
         return uri.toString();
       }
       ''';
-      expect(execute(source),
-          equals('data:application/octet-stream;base64,aGVsbG8='));
+      expect(
+        execute(source),
+        equals('data:application/octet-stream;base64,aGVsbG8='),
+      );
     });
 
     test('dataFromString', () {

@@ -5,7 +5,8 @@ void main() {
   group('runZoned and runZonedGuarded stdlib tests', () {
     test('runZoned with return value and zoneValues', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:async';
 
         main() {
@@ -14,14 +15,16 @@ void main() {
           });
           return res;
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(300));
     });
 
     test('runZonedGuarded capturing error', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:async';
 
         main() {
@@ -33,7 +36,8 @@ void main() {
           });
           return caughtError;
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals('Zone exception'));
     });

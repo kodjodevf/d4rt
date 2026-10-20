@@ -665,12 +665,13 @@ void main() {
           }
         ''');
         expect(
-            result,
-            equals([
-              [4.0, 6.0],
-              [-2.0, -2.0],
-              [2.0, 4.0]
-            ]));
+          result,
+          equals([
+            [4.0, 6.0],
+            [-2.0, -2.0],
+            [2.0, 4.0],
+          ]),
+        );
       });
     });
 
@@ -1006,12 +1007,13 @@ void main() {
           }
         ''');
         expect(
-            result,
-            equals([
-              21,
-              21,
-              [10, 21, 30]
-            ]));
+          result,
+          equals([
+            21,
+            21,
+            [10, 21, 30],
+          ]),
+        );
       });
 
       test('Postfix increment on index access (array[i]++)', () {
@@ -1023,12 +1025,13 @@ void main() {
           }
         ''');
         expect(
-            result,
-            equals([
-              5,
-              6,
-              [6, 15, 25]
-            ]));
+          result,
+          equals([
+            5,
+            6,
+            [6, 15, 25],
+          ]),
+        );
       });
 
       test('Increment with custom class operators', () {

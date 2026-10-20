@@ -6,7 +6,8 @@ void main() {
   const String testLibPath = 'd4rt-mem:/byte_buffer_test.dart';
 
   dynamic executeTestScript(String scriptBody) {
-    final fullScript = '''
+    final fullScript =
+        '''
       import 'dart:typed_data';
       // For Uint8List and ByteBuffer if they are used explicitly in script
       // However, Endian is accessed like a class with static members.

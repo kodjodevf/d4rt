@@ -10,7 +10,9 @@ void main() {
     });
 
     test('Capability, SendPort, ReceivePort and RemoteError subtyping', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:async';
         import 'dart:isolate';
 
@@ -42,7 +44,9 @@ void main() {
             isError,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);
@@ -54,7 +58,9 @@ void main() {
     });
 
     test('ReceivePort communication and closure listeners', () async {
-      final result = await d4rt.execute(source: '''
+      final result =
+          await d4rt.execute(
+                source: '''
         import 'dart:async';
         import 'dart:isolate';
 
@@ -72,7 +78,9 @@ void main() {
           final received = await completer.future;
           return [received];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(12345));
     });

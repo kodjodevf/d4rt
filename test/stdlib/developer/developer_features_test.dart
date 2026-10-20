@@ -10,7 +10,9 @@ void main() {
     });
 
     test('Flow bridge and operations', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:developer';
 
         main() {
@@ -30,7 +32,9 @@ void main() {
             endFlow.id,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isA<int>());
       expect(result[1], isTrue);
@@ -40,7 +44,9 @@ void main() {
     });
 
     test('ServiceExtensionResponse constants and constructors', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:developer';
 
         main() {
@@ -68,7 +74,9 @@ void main() {
             errResp.errorDetail,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(-32602));
       expect(result[1], equals(-32000));
@@ -81,7 +89,9 @@ void main() {
     });
 
     test('Timeline.timeSync with closure callback', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:developer';
 
         main() {
@@ -102,7 +112,9 @@ void main() {
             tagLabel,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(84));
       expect(result[1], equals(42));

@@ -57,20 +57,36 @@ class FilesystemPermission extends Permission {
   FilesystemPermission._(this._path, this._read, this._write, this._execute);
 
   /// Allows reading any file or directory.
-  static final FilesystemPermission read =
-      FilesystemPermission._(null, true, false, false);
+  static final FilesystemPermission read = FilesystemPermission._(
+    null,
+    true,
+    false,
+    false,
+  );
 
   /// Allows writing to any file or directory.
-  static final FilesystemPermission write =
-      FilesystemPermission._(null, false, true, false);
+  static final FilesystemPermission write = FilesystemPermission._(
+    null,
+    false,
+    true,
+    false,
+  );
 
   /// Allows executing any file.
-  static final FilesystemPermission execute =
-      FilesystemPermission._(null, false, false, true);
+  static final FilesystemPermission execute = FilesystemPermission._(
+    null,
+    false,
+    false,
+    true,
+  );
 
   /// Allows all filesystem operations on any path.
-  static final FilesystemPermission any =
-      FilesystemPermission._(null, true, true, true);
+  static final FilesystemPermission any = FilesystemPermission._(
+    null,
+    true,
+    true,
+    true,
+  );
 
   /// Allows reading files/directories under the specified path.
   factory FilesystemPermission.readPath(String path) =>
@@ -187,23 +203,48 @@ class NetworkPermission extends Permission {
   final bool _bind;
 
   NetworkPermission._(
-      this._host, this._port, this._connect, this._listen, this._bind);
+    this._host,
+    this._port,
+    this._connect,
+    this._listen,
+    this._bind,
+  );
 
   /// Allows connecting to any host/port.
-  static final NetworkPermission connect =
-      NetworkPermission._(null, null, true, false, false);
+  static final NetworkPermission connect = NetworkPermission._(
+    null,
+    null,
+    true,
+    false,
+    false,
+  );
 
   /// Allows listening on any port.
-  static final NetworkPermission listen =
-      NetworkPermission._(null, null, false, true, false);
+  static final NetworkPermission listen = NetworkPermission._(
+    null,
+    null,
+    false,
+    true,
+    false,
+  );
 
   /// Allows binding to any address/port.
-  static final NetworkPermission bind =
-      NetworkPermission._(null, null, false, false, true);
+  static final NetworkPermission bind = NetworkPermission._(
+    null,
+    null,
+    false,
+    false,
+    true,
+  );
 
   /// Allows all network operations.
-  static final NetworkPermission any =
-      NetworkPermission._(null, null, true, true, true);
+  static final NetworkPermission any = NetworkPermission._(
+    null,
+    null,
+    true,
+    true,
+    true,
+  );
 
   /// Allows connecting to the specified host.
   factory NetworkPermission.connectTo(String host) =>
@@ -288,8 +329,9 @@ class ProcessRunPermission extends Permission {
 
   /// Allows running the specified command with specific arguments.
   factory ProcessRunPermission.commandWithArgs(
-          String command, List<String> args) =>
-      ProcessRunPermission._(command, args);
+    String command,
+    List<String> args,
+  ) => ProcessRunPermission._(command, args);
 
   @override
   String get description {
@@ -389,16 +431,19 @@ class DangerousPermission extends Permission {
   DangerousPermission._(this._operation);
 
   /// Allows evaluation of arbitrary code strings (eval-like functionality).
-  static final DangerousPermission codeEvaluation =
-      DangerousPermission._('code evaluation');
+  static final DangerousPermission codeEvaluation = DangerousPermission._(
+    'code evaluation',
+  );
 
   /// Allows loading and executing native plugins/libraries.
-  static final DangerousPermission nativePlugins =
-      DangerousPermission._('native plugins');
+  static final DangerousPermission nativePlugins = DangerousPermission._(
+    'native plugins',
+  );
 
   /// Allows all dangerous operations.
-  static final DangerousPermission any =
-      DangerousPermission._('any dangerous operation');
+  static final DangerousPermission any = DangerousPermission._(
+    'any dangerous operation',
+  );
 
   @override
   String get description => 'dangerous operation: $_operation';

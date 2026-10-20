@@ -10,7 +10,9 @@ void main() {
     });
 
     test('HtmlEscapeMode static getters and modes', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:convert';
 
         main() {
@@ -35,7 +37,9 @@ void main() {
             unkMode.escapeSlash,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals('&lt;foo &amp; &quot;bar&quot;&gt;'));
       expect(result[1], isTrue);
@@ -47,7 +51,9 @@ void main() {
     });
 
     test('JsonUnsupportedObjectError bridge and properties', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:convert';
 
         main() {
@@ -62,16 +68,25 @@ void main() {
             err.toString(),
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);
       expect(result[2], equals('custom cause'));
-      expect(result[3], contains('Converting object to an encodable object failed: Instance of \'Object\''));
+      expect(
+        result[3],
+        contains(
+          'Converting object to an encodable object failed: Instance of \'Object\'',
+        ),
+      );
     });
 
     test('Codec, Converter, and Encoding subtyping', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:async';
         import 'dart:convert';
 
@@ -96,7 +111,9 @@ void main() {
             isDecoderConverter,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);

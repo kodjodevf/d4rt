@@ -5,7 +5,8 @@ void main() {
   group('Expando stdlib tests', () {
     test('Expando attaches values to objects dynamically', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         class User {
@@ -23,7 +24,8 @@ void main() {
 
           return [expando.name, expando[user1], expando[user2]];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(['userScores', 100, 200]));
     });

@@ -149,11 +149,12 @@ void main() {
       expect(result, equals('Index: 2'));
     });
 
-    test('Enum with mixin providing instance methods (static fields skipped)',
-        () {
-      // Note: Static fields in mixins are a known limitation in d4rt
-      // This test focuses on instance methods which are the primary use case for mixins
-      const source = '''
+    test(
+      'Enum with mixin providing instance methods (static fields skipped)',
+      () {
+        // Note: Static fields in mixins are a known limitation in d4rt
+        // This test focuses on instance methods which are the primary use case for mixins
+        const source = '''
         mixin Timestamped {
           int getTimestamp() {
             return 12345;
@@ -170,9 +171,10 @@ void main() {
           return Task.todo.getTimestamp();
         }
       ''';
-      final result = execute(source);
-      expect(result, equals(12345));
-    });
+        final result = execute(source);
+        expect(result, equals(12345));
+      },
+    );
 
     test('Enum with mixin overriding toString', () {
       const source = '''
@@ -226,11 +228,12 @@ void main() {
       ''';
       final result = execute(source);
       expect(
-          result,
-          equals([
-            'Active',
-            {'type': 'serializable'}
-          ]));
+        result,
+        equals([
+          'Active',
+          {'type': 'serializable'},
+        ]),
+      );
     });
 
     test('Enum with regular mixin (not requiring on clause)', () {
@@ -304,13 +307,14 @@ void main() {
       ''';
       final result = execute(source);
       expect(
-          result,
-          equals([
-            'State.idle',
-            'State.loading',
-            'State.success',
-            'State.failure'
-          ]));
+        result,
+        equals([
+          'State.idle',
+          'State.loading',
+          'State.success',
+          'State.failure',
+        ]),
+      );
     });
 
     test('Enum with mixin and equality still works', () {

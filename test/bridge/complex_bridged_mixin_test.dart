@@ -113,12 +113,18 @@ void main() {
 
       expect(resultMap['result1_success'], isTrue);
       expect(resultMap['result1_prime'], isTrue); // 7 is prime
-      expect(resultMap['result1_fibonacci'],
-          equals([0, 1, 1, 2, 3, 5, 8])); // First 7 Fibonacci numbers
-      expect(resultMap['result2_error'],
-          isTrue); // Invalid email should cause error
-      expect(resultMap['total_processed'],
-          equals(1)); // Only valid data should be processed
+      expect(
+        resultMap['result1_fibonacci'],
+        equals([0, 1, 1, 2, 3, 5, 8]),
+      ); // First 7 Fibonacci numbers
+      expect(
+        resultMap['result2_error'],
+        isTrue,
+      ); // Invalid email should cause error
+      expect(
+        resultMap['total_processed'],
+        equals(1),
+      ); // Only valid data should be processed
     });
 
     test('math operations with bridged mixin', () async {
@@ -162,7 +168,9 @@ void main() {
       expect(resultMap['triangle_area'], equals(12.0)); // 0.5 * 4 * 6
       expect(resultMap['distance'], equals(5.0)); // √(3² + 4²)
       expect(
-          resultMap['fibonacci_10'], equals([0, 1, 1, 2, 3, 5, 8, 13, 21, 34]));
+        resultMap['fibonacci_10'],
+        equals([0, 1, 1, 2, 3, 5, 8, 13, 21, 34]),
+      );
       expect(resultMap['is_17_prime'], isTrue);
       expect(resultMap['is_16_prime'], isFalse);
       expect(resultMap['ninety_degrees'], closeTo(pi / 2, 0.001));
@@ -293,7 +301,9 @@ void main() {
       expect(resultMap['has_key1'], isTrue);
       expect(resultMap['has_key4'], isFalse);
       expect(
-          resultMap['get_key1'], equals('value1')); // Now returns actual value
+        resultMap['get_key1'],
+        equals('value1'),
+      ); // Now returns actual value
       expect(resultMap['get_missing'], isNull);
     });
 
@@ -337,10 +347,14 @@ void main() {
       final resultMap = result as Map;
 
       expect(resultMap['active_events'], equals(['click', 'change', 'submit']));
-      expect(resultMap['test_listener_count'],
-          equals(1)); // Now properly counts listeners
-      expect(resultMap['event_log'],
-          isEmpty); // Callbacks from bridged mixins don't execute in interpreted context
+      expect(
+        resultMap['test_listener_count'],
+        equals(1),
+      ); // Now properly counts listeners
+      expect(
+        resultMap['event_log'],
+        isEmpty,
+      ); // Callbacks from bridged mixins don't execute in interpreted context
     });
   });
 }
@@ -363,7 +377,8 @@ void _registerAllMixins(D4rt d4rt) {
         'addEventListener': (visitor, instance, positionalArgs, namedArgs) {
           if (positionalArgs.length < 2) {
             throw ArgumentError(
-                'addEventListener requires eventType and callback');
+              'addEventListener requires eventType and callback',
+            );
           }
           final eventType = positionalArgs[0].toString();
           final state = getInstanceState(instance);
@@ -426,8 +441,9 @@ void _registerAllMixins(D4rt d4rt) {
           }
           final phone = positionalArgs[0].toString();
           final phoneRegex = RegExp(r'^\+?[1-9]\d{1,14}$');
-          return phoneRegex
-              .hasMatch(phone.replaceAll(RegExp(r'[\s\-\(\)]'), ''));
+          return phoneRegex.hasMatch(
+            phone.replaceAll(RegExp(r'[\s\-\(\)]'), ''),
+          );
         },
         'addValidationError': (visitor, instance, positionalArgs, namedArgs) {
           if (positionalArgs.length < 2) {
@@ -436,27 +452,34 @@ void _registerAllMixins(D4rt d4rt) {
           final field = positionalArgs[0].toString();
           final error = positionalArgs[1].toString();
           final state = getInstanceState(instance);
-          final errors = state.putIfAbsent(
-                  'validationErrors', () => <String, List<String>>{})
-              as Map<String, List<String>>;
+          final errors =
+              state.putIfAbsent(
+                    'validationErrors',
+                    () => <String, List<String>>{},
+                  )
+                  as Map<String, List<String>>;
           errors.putIfAbsent(field, () => []).add(error);
           return null;
         },
         'clearValidationErrors':
             (visitor, instance, positionalArgs, namedArgs) {
-          final field =
-              positionalArgs.isNotEmpty ? positionalArgs[0]?.toString() : null;
-          final state = getInstanceState(instance);
-          final errors = state.putIfAbsent(
-                  'validationErrors', () => <String, List<String>>{})
-              as Map<String, List<String>>;
-          if (field != null) {
-            errors.remove(field);
-          } else {
-            errors.clear();
-          }
-          return null;
-        },
+              final field = positionalArgs.isNotEmpty
+                  ? positionalArgs[0]?.toString()
+                  : null;
+              final state = getInstanceState(instance);
+              final errors =
+                  state.putIfAbsent(
+                        'validationErrors',
+                        () => <String, List<String>>{},
+                      )
+                      as Map<String, List<String>>;
+              if (field != null) {
+                errors.remove(field);
+              } else {
+                errors.clear();
+              }
+              return null;
+            },
         'getFirstError': (visitor, instance, positionalArgs, namedArgs) {
           if (positionalArgs.isEmpty) {
             throw ArgumentError('getFirstError requires field');
@@ -585,8 +608,9 @@ void _registerAllMixins(D4rt d4rt) {
           if (params is Map<String, dynamic>) {
             parsedParams = params;
           } else if (params is Map) {
-            parsedParams =
-                params.map((key, value) => MapEntry(key.toString(), value));
+            parsedParams = params.map(
+              (key, value) => MapEntry(key.toString(), value),
+            );
           } else {
             throw ArgumentError('params must be a Map');
           }

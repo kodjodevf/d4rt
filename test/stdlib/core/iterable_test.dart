@@ -13,11 +13,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [2, 4, 6, 8, 10],
-            [2, 4]
-          ]));
+        execute(source),
+        equals([
+          [2, 4, 6, 8, 10],
+          [2, 4],
+        ]),
+      );
     });
 
     test('Iterable.reduce and Iterable.fold', () {
@@ -60,11 +61,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            true,
-            [1, 2, 3]
-          ]));
+        execute(source),
+        equals([
+          true,
+          [1, 2, 3],
+        ]),
+      );
     });
 
     test('Iterable.skip and Iterable.toList', () {
@@ -75,11 +77,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [3, 4, 5],
-            [1, 2, 3, 4, 5]
-          ]));
+        execute(source),
+        equals([
+          [3, 4, 5],
+          [1, 2, 3, 4, 5],
+        ]),
+      );
     });
 
     test('Iterable.join and Iterable.toSet', () {
@@ -92,11 +95,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            '1, 2, 3, 4, 5',
-            [1, 2, 3, 4, 5]
-          ]));
+        execute(source),
+        equals([
+          '1, 2, 3, 4, 5',
+          [1, 2, 3, 4, 5],
+        ]),
+      );
     });
 
     test('Iterable.expand', () {

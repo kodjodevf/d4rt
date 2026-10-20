@@ -14,11 +14,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [104, 101, 108, 108, 111],
-            'hello'
-          ]));
+        execute(source),
+        equals([
+          [104, 101, 108, 108, 111],
+          'hello',
+        ]),
+      );
     });
 
     test('Codec fuse', () {
@@ -47,11 +48,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [104, 101, 108, 108, 111],
-            'hello'
-          ]));
+        execute(source),
+        equals([
+          [104, 101, 108, 108, 111],
+          'hello',
+        ]),
+      );
     });
   });
 }

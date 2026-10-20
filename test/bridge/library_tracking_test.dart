@@ -48,10 +48,7 @@ void main() {
     late BridgedClass mockBridgedClass;
 
     setUp(() {
-      mockBridgedClass = BridgedClass(
-        nativeType: String,
-        name: 'TestClass',
-      );
+      mockBridgedClass = BridgedClass(nativeType: String, name: 'TestClass');
     });
 
     test('wraps bridged class with origin', () {
@@ -178,13 +175,19 @@ void main() {
         final origin = SourceOrigin.fromUri('package:pkg/foo.dart', 'Foo');
 
         // First registration
-        final first =
-            registry.addClass(bridged, 'package:a/a.dart', origin: origin);
+        final first = registry.addClass(
+          bridged,
+          'package:a/a.dart',
+          origin: origin,
+        );
         expect(first, isTrue);
 
         // Second registration with same origin from different import
-        final second =
-            registry.addClass(bridged, 'package:b/b.dart', origin: origin);
+        final second = registry.addClass(
+          bridged,
+          'package:b/b.dart',
+          origin: origin,
+        );
         expect(second, isFalse);
 
         expect(registry.classes, hasLength(1));
@@ -215,10 +218,16 @@ void main() {
         );
         final origin = SourceOrigin.fromUri('package:pkg/enums.dart', 'Status');
 
-        final first =
-            registry.addEnum(enumDef, 'package:a/a.dart', origin: origin);
-        final second =
-            registry.addEnum(enumDef, 'package:b/b.dart', origin: origin);
+        final first = registry.addEnum(
+          enumDef,
+          'package:a/a.dart',
+          origin: origin,
+        );
+        final second = registry.addEnum(
+          enumDef,
+          'package:b/b.dart',
+          origin: origin,
+        );
 
         expect(first, isTrue);
         expect(second, isFalse);
@@ -231,10 +240,18 @@ void main() {
       test('registers function with deduplication', () {
         final origin = SourceOrigin.fromUri('package:pkg/utils.dart', 'helper');
 
-        final first =
-            registry.addFunction('helper', () {}, 'pkg:a', origin: origin);
-        final second =
-            registry.addFunction('helper', () {}, 'pkg:b', origin: origin);
+        final first = registry.addFunction(
+          'helper',
+          () {},
+          'pkg:a',
+          origin: origin,
+        );
+        final second = registry.addFunction(
+          'helper',
+          () {},
+          'pkg:b',
+          origin: origin,
+        );
 
         expect(first, isTrue);
         expect(second, isFalse);
@@ -247,8 +264,12 @@ void main() {
         final origin = SourceOrigin.fromUri('package:pkg/const.dart', 'PI');
 
         final first = registry.addVariable('PI', 3.14, 'pkg:a', origin: origin);
-        final second =
-            registry.addVariable('PI', 3.14, 'pkg:b', origin: origin);
+        final second = registry.addVariable(
+          'PI',
+          3.14,
+          'pkg:b',
+          origin: origin,
+        );
 
         expect(first, isTrue);
         expect(second, isFalse);
@@ -260,10 +281,18 @@ void main() {
       test('registers getter with deduplication', () {
         final origin = SourceOrigin.fromUri('package:pkg/config.dart', 'debug');
 
-        final first =
-            registry.addGetter('debug', () => true, 'pkg:a', origin: origin);
-        final second =
-            registry.addGetter('debug', () => true, 'pkg:b', origin: origin);
+        final first = registry.addGetter(
+          'debug',
+          () => true,
+          'pkg:a',
+          origin: origin,
+        );
+        final second = registry.addGetter(
+          'debug',
+          () => true,
+          'pkg:b',
+          origin: origin,
+        );
 
         expect(first, isTrue);
         expect(second, isFalse);

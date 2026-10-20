@@ -53,11 +53,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [1, 2, 3],
-            false
-          ]));
+        execute(source),
+        equals([
+          [1, 2, 3],
+          false,
+        ]),
+      );
     });
 
     test('Iterator with nested loops', () {

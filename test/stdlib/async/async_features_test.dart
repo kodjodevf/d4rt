@@ -10,7 +10,8 @@ void main() {
     });
 
     test('Timer.run and unawaited execution', () async {
-      final result = await d4rt.execute(source: '''
+      final result = await d4rt.execute(
+        source: '''
         import 'dart:async';
 
         main() async {
@@ -24,13 +25,16 @@ void main() {
           await Future.delayed(Duration(milliseconds: 50));
           return count;
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(15));
     });
 
     test('Async subtyping and is-checks', () async {
-      final result = await d4rt.execute(source: '''
+      final result =
+          await d4rt.execute(
+                source: '''
         import 'dart:async';
 
         main() async {
@@ -61,7 +65,9 @@ void main() {
             isTimeoutEx,
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);

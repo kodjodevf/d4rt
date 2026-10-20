@@ -2,22 +2,49 @@ import 'dart:io';
 
 import 'package:d4rt/d4rt.dart';
 
-void checkFilesystemReadPermission(InterpreterVisitor visitor, String path,
-    {String operation = 'read'}) {
-  _checkFilesystemPermission(visitor, path,
-      operation: operation, read: true, write: false, execute: false);
+void checkFilesystemReadPermission(
+  InterpreterVisitor visitor,
+  String path, {
+  String operation = 'read',
+}) {
+  _checkFilesystemPermission(
+    visitor,
+    path,
+    operation: operation,
+    read: true,
+    write: false,
+    execute: false,
+  );
 }
 
-void checkFilesystemWritePermission(InterpreterVisitor visitor, String path,
-    {String operation = 'write'}) {
-  _checkFilesystemPermission(visitor, path,
-      operation: operation, read: false, write: true, execute: false);
+void checkFilesystemWritePermission(
+  InterpreterVisitor visitor,
+  String path, {
+  String operation = 'write',
+}) {
+  _checkFilesystemPermission(
+    visitor,
+    path,
+    operation: operation,
+    read: false,
+    write: true,
+    execute: false,
+  );
 }
 
-void checkFilesystemExecutePermission(InterpreterVisitor visitor, String path,
-    {String operation = 'execute'}) {
-  _checkFilesystemPermission(visitor, path,
-      operation: operation, read: false, write: false, execute: true);
+void checkFilesystemExecutePermission(
+  InterpreterVisitor visitor,
+  String path, {
+  String operation = 'execute',
+}) {
+  _checkFilesystemPermission(
+    visitor,
+    path,
+    operation: operation,
+    read: false,
+    write: false,
+    execute: true,
+  );
 }
 
 void _checkFilesystemPermission(
@@ -42,6 +69,8 @@ void _checkFilesystemPermission(
 
   if (allowed) return;
 
-  throw RuntimeError('Filesystem permission denied for $operation on "$path". '
-      'Grant an appropriate FilesystemPermission for this path.');
+  throw RuntimeError(
+    'Filesystem permission denied for $operation on "$path". '
+    'Grant an appropriate FilesystemPermission for this path.',
+  );
 }

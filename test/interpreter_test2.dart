@@ -70,10 +70,14 @@ void main() {
         expect(eval('{...{"a": 1}}'), {'a': 1});
         expect(eval('{...?{"a": 1}, ?null, "b": false}'), {'a': 1, 'b': false});
         expect(eval('{?null, ?"a": 2}'), {'a': 2});
-        expect(eval('{"a": 1, if (true) "b": 2 else ...{"c": 3}}'),
-            {'a': 1, 'b': 2});
-        expect(eval('{"a": 1, if (false) "b": 2 else ...{"c": 3}}'),
-            {'a': 1, 'c': 3});
+        expect(eval('{"a": 1, if (true) "b": 2 else ...{"c": 3}}'), {
+          'a': 1,
+          'b': 2,
+        });
+        expect(eval('{"a": 1, if (false) "b": 2 else ...{"c": 3}}'), {
+          'a': 1,
+          'c': 3,
+        });
       });
 
       test('sets', () {
@@ -189,8 +193,10 @@ void main() {
       expect(run('main() { const a = 42; return a; }'), 42);
     });
     test('local variable declaration', () {
-      expect(run('main() { var a = 42; { var a = 23; return a; } return a; }'),
-          23);
+      expect(
+        run('main() { var a = 42; { var a = 23; return a; } return a; }'),
+        23,
+      );
     });
     group('assignment', () {
       test('=', () {
@@ -225,81 +231,134 @@ void main() {
       expect(run('main() { if (true) return "T"; }'), 'T');
       expect(run('main() { if (false) return "T"; }'), null);
       expect(run('main() { if (false) return "T"; else return "F"; }'), 'F');
-      expect(run('main() { if (false) { return "T"; } else { return "F"; } }'),
-          'F');
       expect(
-          run('main() { if (false) { return "T"; } else if (true) { return "E"; } }'),
-          'E');
+        run('main() { if (false) { return "T"; } else { return "F"; } }'),
+        'F',
+      );
+      expect(
+        run(
+          'main() { if (false) { return "T"; } else if (true) { return "E"; } }',
+        ),
+        'E',
+      );
     });
     test('while', () {
       expect(run('main() { while(false) { } }'), null);
       expect(run('main() { var i = 0; while(i < 3) { i++; } return i; }'), 3);
       expect(
-          run('main() { var i = 0; while(i < 3) { if (i == 2) break; i++; } return i; }'),
-          2);
+        run(
+          'main() { var i = 0; while(i < 3) { if (i == 2) break; i++; } return i; }',
+        ),
+        2,
+      );
       expect(
-          run('main() { var i = 0; while(i++ < 3) { if (i == 1) continue; print(i); } return i; }'),
-          4);
+        run(
+          'main() { var i = 0; while(i++ < 3) { if (i == 1) continue; print(i); } return i; }',
+        ),
+        4,
+      );
     });
     test('do/while', () {
       expect(run('main() { do { return "A"; } while(false); }'), 'A');
       expect(
-          run('main() { var i = 0; var result = 0; do { result += i; } while(i++ < 2); return result; }'),
-          3);
+        run(
+          'main() { var i = 0; var result = 0; do { result += i; } while(i++ < 2); return result; }',
+        ),
+        3,
+      );
       expect(
-          run('main() { var i = 0; var result = 0; do { if (i == 1) break; result += i; } while(i++ < 2); return result; }'),
-          0);
+        run(
+          'main() { var i = 0; var result = 0; do { if (i == 1) break; result += i; } while(i++ < 2); return result; }',
+        ),
+        0,
+      );
       expect(
-          run('main() { var i = 0; var result = 0; do { if (i == 1) continue; result += i; } while(i++ < 2); return result; }'),
-          02);
+        run(
+          'main() { var i = 0; var result = 0; do { if (i == 1) continue; result += i; } while(i++ < 2); return result; }',
+        ),
+        02,
+      );
     });
     test('for/next', () {
       expect(
-          run('main() { var result = 0; for (var i = 0; i < 3; i++) result += i; return result; }'),
-          3);
+        run(
+          'main() { var result = 0; for (var i = 0; i < 3; i++) result += i; return result; }',
+        ),
+        3,
+      );
       expect(
-          run('main() { var result = 0; for (var i = 0; i < 3; i++) { if(i == 2) break; result += i; } return result; }'),
-          1);
+        run(
+          'main() { var result = 0; for (var i = 0; i < 3; i++) { if(i == 2) break; result += i; } return result; }',
+        ),
+        1,
+      );
       expect(
-          run('main() { var result = 0; for (var i = 0; i < 3; i++) { if(i == 1) continue; result += i; } return result; }'),
-          2);
+        run(
+          'main() { var result = 0; for (var i = 0; i < 3; i++) { if(i == 1) continue; result += i; } return result; }',
+        ),
+        2,
+      );
       expect(
-          run('main() { var i = 1; for (i = 0; i < 3; i++) {} return i; }'), 3);
+        run('main() { var i = 1; for (i = 0; i < 3; i++) {} return i; }'),
+        3,
+      );
       expect(
-          run('main() { var i = 1; for (var i = 0; i < 3; i++) {} return i; }'),
-          1);
+        run('main() { var i = 1; for (var i = 0; i < 3; i++) {} return i; }'),
+        1,
+      );
     });
     test('for/each', () {
       expect(run('main() { for (final a in []) return a; }'), null);
       expect(
-          run('main() { var result = 0; for (final a in [3, 4, 2]) result += a; return result; }'),
-          9);
+        run(
+          'main() { var result = 0; for (final a in [3, 4, 2]) result += a; return result; }',
+        ),
+        9,
+      );
       expect(
-          run('main() { var result = 0; for (final a in [3, 4, 2]) { if (a == 2) break; result += a; } return result; }'),
-          7);
+        run(
+          'main() { var result = 0; for (final a in [3, 4, 2]) { if (a == 2) break; result += a; } return result; }',
+        ),
+        7,
+      );
       expect(
-          run('main() { var result = 0; for (final a in [3, 4, 2]) { if (a == 4) continue; result += a; } return result; }'),
-          5);
+        run(
+          'main() { var result = 0; for (final a in [3, 4, 2]) { if (a == 4) continue; result += a; } return result; }',
+        ),
+        5,
+      );
       expect(run('main() { var a = 1; for (a in [3, 4, 2]) {} return a; }'), 2);
-      expect(run('main() { var a = 1; for (var a in [3, 4, 2]) {} return a; }'),
-          1);
+      expect(
+        run('main() { var a = 1; for (var a in [3, 4, 2]) {} return a; }'),
+        1,
+      );
     });
     test('try/catch', () {
       expect(
-          run('main() { try { var result = "B"; 1~/0; return result + "E"; } catch (e) { return "C"; } }'),
-          'C');
+        run(
+          'main() { try { var result = "B"; 1~/0; return result + "E"; } catch (e) { return "C"; } }',
+        ),
+        'C',
+      );
       expect(
-          run('main() { try { var result = "B"; 1~/1; return result + "E"; } catch (e) { return "C"; } }'),
-          'BE');
+        run(
+          'main() { try { var result = "B"; 1~/1; return result + "E"; } catch (e) { return "C"; } }',
+        ),
+        'BE',
+      );
       expect(
-          run('main() { for (var i in [1, 2]) { try { return i; } catch (e, st) { return "X"; } } }'),
-          1);
+        run(
+          'main() { for (var i in [1, 2]) { try { return i; } catch (e, st) { return "X"; } } }',
+        ),
+        1,
+      );
     });
   });
 
   group('examples', () {
     test('factorial', () {
-      expect(run('''
+      expect(
+        run('''
         fac(n) {
           if (n == 0) return 1;
           return fac(n - 1) * n;
@@ -307,7 +366,9 @@ void main() {
         main() {
           return "\${fac(0)} \${fac(1)} \${fac(10)}";
       
-        }'''), '1 1 3628800');
+        }'''),
+        '1 1 3628800',
+      );
     });
     test('string methods', () {
       expect(run('main() { return "".isEmpty; }'), true);
@@ -335,7 +396,8 @@ void main() {
   });
   group('switch', () {
     test('constant case', () {
-      expect(run('''
+      expect(
+        run('''
       main() {
       var a = 1;
       switch (a) {
@@ -347,11 +409,14 @@ void main() {
         break;
       }
       }
-    '''), 'one');
+    '''),
+        'one',
+      );
     });
 
     test('default case', () {
-      expect(run('''
+      expect(
+        run('''
       main() {
       var a = 3;
       switch (a) {
@@ -365,7 +430,9 @@ void main() {
         return 'other';
       }
       }
-    '''), 'other');
+    '''),
+        'other',
+      );
     });
   });
 
@@ -376,8 +443,11 @@ void main() {
 
     test('map pattern', () {
       expect(
-          run('main() { var { "a": a, "b": b } = { "a": 1, "b": 2 }; return a; }'),
-          1);
+        run(
+          'main() { var { "a": a, "b": b } = { "a": 1, "b": 2 }; return a; }',
+        ),
+        1,
+      );
     });
 
     test('record pattern', () {
@@ -387,10 +457,14 @@ void main() {
 
   test('AssertStatement', () {
     expect(
-        () => run('main() { assert(false); }'), throwsA(isA<RuntimeError>()));
+      () => run('main() { assert(false); }'),
+      throwsA(isA<RuntimeError>()),
+    );
     expect(() => run('main() { assert(true); }'), returnsNormally);
-    expect(() => run('main() { assert(1 == 2, "message"); }'),
-        throwsA(isA<RuntimeError>()));
+    expect(
+      () => run('main() { assert(1 == 2, "message"); }'),
+      throwsA(isA<RuntimeError>()),
+    );
   });
   test('AsExpression', () {
     expect(() => run('main() { return 123 as int; }'), returnsNormally);
@@ -424,7 +498,8 @@ void main() {
     expect(run('main() { var a = [1, 2, 3]; return a.length; }'), 3);
   });
   test('RethrowExpression', () {
-    expect(() => run('''
+    expect(
+      () => run('''
       main() {
         try {
         throw "error";
@@ -432,7 +507,9 @@ void main() {
         rethrow;
         }
       }
-      '''), throwsA(equals("error")));
+      '''),
+      throwsA(equals("error")),
+    );
   });
 
   test('Complex default values for optional parameters', () {
@@ -555,8 +632,10 @@ void main() {
       // Note: Getter tear-off currently returns the bound method itself, not a function
       // that calls the getter. This needs adjustment in the interpreter or test.
       // For now, we test the method tear-off works.
-      expect(() => run(source),
-          returnsNormally); // We expect it to run, value check is tricky
+      expect(
+        () => run(source),
+        returnsNormally,
+      ); // We expect it to run, value check is tricky
 
       // Let's refine the test to check the final value via direct access
       final source2 = '''
@@ -701,12 +780,15 @@ void main() {
 
     test('nested record creation', () {
       final source = 'main() { return (1, (a: 2, b: 3), c: (4, d: 5)); }';
-      final expected = InterpretedRecord([
-        1,
-        InterpretedRecord([], {'a': 2, 'b': 3}),
-      ], {
-        'c': InterpretedRecord([4], {'d': 5}),
-      });
+      final expected = InterpretedRecord(
+        [
+          1,
+          InterpretedRecord([], {'a': 2, 'b': 3}),
+        ],
+        {
+          'c': InterpretedRecord([4], {'d': 5}),
+        },
+      );
       expect(run(source), expected);
     });
 

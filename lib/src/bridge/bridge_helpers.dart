@@ -177,9 +177,7 @@ extension BridgePositionalArgs on List<Object?> {
   void requireExactCount(int count, [String? context]) {
     if (length != count) {
       final ctx = context != null ? ' for $context' : '';
-      throw ArgumentError(
-        'Expected exactly $count arguments$ctx, got $length',
-      );
+      throw ArgumentError('Expected exactly $count arguments$ctx, got $length');
     }
   }
 }
@@ -380,13 +378,15 @@ extension BridgeInstanceValidation on Object? {
 
   /// Coerces this value to type T, unwrapping BridgedInstance if necessary.
   T coerce<T>(String paramName, [String? context]) {
-    final value =
-        this is BridgedInstance ? (this as BridgedInstance).nativeObject : this;
+    final value = this is BridgedInstance
+        ? (this as BridgedInstance).nativeObject
+        : this;
 
     if (value == null && null is! T) {
       final ctx = context != null ? ' in $context' : '';
       throw ArgumentError(
-          'Argument "$paramName"$ctx cannot be null: expected $T');
+        'Argument "$paramName"$ctx cannot be null: expected $T',
+      );
     }
 
     if (value is T) return value;

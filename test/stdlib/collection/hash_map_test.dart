@@ -10,7 +10,8 @@ void main() {
     });
 
     dynamic execute(String mainFunctionBody, {List<Object?>? args}) {
-      final source = '''
+      final source =
+          '''
         import 'dart:collection';
 
         main() {
@@ -109,9 +110,13 @@ void main() {
         return log;
       ''');
       expect(
-          result,
-          TypeMatcher<List>()
-              .having((l) => l, 'elements', unorderedEquals(['a:1', 'b:2'])));
+        result,
+        TypeMatcher<List>().having(
+          (l) => l,
+          'elements',
+          unorderedEquals(['a:1', 'b:2']),
+        ),
+      );
     });
 
     test('putIfAbsent() method', () {

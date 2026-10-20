@@ -9,8 +9,12 @@ void main() {
       d4rt = D4rt();
     });
 
-    test('Relational patterns and Logical-AND patterns in switch expressions', () {
-      final result = d4rt.execute(source: '''
+    test(
+      'Relational patterns and Logical-AND patterns in switch expressions',
+      () {
+        final result =
+            d4rt.execute(
+                  source: '''
         String classify(int score) => switch (score) {
           >= 90 => 'A',
           >= 80 && < 90 => 'B',
@@ -29,13 +33,18 @@ void main() {
             classify(45),
           ];
         }
-      ''') as List;
+      ''',
+                )
+                as List;
 
-      expect(result, equals(['A', 'B', 'C', 'D', 'F']));
-    });
+        expect(result, equals(['A', 'B', 'C', 'D', 'F']));
+      },
+    );
 
     test('Relational patterns in switch statement with when guards', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         String testSwitch(int value, bool extraCheck) {
           String res = '';
           switch (value) {
@@ -62,18 +71,25 @@ void main() {
             testSwitch(42, false),
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
-      expect(result, equals([
-        'very large verified',
-        'very large unverified',
-        'non-positive',
-        'normal',
-      ]));
+      expect(
+        result,
+        equals([
+          'very large verified',
+          'very large unverified',
+          'non-positive',
+          'normal',
+        ]),
+      );
     });
 
     test('NullCheck, NullAssert, Parenthesized and Cast patterns', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         String testPatterns(Object? obj) => switch (obj) {
           (int x) when x > 0 => 'positive-int:\$x',
           int x? => 'non-null-int:\$x',
@@ -89,18 +105,20 @@ void main() {
             testPatterns(null),
           ];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
-      expect(result, equals([
-        'positive-int:42',
-        'non-null-int:-5',
-        'string:hello',
-        'other',
-      ]));
+      expect(
+        result,
+        equals(['positive-int:42', 'non-null-int:-5', 'string:hello', 'other']),
+      );
     });
 
     test('For-in loop with pattern destructuring', () {
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         main() {
           final points = [(1, 2), (3, 4), (5, 6)];
           int sumX = 0;
@@ -113,13 +131,19 @@ void main() {
 
           return [sumX, sumY];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result, equals([9, 12]));
     });
 
-    test('Collection for-in with pattern destructuring and if-case in collections', () {
-      final result = d4rt.execute(source: '''
+    test(
+      'Collection for-in with pattern destructuring and if-case in collections',
+      () {
+        final result =
+            d4rt.execute(
+                  source: '''
         main() {
           final pairs = [('a', 1), ('b', 2), ('c', 3)];
           final formatted = [for (final (k, v) in pairs) '\$k:\$v'];
@@ -134,10 +158,13 @@ void main() {
 
           return [formatted, statusList];
         }
-      ''') as List;
+      ''',
+                )
+                as List;
 
-      expect(result[0], equals(['a:1', 'b:2', 'c:3']));
-      expect(result[1], equals(['Adult: Alice', 'Minor']));
-    });
+        expect(result[0], equals(['a:1', 'b:2', 'c:3']));
+        expect(result[1], equals(['Adult: Alice', 'Minor']));
+      },
+    );
   });
 }

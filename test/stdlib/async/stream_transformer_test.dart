@@ -154,9 +154,10 @@ main() async {
       expect(result, equals([2, 4]));
     });
 
-    test('StreamTransformer.fromHandlers - mapping to different type',
-        () async {
-      const code = '''
+    test(
+      'StreamTransformer.fromHandlers - mapping to different type',
+      () async {
+        const code = '''
 import 'dart:async';
 
 main() async {
@@ -185,9 +186,10 @@ main() async {
   return results;
 }
 ''';
-      final result = await executeAsync(code);
-      expect(result, equals(['Number: 1', 'Number: 2']));
-    });
+        final result = await executeAsync(code);
+        expect(result, equals(['Number: 1', 'Number: 2']));
+      },
+    );
 
     test('StreamTransformer.fromBind - custom stream binding', () async {
       const code = '''

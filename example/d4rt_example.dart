@@ -4,9 +4,7 @@ class User {
   String name;
   int _age;
   User(this.name, this._age);
-  User.guest()
-      : name = 'Guest',
-        _age = 0;
+  User.guest() : name = 'Guest', _age = 0;
 
   // ignore: unnecessary_getters_setters
   int get age => _age;
@@ -23,10 +21,8 @@ final userBridge = BridgedClass(
   nativeType: User,
   name: 'User',
   constructors: {
-    '': (visitor, positionalArgs, namedArgs) => User(
-          positionalArgs[0] as String,
-          positionalArgs[1] as int,
-        ),
+    '': (visitor, positionalArgs, namedArgs) =>
+        User(positionalArgs[0] as String, positionalArgs[1] as int),
     'guest': (visitor, positionalArgs, namedArgs) => User.guest(),
   },
   methods: {
@@ -50,7 +46,9 @@ final userBridge = BridgedClass(
 void main() async {
   final interpreter = D4rt();
   interpreter.registerBridgedClass(
-      userBridge, 'package:d4rt_example/d4rt_example.dart');
+    userBridge,
+    'package:d4rt_example/d4rt_example.dart',
+  );
 
   final code = '''
     import 'package:d4rt_example/d4rt_example.dart';

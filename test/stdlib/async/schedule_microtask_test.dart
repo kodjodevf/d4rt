@@ -5,7 +5,9 @@ void main() {
   group('scheduleMicrotask and Zone stdlib tests', () {
     test('scheduleMicrotask executes asynchronously', () async {
       final d4rt = D4rt();
-      final result = await d4rt.execute(source: '''
+      final result =
+          await d4rt.execute(
+                source: '''
         import 'dart:async';
 
         Future<List<String>> main() async {
@@ -20,14 +22,18 @@ void main() {
           await Future.delayed(Duration(milliseconds: 50));
           return events;
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result, equals(['start', 'end', 'microtask']));
     });
 
     test('Zone.current and Zone.root bridge access', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:async';
 
         main() {
@@ -35,7 +41,9 @@ void main() {
           final root = Zone.root;
           return [cur != null, root != null, root.inSameErrorZone(root)];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);
@@ -44,7 +52,8 @@ void main() {
 
     test('Zone.run execution', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:async';
 
         main() {
@@ -53,7 +62,8 @@ void main() {
           });
           return res;
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(42));
     });

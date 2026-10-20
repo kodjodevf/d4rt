@@ -3,9 +3,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('Execution Limits & Sandbox Timeout Tests', () {
-    test('maxSteps terminates infinite while loop with ExecutionLimitException', () {
-      final d4rt = D4rt();
-      const source = '''
+    test(
+      'maxSteps terminates infinite while loop with ExecutionLimitException',
+      () {
+        final d4rt = D4rt();
+        const source = '''
         void main() {
           while (true) {
             // Infinite loop
@@ -13,15 +15,18 @@ void main() {
         }
       ''';
 
-      expect(
-        () => d4rt.execute(source: source, maxSteps: 50),
-        throwsA(isA<ExecutionLimitException>()),
-      );
-    });
+        expect(
+          () => d4rt.execute(source: source, maxSteps: 50),
+          throwsA(isA<ExecutionLimitException>()),
+        );
+      },
+    );
 
-    test('maxSteps terminates infinite for loop with ExecutionLimitException', () {
-      final d4rt = D4rt();
-      const source = '''
+    test(
+      'maxSteps terminates infinite for loop with ExecutionLimitException',
+      () {
+        final d4rt = D4rt();
+        const source = '''
         void main() {
           for (var i = 0; i >= 0; i++) {
             // Infinite loop
@@ -29,11 +34,12 @@ void main() {
         }
       ''';
 
-      expect(
-        () => d4rt.execute(source: source, maxSteps: 100),
-        throwsA(isA<ExecutionLimitException>()),
-      );
-    });
+        expect(
+          () => d4rt.execute(source: source, maxSteps: 100),
+          throwsA(isA<ExecutionLimitException>()),
+        );
+      },
+    );
 
     test('timeout terminates infinite loop with ExecutionTimeoutException', () {
       final d4rt = D4rt();
@@ -47,7 +53,10 @@ void main() {
       ''';
 
       expect(
-        () => d4rt.execute(source: source, timeout: const Duration(milliseconds: 100)),
+        () => d4rt.execute(
+          source: source,
+          timeout: const Duration(milliseconds: 100),
+        ),
         throwsA(isA<ExecutionTimeoutException>()),
       );
     });

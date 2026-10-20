@@ -25,7 +25,7 @@ class InterpretedClass implements Callable, RuntimeType {
   final bool isAbstract;
   List<InterpretedClass> interfaces;
   List<BridgedClass>
-      bridgedInterfaces; // Bridged classes that this class implements
+  bridgedInterfaces; // Bridged classes that this class implements
   final bool isMixin;
   List<InterpretedClass> onClauseTypes;
   List<InterpretedClass> mixins;
@@ -36,7 +36,7 @@ class InterpretedClass implements Callable, RuntimeType {
   // Add fields for type parameter information (like InterpretedFunction)
   final List<String> typeParameterNames; // e.g., ['T', 'U', 'V']
   final Map<String, RuntimeType?>
-      typeParameterBounds; // e.g., {'T': num, 'U': Object}
+  typeParameterBounds; // e.g., {'T': num, 'U': Object}
 
   // Fields for class modifiers
   final bool isFinal;
@@ -49,7 +49,8 @@ class InterpretedClass implements Callable, RuntimeType {
 
   // Helper methods to extract type parameter information from AST (similar to InterpretedFunction)
   static List<String> extractTypeParameterNames(
-      TypeParameterList? typeParameters) {
+    TypeParameterList? typeParameters,
+  ) {
     if (typeParameters == null) return [];
     return typeParameters.typeParameters
         .map((param) => param.name.lexeme)
@@ -57,7 +58,9 @@ class InterpretedClass implements Callable, RuntimeType {
   }
 
   static Map<String, RuntimeType?> extractTypeParameterBounds(
-      TypeParameterList? typeParameters, Environment? resolveEnvironment) {
+    TypeParameterList? typeParameters,
+    Environment? resolveEnvironment,
+  ) {
     final bounds = <String, RuntimeType?>{};
     if (typeParameters == null) return bounds;
 
@@ -68,16 +71,21 @@ class InterpretedClass implements Callable, RuntimeType {
       if (typeParam.bound != null && resolveEnvironment != null) {
         try {
           Logger.debug(
-              "[InterpretedClass._extractTypeParameterBounds] Resolving bound for type parameter '$paramName'");
+            "[InterpretedClass._extractTypeParameterBounds] Resolving bound for type parameter '$paramName'",
+          );
 
           bound = resolveTypeAnnotationDynamic(
-              typeParam.bound!, resolveEnvironment);
+            typeParam.bound!,
+            resolveEnvironment,
+          );
 
           Logger.debug(
-              "[InterpretedClass._extractTypeParameterBounds] Successfully resolved bound for '$paramName' to: ${bound.name}");
+            "[InterpretedClass._extractTypeParameterBounds] Successfully resolved bound for '$paramName' to: ${bound.name}",
+          );
         } catch (e) {
           Logger.debug(
-              "[InterpretedClass._extractTypeParameterBounds] Failed to resolve bound for '$paramName': $e");
+            "[InterpretedClass._extractTypeParameterBounds] Failed to resolve bound for '$paramName': $e",
+          );
           rethrow;
         }
       }
@@ -90,7 +98,9 @@ class InterpretedClass implements Callable, RuntimeType {
 
   // Helper method for dynamic type resolution
   static RuntimeType resolveTypeAnnotationDynamic(
-      TypeAnnotation typeNode, Environment env) {
+    TypeAnnotation typeNode,
+    Environment env,
+  ) {
     return resolveRuntimeTypeAnnotation(typeNode, env);
   }
 
@@ -127,11 +137,11 @@ class InterpretedClass implements Callable, RuntimeType {
     // Add type parameter information
     this.typeParameterNames = const [],
     this.typeParameterBounds = const {},
-  })  : interfaces = interfaces ?? [],
-        bridgedInterfaces = bridgedInterfaces ?? [],
-        onClauseTypes = onClauseTypes ?? [],
-        mixins = mixins ?? [],
-        bridgedMixins = bridgedMixins ?? [];
+  }) : interfaces = interfaces ?? [],
+       bridgedInterfaces = bridgedInterfaces ?? [],
+       onClauseTypes = onClauseTypes ?? [],
+       mixins = mixins ?? [],
+       bridgedMixins = bridgedMixins ?? [];
 
   @override
   String toString() {
@@ -149,8 +159,9 @@ class InterpretedClass implements Callable, RuntimeType {
 
     // Check applied mixins in reverse order
     for (int i = mixins.length - 1; i >= 0; i--) {
-      final mixinMethod =
-          mixins[i].findInstanceMethod(name); // Recursive call on mixin
+      final mixinMethod = mixins[i].findInstanceMethod(
+        name,
+      ); // Recursive call on mixin
       if (mixinMethod != null) {
         // We found the method in a mixin.
         // Note: Mixins don't change the 'this' binding context,
@@ -235,7 +246,8 @@ class InterpretedClass implements Callable, RuntimeType {
   }
 
   bridge.BridgedClass? findBridgedSuperclassDefiningInstanceMethod(
-      String name) {
+    String name,
+  ) {
     InterpretedClass? current = this;
     while (current != null) {
       final bridgedSuper = current.bridgedSuperclass;
@@ -249,7 +261,8 @@ class InterpretedClass implements Callable, RuntimeType {
   }
 
   bridge.BridgedClass? findBridgedSuperclassDefiningInstanceGetter(
-      String name) {
+    String name,
+  ) {
     InterpretedClass? current = this;
     while (current != null) {
       final bridgedSuper = current.bridgedSuperclass;
@@ -263,7 +276,8 @@ class InterpretedClass implements Callable, RuntimeType {
   }
 
   bridge.BridgedClass? findBridgedSuperclassDefiningInstanceSetter(
-      String name) {
+    String name,
+  ) {
     InterpretedClass? current = this;
     while (current != null) {
       final bridgedSuper = current.bridgedSuperclass;
@@ -399,21 +413,26 @@ class InterpretedClass implements Callable, RuntimeType {
       return typeArg.isSubtypeOf(bound);
     } catch (e) {
       Logger.debug(
-          "[InterpretedClass._checkTypeSatisfiesBound] Error checking subtype relationship: $e");
+        "[InterpretedClass._checkTypeSatisfiesBound] Error checking subtype relationship: $e",
+      );
       // If we can't determine the relationship, default to false for strict validation
       return false;
     }
   }
 
   List<RuntimeType> _getValidatedTypeArguments(
-      List<RuntimeType>? providedTypeArguments) {
+    List<RuntimeType>? providedTypeArguments,
+  ) {
     List<RuntimeType> effective;
     if (providedTypeArguments == null || providedTypeArguments.isEmpty) {
-      effective = List.generate(typeParameterNames.length,
-          (_) => BridgedClass(nativeType: Object, name: 'dynamic'));
+      effective = List.generate(
+        typeParameterNames.length,
+        (_) => BridgedClass(nativeType: Object, name: 'dynamic'),
+      );
     } else if (providedTypeArguments.length != typeParameterNames.length) {
       throw RuntimeError(
-          "Class '$name' requires ${typeParameterNames.length} type argument(s), but ${providedTypeArguments.length} were provided.");
+        "Class '$name' requires ${typeParameterNames.length} type argument(s), but ${providedTypeArguments.length} were provided.",
+      );
     } else {
       effective = providedTypeArguments;
     }
@@ -427,7 +446,8 @@ class InterpretedClass implements Callable, RuntimeType {
         bool satisfiesBound = _checkTypeSatisfiesBound(typeArg, bound);
         if (!satisfiesBound) {
           throw RuntimeError(
-              "Type argument '${typeArg.name}' for type parameter '$paramName' does not satisfy bound '${bound.name}' in class '$name'");
+            "Type argument '${typeArg.name}' for type parameter '$paramName' does not satisfy bound '${bound.name}' in class '$name'",
+          );
         }
       }
     }
@@ -436,7 +456,9 @@ class InterpretedClass implements Callable, RuntimeType {
 
   // Helper to create instance and run field initializers
   InterpretedInstance createAndInitializeInstance(
-      InterpreterVisitor visitor, List<RuntimeType>? typeArguments) {
+    InterpreterVisitor visitor,
+    List<RuntimeType>? typeArguments,
+  ) {
     // Prevent direct instantiation of abstract classes
     if (isAbstract) {
       throw RuntimeError("Cannot instantiate abstract class '$name'.");
@@ -446,8 +468,10 @@ class InterpretedClass implements Callable, RuntimeType {
     final effectiveTypeArgs = _getValidatedTypeArguments(typeArguments);
 
     // 1. Create the instance with a link to the class
-    final instance = InterpretedInstance(this,
-        typeArguments: effectiveTypeArgs); // Pass only the class
+    final instance = InterpretedInstance(
+      this,
+      typeArguments: effectiveTypeArgs,
+    ); // Pass only the class
 
     // Use the environment where the class was defined as the outer scope
     // for evaluating initializers. We need to traverse the hierarchy.
@@ -465,8 +489,9 @@ class InterpretedClass implements Callable, RuntimeType {
     for (final klassInHierarchy in hierarchy) {
       // Create a temporary environment for this specific class's initializers,
       // enclosing the environment where *that* class was defined.
-      final fieldInitEnv =
-          Environment(enclosing: klassInHierarchy.classDefinitionEnvironment);
+      final fieldInitEnv = Environment(
+        enclosing: klassInHierarchy.classDefinitionEnvironment,
+      );
       fieldInitEnv.define('this', instance); // Define 'this' for initializers
 
       try {
@@ -497,14 +522,19 @@ class InterpretedClass implements Callable, RuntimeType {
                   }, isFinal: isFinal);
                   instance._fields[fieldName] = lateVar;
                   Logger.debug(
-                      "[Instance Init] Defined late instance field '$fieldName' with lazy initializer.");
+                    "[Instance Init] Defined late instance field '$fieldName' with lazy initializer.",
+                  );
                 } else {
                   // Late instance field without initializer
-                  final lateVar =
-                      LateVariable(fieldName, null, isFinal: isFinal);
+                  final lateVar = LateVariable(
+                    fieldName,
+                    null,
+                    isFinal: isFinal,
+                  );
                   instance._fields[fieldName] = lateVar;
                   Logger.debug(
-                      "[Instance Init] Defined late instance field '$fieldName' without initializer.");
+                    "[Instance Init] Defined late instance field '$fieldName' without initializer.",
+                  );
                 }
               } else {
                 // Regular field handling
@@ -526,8 +556,9 @@ class InterpretedClass implements Callable, RuntimeType {
         for (final mixin in klassInHierarchy.mixins) {
           // Each mixin's field initializers run in the mixin's definition environment
           // with 'this' bound to the instance being created.
-          final mixinFieldInitEnv =
-              Environment(enclosing: mixin.classDefinitionEnvironment);
+          final mixinFieldInitEnv = Environment(
+            enclosing: mixin.classDefinitionEnvironment,
+          );
           mixinFieldInitEnv.define('this', instance);
 
           // Temporarily set visitor environment for this mixin's initializers
@@ -539,18 +570,21 @@ class InterpretedClass implements Callable, RuntimeType {
                 for (final variable in fieldDecl.fields.variables) {
                   final fieldName = variable.name.lexeme;
                   if (variable.initializer != null) {
-                    final value =
-                        variable.initializer!.accept<Object?>(visitor);
+                    final value = variable.initializer!.accept<Object?>(
+                      visitor,
+                    );
                     // Set (or overwrite) the field on the instance
                     instance._fields[fieldName] = value;
                     Logger.debug(
-                        "[Instance Init] Initialized mixin field '${klassInHierarchy.name}.$fieldName' from mixin '${mixin.name}' with value: $value");
+                      "[Instance Init] Initialized mixin field '${klassInHierarchy.name}.$fieldName' from mixin '${mixin.name}' with value: $value",
+                    );
                   } else {
                     // Ensure field exists even if not initialized (Dart default is null)
                     // Only set null if field wasn't already set by class or previous mixin
                     instance._fields.putIfAbsent(fieldName, () {
                       Logger.debug(
-                          "[Instance Init] Initialized mixin field '${klassInHierarchy.name}.$fieldName' from mixin '${mixin.name}' to null (default)");
+                        "[Instance Init] Initialized mixin field '${klassInHierarchy.name}.$fieldName' from mixin '${mixin.name}' to null (default)",
+                      );
                       return null;
                     });
                   }
@@ -570,15 +604,19 @@ class InterpretedClass implements Callable, RuntimeType {
 
     // Instance fields from class hierarchy AND mixins should now be initialized.
     Logger.debug(
-        "[Instance Init] Finished instance initialization for '$name'. Fields: ${instance._fields}");
+      "[Instance Init] Finished instance initialization for '$name'. Fields: ${instance._fields}",
+    );
 
     return instance;
   }
 
   @override
-  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
-      [Map<String, Object?> namedArguments = const {},
-      List<RuntimeType>? typeArguments]) {
+  Object? call(
+    InterpreterVisitor visitor,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
     // 1. Create and initialize instance using the new helper
     final instance = createAndInitializeInstance(visitor, typeArguments);
 
@@ -595,16 +633,22 @@ class InterpretedClass implements Callable, RuntimeType {
         final boundConstructor = constructor.bind(instance);
         // Pass initializers to call?
         boundConstructor.call(
-            visitor, positionalArguments, namedArguments, typeArguments);
+          visitor,
+          positionalArguments,
+          namedArguments,
+          typeArguments,
+        );
       } on RuntimeError catch (e) {
         throw RuntimeError(
-            "Error during constructor execution for class '$name': ${e.message}");
+          "Error during constructor execution for class '$name': ${e.message}",
+        );
       }
     } else {
       // No explicit constructor found. Check arity for default constructor.
       if (positionalArguments.isNotEmpty || (namedArguments.isNotEmpty)) {
         throw RuntimeError(
-            "Class '$name' does not have an unnamed constructor that accepts arguments.");
+          "Class '$name' does not have an unnamed constructor that accepts arguments.",
+        );
       }
       // If no constructor and no args passed, it's okay (implicit default constructor).
     }
@@ -691,7 +735,8 @@ class InterpretedClass implements Callable, RuntimeType {
     var currentSuper = superclass;
     while (currentSuper != null) {
       queue.add(
-          currentSuper); // Add superclass to check its interfaces/abstract members
+        currentSuper,
+      ); // Add superclass to check its interfaces/abstract members
       currentSuper = currentSuper.superclass;
     }
 
@@ -708,15 +753,21 @@ class InterpretedClass implements Callable, RuntimeType {
       currentClass.methods.forEach((name, func) {
         // Abstract methods from superclasses also count as required signatures
         requiredMembers.putIfAbsent(
-            name, () => func.isAbstract ? 'method' : 'method');
+          name,
+          () => func.isAbstract ? 'method' : 'method',
+        );
       });
       currentClass.getters.forEach((name, func) {
         requiredMembers.putIfAbsent(
-            name, () => func.isAbstract ? 'getter' : 'getter');
+          name,
+          () => func.isAbstract ? 'getter' : 'getter',
+        );
       });
       currentClass.setters.forEach((name, func) {
         requiredMembers.putIfAbsent(
-            name, () => func.isAbstract ? 'setter' : 'setter');
+          name,
+          () => func.isAbstract ? 'setter' : 'setter',
+        );
       });
 
       // Add interfaces implemented by this class to the queue
@@ -924,7 +975,9 @@ class InterpretedInstance implements RuntimeValue {
 
   /// Check if a class is a subtype of another class (including inheritance)
   bool _isClassSubtypeOf(
-      InterpretedClass subClass, InterpretedClass superClass) {
+    InterpretedClass subClass,
+    InterpretedClass superClass,
+  ) {
     if (subClass == superClass) {
       return true;
     }
@@ -957,14 +1010,18 @@ class InterpretedInstance implements RuntimeValue {
 
   /// Validate that a value can be assigned to a field with a specific generic type constraint
   void validateFieldAssignment(
-      String fieldName, Object? value, RuntimeType? expectedType) {
+    String fieldName,
+    Object? value,
+    RuntimeType? expectedType,
+  ) {
     if (expectedType == null) {
       return; // No type constraint
     }
 
     if (!_isValueCompatibleWithType(value, expectedType)) {
       throw RuntimeError(
-          "Type error: Cannot assign value of type '${_getValueTypeName(value)}' to field '$fieldName' expecting type '${expectedType.name}' in class '${klass.name}'");
+        "Type error: Cannot assign value of type '${_getValueTypeName(value)}' to field '$fieldName' expecting type '${expectedType.name}' in class '${klass.name}'",
+      );
     }
   }
 
@@ -1000,7 +1057,10 @@ class InterpretedInstance implements RuntimeValue {
 
   /// Validate that a value being added to a List&lt;T&gt; matches type T
   void _validateListElementType(
-      String fieldName, Object? value, RuntimeType elementType) {
+    String fieldName,
+    Object? value,
+    RuntimeType elementType,
+  ) {
     if (fieldName == 'add' || fieldName == 'insert' || fieldName == 'addAll') {
       // These operations should validate the element type
       if (fieldName == 'addAll' && value is List) {
@@ -1008,32 +1068,40 @@ class InterpretedInstance implements RuntimeValue {
         for (int i = 0; i < value.length; i++) {
           if (!_isValueCompatibleWithType(value[i], elementType)) {
             throw RuntimeError(
-                "Type error: Cannot add element of type '${_getValueTypeName(value[i])}' at index $i to List<${elementType.name}>");
+              "Type error: Cannot add element of type '${_getValueTypeName(value[i])}' at index $i to List<${elementType.name}>",
+            );
           }
         }
       } else if (fieldName == 'add' || fieldName == 'insert') {
         // Validate single element
         if (!_isValueCompatibleWithType(value, elementType)) {
           throw RuntimeError(
-              "Type error: Cannot add element of type '${_getValueTypeName(value)}' to List<${elementType.name}>");
+            "Type error: Cannot add element of type '${_getValueTypeName(value)}' to List<${elementType.name}>",
+          );
         }
       }
     }
   }
 
   /// Validate Map&lt;K,V&gt; key and value types
-  void _validateMapTypes(String fieldName, Object? value, RuntimeType keyType,
-      RuntimeType valueType) {
+  void _validateMapTypes(
+    String fieldName,
+    Object? value,
+    RuntimeType keyType,
+    RuntimeType valueType,
+  ) {
     if (fieldName == 'putIfAbsent' || fieldName == 'addAll') {
       if (value is Map) {
         for (final entry in value.entries) {
           if (!_isValueCompatibleWithType(entry.key, keyType)) {
             throw RuntimeError(
-                "Type error: Cannot add key of type '${_getValueTypeName(entry.key)}' to Map<${keyType.name}, ${valueType.name}>");
+              "Type error: Cannot add key of type '${_getValueTypeName(entry.key)}' to Map<${keyType.name}, ${valueType.name}>",
+            );
           }
           if (!_isValueCompatibleWithType(entry.value, valueType)) {
             throw RuntimeError(
-                "Type error: Cannot add value of type '${_getValueTypeName(entry.value)}' to Map<${keyType.name}, ${valueType.name}>");
+              "Type error: Cannot add value of type '${_getValueTypeName(entry.value)}' to Map<${keyType.name}, ${valueType.name}>",
+            );
           }
         }
       }
@@ -1042,19 +1110,24 @@ class InterpretedInstance implements RuntimeValue {
 
   /// Validate Set&lt;T&gt; element type
   void _validateSetElementType(
-      String fieldName, Object? value, RuntimeType elementType) {
+    String fieldName,
+    Object? value,
+    RuntimeType elementType,
+  ) {
     if (fieldName == 'add' || fieldName == 'addAll') {
       if (fieldName == 'addAll' && value is Iterable) {
         for (final element in value) {
           if (!_isValueCompatibleWithType(element, elementType)) {
             throw RuntimeError(
-                "Type error: Cannot add element of type '${_getValueTypeName(element)}' to Set<${elementType.name}>");
+              "Type error: Cannot add element of type '${_getValueTypeName(element)}' to Set<${elementType.name}>",
+            );
           }
         }
       } else if (fieldName == 'add') {
         if (!_isValueCompatibleWithType(value, elementType)) {
           throw RuntimeError(
-              "Type error: Cannot add element of type '${_getValueTypeName(value)}' to Set<${elementType.name}>");
+            "Type error: Cannot add element of type '${_getValueTypeName(value)}' to Set<${elementType.name}>",
+          );
         }
       }
     }
@@ -1073,7 +1146,8 @@ class InterpretedInstance implements RuntimeValue {
   @override
   Object? get(String name, {InterpreterVisitor? visitor}) {
     Logger.debug(
-        "[Instance.get] Looking for '$name' on instance $hashCode of '${klass.name}'. Fields: ${_fields.keys}");
+      "[Instance.get] Looking for '$name' on instance $hashCode of '${klass.name}'. Fields: ${_fields.keys}",
+    );
 
     // Check fields in the current instance first
     if (_fields.containsKey(name)) {
@@ -1081,16 +1155,19 @@ class InterpretedInstance implements RuntimeValue {
       if (fieldValue is LateVariable) {
         // Return the value of the late variable (will initialize if needed)
         Logger.debug(
-            "[Instance.get] Found late field '$name', accessing value...");
+          "[Instance.get] Found late field '$name', accessing value...",
+        );
         return fieldValue.value;
       }
       Logger.debug(
-          "[Instance.get] Found field '$name' with value: $fieldValue");
+        "[Instance.get] Found field '$name' with value: $fieldValue",
+      );
       return fieldValue;
     }
 
     Logger.debug(
-        "[Instance.get] Field '$name' not found in instance fields. Checking getters/methods...");
+      "[Instance.get] Field '$name' not found in instance fields. Checking getters/methods...",
+    );
 
     // Check instance members (getter/method) in the current class and superclasses
     InterpretedClass? currentClass = klass;
@@ -1116,8 +1193,9 @@ class InterpretedInstance implements RuntimeValue {
         if (visitor != null) {
           return staticGetter.bind(this).call(visitor, [], {});
         } else {
-          return staticGetter
-              .bind(this); // Bind to the *original* instance ('this')
+          return staticGetter.bind(
+            this,
+          ); // Bind to the *original* instance ('this')
         }
       }
 
@@ -1141,14 +1219,16 @@ class InterpretedInstance implements RuntimeValue {
         final getterAdapter = bridgedSuper.findInstanceGetterAdapter(name);
         if (getterAdapter != null) {
           Logger.debug(
-              "[Instance.get] Found getter '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Calling adapter.");
+            "[Instance.get] Found getter '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Calling adapter.",
+          );
           try {
             final result = getterAdapter(visitor, nativeTarget);
 
             // Check if result is a native enum that has been bridged
             if (result != null && visitor != null) {
-              final bridgedEnumValue =
-                  visitor.environment.getBridgedEnumValue(result);
+              final bridgedEnumValue = visitor.environment.getBridgedEnumValue(
+                result,
+              );
               if (bridgedEnumValue != null) {
                 return bridgedEnumValue;
               }
@@ -1157,9 +1237,11 @@ class InterpretedInstance implements RuntimeValue {
             return result;
           } catch (e, s) {
             Logger.error(
-                "Native exception during bridged superclass getter '$name': $e\n$s");
+              "Native exception during bridged superclass getter '$name': $e\n$s",
+            );
             throw RuntimeError(
-                "Native error in bridged superclass getter '$name': $e");
+              "Native error in bridged superclass getter '$name': $e",
+            );
           }
         }
 
@@ -1167,9 +1249,14 @@ class InterpretedInstance implements RuntimeValue {
         final methodAdapter = bridgedSuper.findInstanceMethodAdapter(name);
         if (methodAdapter != null) {
           Logger.debug(
-              "[Instance.get] Found method '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Returning bound callable.");
+            "[Instance.get] Found method '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Returning bound callable.",
+          );
           return BridgedSuperMethodCallable(
-              nativeTarget, methodAdapter, name, bridgedSuper.name);
+            nativeTarget,
+            methodAdapter,
+            name,
+            bridgedSuper.name,
+          );
         }
       }
 
@@ -1207,15 +1294,18 @@ class InterpretedInstance implements RuntimeValue {
       final getterAdapter = bridgedMixin.findInstanceGetterAdapter(name);
       if (getterAdapter != null) {
         Logger.debug(
-            "[Instance.get] Found getter '$name' in bridged mixin '${bridgedMixin.name}'. Calling adapter directly.");
+          "[Instance.get] Found getter '$name' in bridged mixin '${bridgedMixin.name}'. Calling adapter directly.",
+        );
         try {
           // For bridged mixins, call the getter directly and return the value
           return getterAdapter(visitor, this);
         } catch (e, s) {
           Logger.error(
-              "Native exception during bridged mixin getter '$name': $e\n$s");
+            "Native exception during bridged mixin getter '$name': $e\n$s",
+          );
           throw RuntimeError(
-              "Native error in bridged mixin getter '$name': $e");
+            "Native error in bridged mixin getter '$name': $e",
+          );
         }
       }
 
@@ -1223,10 +1313,15 @@ class InterpretedInstance implements RuntimeValue {
       final methodAdapter = bridgedMixin.findInstanceMethodAdapter(name);
       if (methodAdapter != null) {
         Logger.debug(
-            "[Instance.get] Found method '$name' in bridged mixin '${bridgedMixin.name}'. Creating bound callable.");
+          "[Instance.get] Found method '$name' in bridged mixin '${bridgedMixin.name}'. Creating bound callable.",
+        );
         // Return a callable that binds the method to this instance
         return BridgedMixinMethodCallable(
-            this, methodAdapter, name, bridgedMixin.name);
+          this,
+          methodAdapter,
+          name,
+          bridgedMixin.name,
+        );
       }
     }
 
@@ -1264,7 +1359,8 @@ class InterpretedInstance implements RuntimeValue {
   @override
   void set(String name, Object? value, [InterpreterVisitor? visitor]) {
     Logger.debug(
-        "[Instance.set] called for '${klass.name}.$name' with value: $value on instance $hashCode");
+      "[Instance.set] called for '${klass.name}.$name' with value: $value on instance $hashCode",
+    );
     // Look for a setter in the current class and superclasses
     InterpretedClass? currentClass = klass;
     while (currentClass != null) {
@@ -1284,15 +1380,18 @@ class InterpretedInstance implements RuntimeValue {
 
         if (setterAdapter != null) {
           Logger.debug(
-              "[Instance.set] Found setter '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Calling adapter.");
+            "[Instance.set] Found setter '$name' in bridged superclass '${bridgedSuper.name}' at level '${currentClass.name}'. Calling adapter.",
+          );
           try {
             setterAdapter(visitor, nativeTarget, value);
             return; // Setter called, assignment done
           } catch (e, s) {
             Logger.error(
-                "Native exception during bridged superclass setter '$name': $e\n$s");
+              "Native exception during bridged superclass setter '$name': $e\n$s",
+            );
             throw RuntimeError(
-                "Native error in bridged superclass setter '$name': $e");
+              "Native error in bridged superclass setter '$name': $e",
+            );
           }
         }
       }
@@ -1303,7 +1402,8 @@ class InterpretedInstance implements RuntimeValue {
 
     // No setter found in the hierarchy or bridge, assign directly to the field
     Logger.debug(
-        "[Instance.set] No setter found for '$name'. Setting field directly. Instance $hashCode");
+      "[Instance.set] No setter found for '$name'. Setting field directly. Instance $hashCode",
+    );
 
     // Check if it's a late variable
     if (_fields.containsKey(name)) {
@@ -1312,7 +1412,8 @@ class InterpretedInstance implements RuntimeValue {
         // Assign to the late variable
         fieldValue.assign(value);
         Logger.debug(
-            "[Instance.set] Assigned to late field '$name'. Fields now: ${_fields.keys}");
+          "[Instance.set] Assigned to late field '$name'. Fields now: ${_fields.keys}",
+        );
         return;
       }
     }
@@ -1322,7 +1423,8 @@ class InterpretedInstance implements RuntimeValue {
 
     _fields[name] = value;
     Logger.debug(
-        "[Instance.set] Field '$name' set. Fields now: ${_fields.keys}");
+      "[Instance.set] Field '$name' set. Fields now: ${_fields.keys}",
+    );
   }
 
   // Added to allow explicit field access, bypassing getters/methods for super
@@ -1336,7 +1438,8 @@ class InterpretedInstance implements RuntimeValue {
     // isn't standard Dart behavior (you'd typically use super.getterName).
     // This method is primarily for the `super.` property access visitor to get the value.
     throw RuntimeError(
-        "Internal Error: Field '$name' not found for super access on instance of ${klass.name}. This might indicate an issue with super property access implementation.");
+      "Internal Error: Field '$name' not found for super access on instance of ${klass.name}. This might indicate an issue with super property access implementation.",
+    );
   }
 
   /// Safely get a field value without throwing if not found
@@ -1398,7 +1501,7 @@ class BoundSuper {
 class BoundBridgedSuper {
   final InterpretedInstance instance; // The actual 'this' instance
   final BridgedClass
-      startLookupClass; // The bridged superclass where lookup begins
+  startLookupClass; // The bridged superclass where lookup begins
 
   BoundBridgedSuper(this.instance, this.startLookupClass);
 }
@@ -1457,11 +1560,12 @@ class InterpretedRecord {
   @override
   String toString() {
     final posStr = positionalFields.join(', ');
-    final namedStr =
-        namedFields.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+    final namedStr = namedFields.entries
+        .map((e) => '${e.key}: ${e.value}')
+        .join(', ');
     final parts = [
       if (posStr.isNotEmpty) posStr,
-      if (namedStr.isNotEmpty) namedStr
+      if (namedStr.isNotEmpty) namedStr,
     ];
     return '(${parts.join(', ')})';
   }
@@ -1507,8 +1611,8 @@ class InterpretedEnum implements RuntimeType {
     this.valueNames, {
     List<InterpretedClass>? mixins,
     List<BridgedClass>? bridgedMixins,
-  })  : mixins = mixins ?? [],
-        bridgedMixins = bridgedMixins ?? [];
+  }) : mixins = mixins ?? [],
+       bridgedMixins = bridgedMixins ?? [];
 
   // Constructor for Declaration Pass (Placeholder)
   InterpretedEnum.placeholder(
@@ -1517,8 +1621,8 @@ class InterpretedEnum implements RuntimeType {
     this.valueNames, {
     List<InterpretedClass>? mixins,
     List<BridgedClass>? bridgedMixins,
-  })  : mixins = mixins ?? [],
-        bridgedMixins = bridgedMixins ?? [];
+  }) : mixins = mixins ?? [],
+       bridgedMixins = bridgedMixins ?? [];
 
   @override
   String toString() => '<enum $name>';
@@ -1530,7 +1634,8 @@ class InterpretedEnum implements RuntimeType {
       if (values.length != valueNames.length) {
         // This shouldn't happen if interpretation pass is correct, but safeguard.
         throw StateError(
-            "Enum '$name' values mismatch between declaration and interpretation.");
+          "Enum '$name' values mismatch between declaration and interpretation.",
+        );
       }
       // Ensure the order matches the declaration order
       _valuesListCache = valueNames.map((name) => values[name]!).toList();
@@ -1576,8 +1681,7 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
 
   // RuntimeValue Implementation (get/set/valueType)
   @override
-  RuntimeType get valueType =>
-      parentEnum; // The type of an enum value is the enum itself
+  RuntimeType get valueType => parentEnum; // The type of an enum value is the enum itself
 
   // Get: Field -> Instance Getter (executed) -> Instance Method (bound)
   @override
@@ -1585,14 +1689,16 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
     // Handle implicit 'name' property
     if (memberName == 'name') {
       Logger.debug(
-          " [EnumValue.get] Accessing implicit property 'name'. Returning: $name");
+        " [EnumValue.get] Accessing implicit property 'name'. Returning: $name",
+      );
       return name; // Return the stored name of the enum value
     }
 
     // Handle implicit 'index' property
     if (memberName == 'index') {
       Logger.debug(
-          " [EnumValue.get] Accessing implicit property 'index'. Returning: $index");
+        " [EnumValue.get] Accessing implicit property 'index'. Returning: $index",
+      );
       return index;
     }
 
@@ -1600,7 +1706,8 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
     if (_fields.containsKey(memberName)) {
       final fieldValue = _fields[memberName];
       Logger.debug(
-          " [EnumValue.get] Found field '$memberName' with value: $fieldValue");
+        " [EnumValue.get] Found field '$memberName' with value: $fieldValue",
+      );
       return fieldValue;
     }
 
@@ -1611,13 +1718,15 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       // This requires the getter function to be callable with the instance
       if (visitor == null) {
         throw RuntimeError(
-            "Internal error: Visitor required to execute enum getter '$memberName'.");
+          "Internal error: Visitor required to execute enum getter '$memberName'.",
+        );
       }
       final boundGetter = getter.bind(this);
       // Call the getter immediately with no arguments
       final getterResult = boundGetter.call(visitor, [], {});
       Logger.debug(
-          " [EnumValue.get] Executed getter '$memberName'. Result: $getterResult");
+        " [EnumValue.get] Executed getter '$memberName'. Result: $getterResult",
+      );
       return getterResult;
     }
 
@@ -1627,7 +1736,8 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       // Return the bound method
       final boundMethod = method.bind(this);
       Logger.debug(
-          " [EnumValue.get] Found method '$memberName'. Returning bound method: $boundMethod");
+        " [EnumValue.get] Found method '$memberName'. Returning bound method: $boundMethod",
+      );
       return boundMethod;
     }
 
@@ -1639,12 +1749,14 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       if (mixinGetter != null) {
         if (visitor == null) {
           throw RuntimeError(
-              "Internal error: Visitor required to execute mixin getter '$memberName'.");
+            "Internal error: Visitor required to execute mixin getter '$memberName'.",
+          );
         }
         final boundGetter = mixinGetter.bind(this);
         final getterResult = boundGetter.call(visitor, [], {});
         Logger.debug(
-            " [EnumValue.get] Executed mixin getter '$memberName' from '${mixin.name}'. Result: $getterResult");
+          " [EnumValue.get] Executed mixin getter '$memberName' from '${mixin.name}'. Result: $getterResult",
+        );
         return getterResult;
       }
 
@@ -1653,7 +1765,8 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       if (mixinMethod != null) {
         final boundMethod = mixinMethod.bind(this);
         Logger.debug(
-            " [EnumValue.get] Found mixin method '$memberName' from '${mixin.name}'. Returning bound method.");
+          " [EnumValue.get] Found mixin method '$memberName' from '${mixin.name}'. Returning bound method.",
+        );
         return boundMethod;
       }
     }
@@ -1665,17 +1778,21 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       if (getterAdapter != null) {
         if (visitor == null) {
           throw RuntimeError(
-              "Internal error: Visitor required to execute bridged mixin getter '$memberName'.");
+            "Internal error: Visitor required to execute bridged mixin getter '$memberName'.",
+          );
         }
         Logger.debug(
-            " [EnumValue.get] Executing bridged mixin getter '$memberName' from '${bridgedMixin.name}'.");
+          " [EnumValue.get] Executing bridged mixin getter '$memberName' from '${bridgedMixin.name}'.",
+        );
         try {
           return getterAdapter(visitor, this);
         } catch (e, s) {
           Logger.error(
-              "Native exception during bridged mixin getter '$memberName': $e\n$s");
+            "Native exception during bridged mixin getter '$memberName': $e\n$s",
+          );
           throw RuntimeError(
-              "Native error in bridged mixin getter '$memberName': $e");
+            "Native error in bridged mixin getter '$memberName': $e",
+          );
         }
       }
 
@@ -1683,23 +1800,30 @@ class InterpretedEnumValue implements RuntimeValue /* Add RuntimeValue */ {
       final methodAdapter = bridgedMixin.findInstanceMethodAdapter(memberName);
       if (methodAdapter != null) {
         Logger.debug(
-            " [EnumValue.get] Found bridged mixin method '$memberName' from '${bridgedMixin.name}'.");
+          " [EnumValue.get] Found bridged mixin method '$memberName' from '${bridgedMixin.name}'.",
+        );
         // Return a callable that wraps the bridged method
         return BridgedEnumMixinMethodCallable(
-            this, methodAdapter, memberName, bridgedMixin.name);
+          this,
+          methodAdapter,
+          memberName,
+          bridgedMixin.name,
+        );
       }
     }
 
     // Property not found
     throw RuntimeError(
-        "Undefined property '$memberName' on enum value '$this'.");
+      "Undefined property '$memberName' on enum value '$this'.",
+    );
   }
 
   // Set: Instance Setter -> Field
   @override
   void set(String memberName, Object? value, [InterpreterVisitor? visitor]) {
     Logger.debug(
-        "[EnumValue.set] called for '$this.$memberName' with value: $value");
+      "[EnumValue.set] called for '$this.$memberName' with value: $value",
+    );
     // 1. Check instance setters defined on the enum
     final setter = parentEnum.setters[memberName];
     if (setter != null) {
@@ -1725,7 +1849,7 @@ class InterpretedExtension {
   final String? name; // Optional name of the extension
   final RuntimeType onType; // The type the extension applies to
   final Map<String, Callable>
-      members; // Instance methods, getters, setters, operators
+  members; // Instance methods, getters, setters, operators
 
   // Static members
   final Map<String, Callable> staticMethods;
@@ -1741,10 +1865,10 @@ class InterpretedExtension {
     Map<String, Callable>? staticGetters,
     Map<String, Callable>? staticSetters,
     Map<String, Object?>? staticFields,
-  })  : staticMethods = staticMethods ?? {},
-        staticGetters = staticGetters ?? {},
-        staticSetters = staticSetters ?? {},
-        staticFields = staticFields ?? {};
+  }) : staticMethods = staticMethods ?? {},
+       staticGetters = staticGetters ?? {},
+       staticSetters = staticSetters ?? {},
+       staticFields = staticFields ?? {};
 
   // Helper to find an instance member
   Callable? findMember(String name) {
@@ -1770,7 +1894,8 @@ class InterpretedExtension {
   Object? getStaticField(String name) {
     if (!staticFields.containsKey(name)) {
       throw RuntimeError(
-          "Extension '${this.name ?? '<unnamed>'}' has no static field '$name'.");
+        "Extension '${this.name ?? '<unnamed>'}' has no static field '$name'.",
+      );
     }
     return staticFields[name];
   }
@@ -1779,7 +1904,8 @@ class InterpretedExtension {
   void setStaticField(String name, Object? value) {
     if (!staticFields.containsKey(name)) {
       throw RuntimeError(
-          "Extension '${this.name ?? '<unnamed>'}' has no static field '$name'.");
+        "Extension '${this.name ?? '<unnamed>'}' has no static field '$name'.",
+      );
     }
     staticFields[name] = value;
   }
@@ -1789,13 +1915,17 @@ class InterpretedExtension {
 /// Stores the specific native super object and the method adapter.
 class BridgedSuperMethodCallable implements Callable {
   final Object
-      superObject; // The actual native object from the bridged super constructor
+  superObject; // The actual native object from the bridged super constructor
   final BridgedMethodAdapter adapter; // The function adapter for the method
   final String methodName;
   final String bridgedClassName;
 
   BridgedSuperMethodCallable(
-      this.superObject, this.adapter, this.methodName, this.bridgedClassName);
+    this.superObject,
+    this.adapter,
+    this.methodName,
+    this.bridgedClassName,
+  );
 
   @override
   RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
@@ -1804,20 +1934,26 @@ class BridgedSuperMethodCallable implements Callable {
   int get arity => 0; // Arity validation is done by the adapter
 
   @override
-  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
-      [Map<String, Object?> namedArguments = const {},
-      List<RuntimeType>? typeArguments]) {
+  Object? call(
+    InterpreterVisitor visitor,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
     try {
       // Call the adapter, passing the stored native super object as the target
       return adapter(visitor, superObject, positionalArguments, namedArguments);
     } on ArgumentError catch (e) {
       throw RuntimeError(
-          "Invalid arguments for bridged superclass method '$bridgedClassName.$methodName': ${e.message}");
+        "Invalid arguments for bridged superclass method '$bridgedClassName.$methodName': ${e.message}",
+      );
     } catch (e, s) {
       Logger.error(
-          "Native exception during call to bridged superclass method '$bridgedClassName.$methodName': $e\n$s");
+        "Native exception during call to bridged superclass method '$bridgedClassName.$methodName': $e\n$s",
+      );
       throw RuntimeError(
-          "Native error in bridged superclass method '$bridgedClassName.$methodName': $e");
+        "Native error in bridged superclass method '$bridgedClassName.$methodName': $e",
+      );
     }
   }
 
@@ -1834,7 +1970,11 @@ class BridgedMixinMethodCallable implements Callable {
   final String bridgedMixinName;
 
   BridgedMixinMethodCallable(
-      this.instance, this.adapter, this.methodName, this.bridgedMixinName);
+    this.instance,
+    this.adapter,
+    this.methodName,
+    this.bridgedMixinName,
+  );
 
   @override
   RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
@@ -1843,9 +1983,12 @@ class BridgedMixinMethodCallable implements Callable {
   int get arity => 0; // Arity validation is done by the adapter
 
   @override
-  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
-      [Map<String, Object?> namedArguments = const {},
-      List<RuntimeType>? typeArguments]) {
+  Object? call(
+    InterpreterVisitor visitor,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
     try {
       // For bridged mixins, we need to create a temporary native-like object
       // or handle the call differently since the adapter expects a native object
@@ -1854,9 +1997,11 @@ class BridgedMixinMethodCallable implements Callable {
       return adapter(visitor, instance, positionalArguments, namedArguments);
     } catch (e, s) {
       Logger.error(
-          "[BridgedMixinMethodCallable] Native exception during call to '$bridgedMixinName.$methodName': $e\n$s");
+        "[BridgedMixinMethodCallable] Native exception during call to '$bridgedMixinName.$methodName': $e\n$s",
+      );
       throw RuntimeError(
-          "Native error in bridged mixin method '$bridgedMixinName.$methodName': $e");
+        "Native error in bridged mixin method '$bridgedMixinName.$methodName': $e",
+      );
     }
   }
 
@@ -1874,7 +2019,11 @@ class BridgedEnumMixinMethodCallable implements Callable {
   final String bridgedMixinName;
 
   BridgedEnumMixinMethodCallable(
-      this.enumValue, this.adapter, this.methodName, this.bridgedMixinName);
+    this.enumValue,
+    this.adapter,
+    this.methodName,
+    this.bridgedMixinName,
+  );
 
   @override
   RuntimeType get callableRuntimeType => FunctionRuntimeType.untyped();
@@ -1883,17 +2032,22 @@ class BridgedEnumMixinMethodCallable implements Callable {
   int get arity => 0; // Arity validation is done by the adapter
 
   @override
-  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
-      [Map<String, Object?> namedArguments = const {},
-      List<RuntimeType>? typeArguments]) {
+  Object? call(
+    InterpreterVisitor visitor,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
     try {
       // Pass the enum value as the target for the adapter
       return adapter(visitor, enumValue, positionalArguments, namedArguments);
     } catch (e, s) {
       Logger.error(
-          "[BridgedEnumMixinMethodCallable] Native exception during call to '$bridgedMixinName.$methodName': $e\n$s");
+        "[BridgedEnumMixinMethodCallable] Native exception during call to '$bridgedMixinName.$methodName': $e\n$s",
+      );
       throw RuntimeError(
-          "Native error in bridged mixin method '$bridgedMixinName.$methodName': $e");
+        "Native error in bridged mixin method '$bridgedMixinName.$methodName': $e",
+      );
     }
   }
 
@@ -1990,12 +2144,16 @@ class InterpretedExtensionType implements Callable, RuntimeType {
   int get arity => 1;
 
   @override
-  Object? call(InterpreterVisitor visitor, List<Object?> positionalArguments,
-      [Map<String, Object?> namedArguments = const {},
-      List<RuntimeType>? typeArguments]) {
+  Object? call(
+    InterpreterVisitor visitor,
+    List<Object?> positionalArguments, [
+    Map<String, Object?> namedArguments = const {},
+    List<RuntimeType>? typeArguments,
+  ]) {
     if (positionalArguments.length != 1) {
       throw RuntimeError(
-          "Extension type '$name' constructor expects exactly 1 argument (the representation value), got ${positionalArguments.length}");
+        "Extension type '$name' constructor expects exactly 1 argument (the representation value), got ${positionalArguments.length}",
+      );
     }
 
     return InterpretedExtensionTypeInstance(
@@ -2044,7 +2202,8 @@ class InterpretedExtensionTypeInstance implements RuntimeValue {
     }
 
     throw RuntimeError(
-        "Undefined property '$name' on extension type '${extensionType.name}'");
+      "Undefined property '$name' on extension type '${extensionType.name}'",
+    );
   }
 
   @override
@@ -2056,10 +2215,12 @@ class InterpretedExtensionTypeInstance implements RuntimeValue {
       // We need a visitor to execute the setter, but it's not available here
       // For now, throw an error - setters on extension types need special handling
       throw RuntimeError(
-          "Setters on extension type '${extensionType.name}' require execution context. Use assignment syntax instead.");
+        "Setters on extension type '${extensionType.name}' require execution context. Use assignment syntax instead.",
+      );
     } else {
       throw RuntimeError(
-          "Cannot set property '$name' on extension type '${extensionType.name}'");
+        "Cannot set property '$name' on extension type '${extensionType.name}'",
+      );
     }
   }
 

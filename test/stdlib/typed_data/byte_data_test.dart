@@ -7,7 +7,8 @@ void main() {
   const String testLibPath = 'd4rt-mem:/byte_data_test.dart';
 
   dynamic executeTestScript(String scriptBody) {
-    final fullScript = '''
+    final fullScript =
+        '''
       import 'dart:typed_data';
       main() {
         $scriptBody
@@ -86,11 +87,12 @@ void main() {
       ''');
       // Native getUint16(0) with default Endian.big will read 0x3412 if bytes are [0x34, 0x12]
       expect(
-          result['valDefaultBig'],
-          (ByteData(2)
-                ..setUint8(0, 0x34)
-                ..setUint8(1, 0x12))
-              .getUint16(0, Endian.big));
+        result['valDefaultBig'],
+        (ByteData(2)
+              ..setUint8(0, 0x34)
+              ..setUint8(1, 0x12))
+            .getUint16(0, Endian.big),
+      );
       expect(result['valLittle'], 0x1234);
       expect(result['byte0'], 0x34);
       expect(result['byte1'], 0x12);

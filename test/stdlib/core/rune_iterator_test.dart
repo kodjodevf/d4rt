@@ -5,7 +5,8 @@ void main() {
   group('RuneIterator stdlib tests', () {
     test('RuneIterator forward and backward iteration', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         main() {
@@ -21,14 +22,16 @@ void main() {
           final prevChar = it.currentAsString;
           return [chars.join(''), lastChar, prevChar];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(['Dart 🎯', '🎯', ' ']));
     });
 
     test('RuneIterator.at constructor and reset', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:core';
 
         main() {
@@ -40,7 +43,8 @@ void main() {
           final firstChar = it.currentAsString;
           return [atChar, firstChar];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(['l', 'H']));
     });

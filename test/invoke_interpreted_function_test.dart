@@ -117,8 +117,10 @@ void main() {
       main() => (squared,applyTwice);
       """;
       final InterpretedRecord tuple = d4rt.execute(source: source);
-      final InterpretedFunction squared = tuple.positionalFields[0] as InterpretedFunction;
-      final InterpretedFunction applyTwice = tuple.positionalFields[1] as InterpretedFunction;
+      final InterpretedFunction squared =
+          tuple.positionalFields[0] as InterpretedFunction;
+      final InterpretedFunction applyTwice =
+          tuple.positionalFields[1] as InterpretedFunction;
 
       final result = d4rt.invokeInterpretedFunction(applyTwice, [2, squared]);
 

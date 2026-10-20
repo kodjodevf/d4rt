@@ -8,10 +8,13 @@ import 'generator_config.dart';
 
 class BridgeGeneratorHandler {
   final _checker = const TypeChecker.fromUrl(
-      'package:d4rt/src/bridge/bridge_annotations.dart#D4rtBridge');
+    'package:d4rt/src/bridge/bridge_annotations.dart#D4rtBridge',
+  );
 
   Future<String?> generateForLibrary(
-      LibraryReader library, BuildStep buildStep) async {
+    LibraryReader library,
+    BuildStep buildStep,
+  ) async {
     final buffer = StringBuffer();
     final sourceCode = await buildStep.readAsString(buildStep.inputId);
 
@@ -45,14 +48,16 @@ class BridgeGeneratorHandler {
       return annotatedElements.any((a) => a.element.name == e.name);
     }).toList();
 
-    final transformed = pipeline.transform(CollectedMetadata(
-      classes: filteredClasses,
-      enums: filteredEnums,
-      functions: metadata.functions,
-      variables: metadata.variables,
-      imports: metadata.imports,
-      sourcePath: buildStep.inputId.path,
-    ));
+    final transformed = pipeline.transform(
+      CollectedMetadata(
+        classes: filteredClasses,
+        enums: filteredEnums,
+        functions: metadata.functions,
+        variables: metadata.variables,
+        imports: metadata.imports,
+        sourcePath: buildStep.inputId.path,
+      ),
+    );
 
     if (transformed.classes.isEmpty && transformed.enums.isEmpty) {
       return null;
@@ -88,7 +93,8 @@ class BridgeGeneratorHandler {
 
     buffer.writeln();
     buffer.writeln(
-        '/// Register all $baseName bridges from this file with the interpreter.');
+      '/// Register all $baseName bridges from this file with the interpreter.',
+    );
     buffer.writeln('void register${pascalName}Bridges(D4rt interpreter) {');
     buffer.writeln("  // ignore: unused_local_variable");
     buffer.writeln("  const defaultUri = '$sourceFileName';");
@@ -100,7 +106,8 @@ class BridgeGeneratorHandler {
       final varName = clsName[0].toLowerCase() + clsName.substring(1);
       final uriStr = libraryUri != null ? "'$libraryUri'" : 'defaultUri';
       buffer.writeln(
-          "  interpreter.registerBridgedClass(${varName}Bridge, $uriStr);");
+        "  interpreter.registerBridgedClass(${varName}Bridge, $uriStr);",
+      );
     }
 
     for (final entry in generatedEnumBridges.entries) {
@@ -109,7 +116,8 @@ class BridgeGeneratorHandler {
       final varName = enmName[0].toLowerCase() + enmName.substring(1);
       final uriStr = libraryUri != null ? "'$libraryUri'" : 'defaultUri';
       buffer.writeln(
-          "  interpreter.registerBridgedEnum(${varName}Bridge, $uriStr);");
+        "  interpreter.registerBridgedEnum(${varName}Bridge, $uriStr);",
+      );
     }
 
     buffer.writeln('}');
@@ -121,17 +129,19 @@ class BridgeGeneratorHandler {
   String _stripBoilerplate(String code) {
     // Basic stripping of generated headers and imports
     final lines = code.split('\n');
-    return lines.where((line) {
-      if (line.trim().isEmpty) return true;
-      if (line.startsWith('///')) {
-        // Keep docs for classes but maybe not the file header
-        if (line.contains('auto-generated')) return false;
-        return true;
-      }
-      if (line.startsWith('import ')) return false;
-      if (line.startsWith('library ')) return false;
-      if (line.startsWith('part ')) return false;
-      return true;
-    }).join('\n');
+    return lines
+        .where((line) {
+          if (line.trim().isEmpty) return true;
+          if (line.startsWith('///')) {
+            // Keep docs for classes but maybe not the file header
+            if (line.contains('auto-generated')) return false;
+            return true;
+          }
+          if (line.startsWith('import ')) return false;
+          if (line.startsWith('library ')) return false;
+          if (line.startsWith('part ')) return false;
+          return true;
+        })
+        .join('\n');
   }
 }

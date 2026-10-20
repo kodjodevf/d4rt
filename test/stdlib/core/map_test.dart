@@ -84,11 +84,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [1, 2],
-            ['one', 'two']
-          ]));
+        execute(source),
+        equals([
+          [1, 2],
+          ['one', 'two'],
+        ]),
+      );
     });
 
     test('update', () {
@@ -167,11 +168,12 @@ void main() {
       final result = execute(source) as List;
       result.sort((a, b) => (a[0] as int).compareTo(b[0] as int));
       expect(
-          result,
-          equals([
-            [1, 'one'],
-            [2, 'two']
-          ]));
+        result,
+        equals([
+          [1, 'one'],
+          [2, 'two'],
+        ]),
+      );
     });
 
     test('cast', () {
@@ -210,11 +212,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            {1: 'one', 2: 'two'},
-            {1: 'one', 2: 'two', 3: 'three'}
-          ]));
+        execute(source),
+        equals([
+          {1: 'one', 2: 'two'},
+          {1: 'one', 2: 'two', 3: 'three'},
+        ]),
+      );
     });
 
     test('fromEntries', () {
@@ -237,7 +240,9 @@ void main() {
       }
       ''';
       expect(
-          execute(source), equals({1: 'Value 1', 2: 'Value 2', 3: 'Value 3'}));
+        execute(source),
+        equals({1: 'Value 1', 2: 'Value 2', 3: 'Value 3'}),
+      );
     });
 
     test('fromIterables', () {

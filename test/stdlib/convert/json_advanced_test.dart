@@ -5,7 +5,9 @@ void main() {
   group('Advanced JSON Encoding & Decoding stdlib tests', () {
     test('JsonEncoder.withIndent formats multiline indented json', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:convert';
 
         main() {
@@ -14,15 +16,21 @@ void main() {
           final indented4 = JsonEncoder.withIndent('    ').convert(data);
           return [indented.contains('\\n  "name"'), indented4.contains('\\n    "version"')];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], isTrue);
       expect(result[1], isTrue);
     });
 
-    test('jsonEncode automatically serializes InterpretedInstance with toJson() method', () {
-      final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+    test(
+      'jsonEncode automatically serializes InterpretedInstance with toJson() method',
+      () {
+        final d4rt = D4rt();
+        final result =
+            d4rt.execute(
+                  source: '''
         import 'dart:convert';
 
         class User {
@@ -39,15 +47,19 @@ void main() {
           final decoded = jsonDecode(jsonStr);
           return [decoded['name'], decoded['age']];
         }
-      ''') as List;
+      ''',
+                )
+                as List;
 
-      expect(result[0], equals('Alice'));
-      expect(result[1], equals(30));
-    });
+        expect(result[0], equals('Alice'));
+        expect(result[1], equals(30));
+      },
+    );
 
     test('jsonDecode with reviver converts values', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:convert';
 
         main() {
@@ -58,7 +70,8 @@ void main() {
           });
           return decoded['count'];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(20));
     });

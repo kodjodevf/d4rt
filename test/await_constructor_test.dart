@@ -5,9 +5,10 @@ dynamic execute(String source, {List<Object?>? args}) {
   final d4rt = D4rt();
   d4rt.setDebug(false);
   return d4rt.execute(
-      library: 'package:test/main.dart',
-      positionalArgs: args,
-      sources: {'package:test/main.dart': source});
+    library: 'package:test/main.dart',
+    positionalArgs: args,
+    sources: {'package:test/main.dart': source},
+  );
 }
 
 void main() {
@@ -104,8 +105,10 @@ void main() {
       ''';
 
       final result = await execute(code);
-      expect(result,
-          equals(["localhost:5432", true, "validated-remote-validated"]));
+      expect(
+        result,
+        equals(["localhost:5432", true, "validated-remote-validated"]),
+      );
     });
 
     test('Factory constructor with complex async initialization', () async {
@@ -161,12 +164,13 @@ void main() {
       expect(result, isA<Map>());
       final resultMap = result as Map;
       expect(
-          resultMap["config"],
-          equals({
-            "env": "prod",
-            "version": "1.0",
-            "modules": "auth,database,cache"
-          }));
+        resultMap["config"],
+        equals({
+          "env": "prod",
+          "version": "1.0",
+          "modules": "auth,database,cache",
+        }),
+      );
       expect(resultMap["modules"], equals(["auth", "database", "cache"]));
     });
 
@@ -200,11 +204,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ["item1", "item2", "item3"],
-            "Processed 3 items"
-          ]));
+        result,
+        equals([
+          ["item1", "item2", "item3"],
+          "Processed 3 items",
+        ]),
+      );
     });
 
     test('Stream subscription async constructor pattern', () async {
@@ -236,11 +241,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ["event1", "event2", "event3"],
-            3
-          ]));
+        result,
+        equals([
+          ["event1", "event2", "event3"],
+          3,
+        ]),
+      );
     });
 
     test('Stream transformation async constructor pattern', () async {
@@ -279,11 +285,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            [6, 8, 10], // 3*2=6, 4*2=8, 5*2=10 (all > 5)
-            8.0 // (6+8+10)/3 = 8.0
-          ]));
+        result,
+        equals([
+          [6, 8, 10], // 3*2=6, 4*2=8, 5*2=10 (all > 5)
+          8.0, // (6+8+10)/3 = 8.0
+        ]),
+      );
     });
 
     test('Complex stream async constructor with error handling', () async {
@@ -344,12 +351,13 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ["processed-good1", "processed-good2", "processed-good3"],
-            ["Error: Exception: Processing failed for error"],
-            true
-          ]));
+        result,
+        equals([
+          ["processed-good1", "processed-good2", "processed-good3"],
+          ["Error: Exception: Processing failed for error"],
+          true,
+        ]),
+      );
     });
 
     test('Stream controller async constructor pattern', () async {
@@ -446,11 +454,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ["data1", "data2", "data3"],
-            true
-          ]));
+        result,
+        equals([
+          ["data1", "data2", "data3"],
+          true,
+        ]),
+      );
     });
 
     test('Stream periodic constructor pattern', () async {
@@ -485,11 +494,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            [0, 2, 4, 6], // count * 2 for count = 0, 1, 2, 3
-            4
-          ]));
+        result,
+        equals([
+          [0, 2, 4, 6], // count * 2 for count = 0, 1, 2, 3
+          4,
+        ]),
+      );
     });
 
     test('Stream broadcast async constructor pattern', () async {
@@ -533,12 +543,13 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ["L1:broadcast1", "L1:broadcast2"],
-            ["L2:broadcast1", "L2:broadcast2"],
-            true
-          ]));
+        result,
+        equals([
+          ["L1:broadcast1", "L1:broadcast2"],
+          ["L2:broadcast1", "L2:broadcast2"],
+          true,
+        ]),
+      );
     });
 
     test('Stream from Future async constructor pattern', () async {
@@ -608,11 +619,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            ["async1", "async2", "async3"],
-            3
-          ]));
+        result,
+        equals([
+          ["async1", "async2", "async3"],
+          3,
+        ]),
+      );
     });
 
     test('Sync generator (sync*) constructor pattern', () async {
@@ -648,11 +660,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            [1, 2, 3, 4],
-            10
-          ]));
+        result,
+        equals([
+          [1, 2, 3, 4],
+          10,
+        ]),
+      );
     });
 
     test('Generator with yield* constructor pattern', () async {
@@ -693,18 +706,19 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            [
-              "direct1",
-              "from_iterable1",
-              "from_iterable2",
-              "direct2",
-              "sub1",
-              "sub2"
-            ],
-            "Combined 6 items"
-          ]));
+        result,
+        equals([
+          [
+            "direct1",
+            "from_iterable1",
+            "from_iterable2",
+            "direct2",
+            "sub1",
+            "sub2",
+          ],
+          "Combined 6 items",
+        ]),
+      );
     });
 
     test('Await for loop with stream processing pattern', () async {
@@ -749,11 +763,12 @@ void main() {
 
       final result = await execute(code);
       expect(
-          result,
-          equals([
-            150, // 10 + 20 + 30 + 40 + 50
-            5
-          ]));
+        result,
+        equals([
+          150, // 10 + 20 + 30 + 40 + 50
+          5,
+        ]),
+      );
     });
   });
 }

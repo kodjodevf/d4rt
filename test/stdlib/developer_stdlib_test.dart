@@ -5,7 +5,8 @@ void main() {
   group('dart:developer stdlib tests', () {
     test('log, inspect, and debugger functions', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:developer';
 
         main() {
@@ -15,14 +16,16 @@ void main() {
           final debugResult = debugger(when: false);
           return [inspected != null, debugResult];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([true, false]));
     });
 
     test('Timeline and TimelineTask', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:developer';
 
         main() {
@@ -41,14 +44,16 @@ void main() {
 
           return [now > 0, syncVal];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([true, 42]));
     });
 
     test('UserTag', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:developer';
 
         main() {
@@ -57,14 +62,16 @@ void main() {
           final defaultTag = UserTag.defaultTag;
           return [tag.label, defaultTag.label];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(['worker', 'Default']));
     });
 
     test('ServiceExtensionResponse and Service.getInfo', () async {
       final d4rt = D4rt();
-      final result = await d4rt.execute(source: '''
+      final result = await d4rt.execute(
+        source: '''
         import 'dart:developer';
 
         main() async {
@@ -73,7 +80,8 @@ void main() {
           final serviceInfo = await Service.getInfo();
           return [successResp.result, errorResp.errorCode, errorResp.errorDetail, serviceInfo != null];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals(['{"ok": true}', -32000, 'Internal error', true]));
     });

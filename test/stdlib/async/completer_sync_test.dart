@@ -5,7 +5,8 @@ void main() {
   group('Completer.sync stdlib tests', () {
     test('Completer.sync instantiation and completion', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result = d4rt.execute(
+        source: '''
         import 'dart:async';
 
         main() {
@@ -13,7 +14,8 @@ void main() {
           completer.complete('sync value');
           return [completer.isCompleted, completer.future is Future];
         }
-      ''');
+      ''',
+      );
 
       expect(result, equals([true, true]));
     });

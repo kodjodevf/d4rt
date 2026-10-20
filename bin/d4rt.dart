@@ -18,7 +18,9 @@ void main(List<String> args) async {
   final filteredArgs = args.where((arg) => arg != '--debug').toList();
 
   // Check for --eval / -e
-  final evalIndex = filteredArgs.indexWhere((arg) => arg == '-e' || arg == '--eval');
+  final evalIndex = filteredArgs.indexWhere(
+    (arg) => arg == '-e' || arg == '--eval',
+  );
   if (evalIndex >= 0) {
     if (evalIndex + 1 >= filteredArgs.length) {
       stderr.writeln('Error: -e/--eval requires a code string argument.');
@@ -31,7 +33,9 @@ void main(List<String> args) async {
   }
 
   // Check for --introspection / -i
-  final introIndex = filteredArgs.indexWhere((arg) => arg == '-i' || arg == '--introspection');
+  final introIndex = filteredArgs.indexWhere(
+    (arg) => arg == '-i' || arg == '--introspection',
+  );
   if (introIndex >= 0) {
     if (introIndex + 1 >= filteredArgs.length) {
       stderr.writeln('Error: -i/--introspection requires a Dart file path.');

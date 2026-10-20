@@ -67,11 +67,12 @@ void main() {
       }
       ''';
       expect(
-          execute(source),
-          equals([
-            [5, 5, 5, 10],
-            null
-          ]));
+        execute(source),
+        equals([
+          [5, 5, 5, 10],
+          null,
+        ]),
+      );
     });
 
     test('Rectangle toString', () {

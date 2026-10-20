@@ -55,7 +55,9 @@ class PrecompiledScript {
 
   @override
   String toString() {
-    final target = uri?.toString() ?? (source != null ? 'source (${source!.length} chars)' : 'compiled AST');
+    final target =
+        uri?.toString() ??
+        (source != null ? 'source (${source!.length} chars)' : 'compiled AST');
     return 'PrecompiledScript($target, declarations: $declarationCount, directives: $directiveCount)';
   }
 }

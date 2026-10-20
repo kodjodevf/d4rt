@@ -5,7 +5,9 @@ void main() {
   group('MapView and collection views stdlib tests', () {
     test('MapView delegates read and write operations', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:collection';
 
         main() {
@@ -14,7 +16,9 @@ void main() {
           view['c'] = 3;
           return [view.length, view['a'], underlying['c'], view.containsKey('b')];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(3));
       expect(result[1], equals(1));
@@ -24,7 +28,9 @@ void main() {
 
     test('LinkedHashSet creation, mutation, and is-checks', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:collection';
 
         main() {
@@ -36,7 +42,9 @@ void main() {
           final isLinkedHashSet = set1 is LinkedHashSet;
           return [set1.length, set1.contains(2), unionSet.length, isSet, isLinkedHashSet];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(4));
       expect(result[1], isTrue);
@@ -47,7 +55,9 @@ void main() {
 
     test('UnmodifiableSetView wraps and exposes set contents', () {
       final d4rt = D4rt();
-      final result = d4rt.execute(source: '''
+      final result =
+          d4rt.execute(
+                source: '''
         import 'dart:collection';
 
         main() {
@@ -55,7 +65,9 @@ void main() {
           final view = UnmodifiableSetView(underlying);
           return [view.length, view.contains(20), view.contains(99)];
         }
-      ''') as List;
+      ''',
+              )
+              as List;
 
       expect(result[0], equals(3));
       expect(result[1], isTrue);

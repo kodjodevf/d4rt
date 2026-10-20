@@ -21,15 +21,18 @@ bool fileUriExistsSync(Uri fileUri) {
 
 String readFileUriAsStringSync(Uri fileUri) {
   throw UnsupportedError(
-      'Filesystem access is not available on this platform.');
+    'Filesystem access is not available on this platform.',
+  );
 }
 
 String normalizeFilesystemPath(String path) {
   return p.normalize(p.absolute(path)).replaceAll('\\', '/');
 }
 
-String basePathEntryFilePath(String basePath,
-    {String entryFile = 'main.dart'}) {
+String basePathEntryFilePath(
+  String basePath, {
+  String entryFile = 'main.dart',
+}) {
   return p.normalize(p.absolute(basePath, entryFile));
 }
 

@@ -166,6 +166,9 @@ class AsyncSuspensionRequest {
   /// [future] The Future that the interpreter should wait for.
   /// [asyncState] The current execution state that will be resumed after the Future completes.
   /// [isYieldSuspension] Whether this suspension is from a yield statement.
-  AsyncSuspensionRequest(this.future, this.asyncState,
-      {this.isYieldSuspension = false});
+  AsyncSuspensionRequest(
+    this.future,
+    this.asyncState, {
+    this.isYieldSuspension = false,
+  });
 }

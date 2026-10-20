@@ -31,7 +31,9 @@ void main() {
         // No adapters for the simple enum initially
       );
       interpreter.registerBridgedEnum(
-          colorDefinition, 'package:test/color.dart');
+        colorDefinition,
+        'package:test/color.dart',
+      );
     });
 
     test('Register and access bridged enum value', () {
@@ -131,59 +133,78 @@ void main() {
         },
         methods: {
           // Adapter for the 'multiply' method
-          'multiply': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (target is ComplexEnum &&
-                positionalArgs.length == 1 &&
-                positionalArgs[0] is int) {
-              final factor = positionalArgs[0] as int;
-              return target.multiply(factor); // Calls the native method
-            }
-            // Provide a more specific error message
-            String errorDetails;
-            if (target is! ComplexEnum) {
-              errorDetails =
-                  'Target is not ComplexEnum (${target.runtimeType})';
-            } else if (positionalArgs.length != 1) {
-              errorDetails =
-                  'Expected 1 argument, got ${positionalArgs.length}';
-            } else {
-              errorDetails =
-                  'Argument must be an integer, got ${positionalArgs[0]?.runtimeType}';
-            }
-            throw ArgumentError(
-                'Invalid arguments for multiply: $errorDetails');
-          },
+          'multiply':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (target is ComplexEnum &&
+                    positionalArgs.length == 1 &&
+                    positionalArgs[0] is int) {
+                  final factor = positionalArgs[0] as int;
+                  return target.multiply(factor); // Calls the native method
+                }
+                // Provide a more specific error message
+                String errorDetails;
+                if (target is! ComplexEnum) {
+                  errorDetails =
+                      'Target is not ComplexEnum (${target.runtimeType})';
+                } else if (positionalArgs.length != 1) {
+                  errorDetails =
+                      'Expected 1 argument, got ${positionalArgs.length}';
+                } else {
+                  errorDetails =
+                      'Argument must be an integer, got ${positionalArgs[0]?.runtimeType}';
+                }
+                throw ArgumentError(
+                  'Invalid arguments for multiply: $errorDetails',
+                );
+              },
           // Adapter for the 'isItemA' method
-          'isItemA': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (target is ComplexEnum &&
-                positionalArgs.isEmpty &&
-                namedArgs.isEmpty) {
-              return target.isItemA(); // Calls the native method
-            }
-            throw ArgumentError(
-                'Invalid arguments for isItemA: Expected 0 arguments');
-          },
+          'isItemA':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (target is ComplexEnum &&
+                    positionalArgs.isEmpty &&
+                    namedArgs.isEmpty) {
+                  return target.isItemA(); // Calls the native method
+                }
+                throw ArgumentError(
+                  'Invalid arguments for isItemA: Expected 0 arguments',
+                );
+              },
           // Adapter for 'toString'
           // This adapter will be used by invoke() if we do item.toString()
-          'toString': (InterpreterVisitor visitor, Object target,
-              List<Object?> positionalArgs, Map<String, Object?> namedArgs) {
-            if (target is ComplexEnum &&
-                positionalArgs.isEmpty &&
-                namedArgs.isEmpty) {
-              // We could return target.toString() if the native enum overrides it,
-              // but for consistency with simple enums, let's return the bridged name.
-              return 'MyComplexEnum.${target.name}';
-            }
-            throw ArgumentError('Invalid arguments for toString');
-          },
+          'toString':
+              (
+                InterpreterVisitor visitor,
+                Object target,
+                List<Object?> positionalArgs,
+                Map<String, Object?> namedArgs,
+              ) {
+                if (target is ComplexEnum &&
+                    positionalArgs.isEmpty &&
+                    namedArgs.isEmpty) {
+                  // We could return target.toString() if the native enum overrides it,
+                  // but for consistency with simple enums, let's return the bridged name.
+                  return 'MyComplexEnum.${target.name}';
+                }
+                throw ArgumentError('Invalid arguments for toString');
+              },
         },
       );
 
       // Register the complex definition
       interpreter.registerBridgedEnum(
-          complexEnumDefinition, 'package:test/complex_enum.dart');
+        complexEnumDefinition,
+        'package:test/complex_enum.dart',
+      );
     });
 
     test('Access complex enum value', () {
@@ -282,9 +303,15 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains('Method "nonExistentMethod" not found'))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('Method "nonExistentMethod" not found'),
+          ),
+        ),
+      );
     });
 
     test('Error on accessing non-existent property', () {
@@ -296,9 +323,15 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains('Property "nonExistentProp" not found'))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('Property "nonExistentProp" not found'),
+          ),
+        ),
+      );
     });
 
     test('Error on calling method with wrong arguments', () {
@@ -310,9 +343,15 @@ void main() {
          }
        ''';
       expect(
-          () => interpreter.execute(source: code),
-          throwsA(isA<RuntimeError>().having((e) => e.message, 'message',
-              contains('Error executing bridged method "multiply"'))));
+        () => interpreter.execute(source: code),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('Error executing bridged method "multiply"'),
+          ),
+        ),
+      );
     });
   });
 }
