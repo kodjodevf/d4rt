@@ -927,10 +927,19 @@ class FileIo {
           file.path,
           operation: 'watch file',
         );
-        return file.watch(
-          events: namedArgs['events'] as int? ?? FileSystemEvent.all,
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        return file
+            .watch(
+              events: namedArgs['events'] as int? ?? FileSystemEvent.all,
+              recursive: namedArgs['recursive'] as bool? ?? false,
+            )
+            .map((event) {
+              checkFilesystemReadPermission(
+                visitor,
+                event.path,
+                operation: 'watch file',
+              );
+              return event;
+            });
       })(),
       'toString': (visitor, target, positionalArgs, namedArgs) =>
           (target as File).toString(),

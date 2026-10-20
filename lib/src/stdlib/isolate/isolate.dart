@@ -89,7 +89,7 @@ class IsolateIsolate {
         throw RuntimeError('Isolate.spawn not fully implemented in D4rt');
       },
       'spawnUri': (visitor, positionalArgs, namedArgs) {
-        checkIsolateSpawnPermission(visitor);
+        checkIsolateSpawnUriPermission(visitor);
         final uri = positionalArgs[0] as Uri;
         final args = positionalArgs[1] as List<String>;
         final message = positionalArgs[2];

@@ -284,10 +284,19 @@ class FileSystemEntityIo {
           entity.path,
           operation: 'watch entity',
         );
-        return entity.watch(
-          events: namedArgs['events'] as int? ?? FileSystemEvent.all,
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        return entity
+            .watch(
+              events: namedArgs['events'] as int? ?? FileSystemEvent.all,
+              recursive: namedArgs['recursive'] as bool? ?? false,
+            )
+            .map((event) {
+              checkFilesystemReadPermission(
+                visitor,
+                event.path,
+                operation: 'watch entity',
+              );
+              return event;
+            });
       },
       'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;

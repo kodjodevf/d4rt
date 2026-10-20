@@ -5,15 +5,18 @@
     to prevent symlink escapes. Scoped network and process permissions fail closed
     when host, port, command or arguments are missing. Isolate spawning and
     communication enforce their respective capabilities at runtime.
+    `Isolate.spawnUri` also requires `DangerousPermission.codeEvaluation`
+    because it executes native Dart code outside the interpreter sandbox.
   - Added permission checks to HTTP, socket, DNS, server bind and UDP send
     operations. Scoped network permissions disable transparent HTTP redirects,
     and explicit redirect destinations and HTTP proxy endpoints are checked
     before use.
     `Process.run`/`start`/`runSync` now enforce command and argument scopes
-    instead of only checking for a generic process permission. Directory
-    listings and link resolution also validate every emitted or resolved path,
-    and link creation checks its target, preventing symlink escapes and symlink
-    planting.
+    instead of only checking for a generic process permission, and
+    `ProcessSignal.watch` requires unrestricted process permission. Directory
+    listings, watch events, temporary-directory prefixes and link resolution
+    also validate every emitted, created or resolved path, and link creation
+    checks its target, preventing symlink escapes and path traversal.
   - `D4rt.eval()` now requires `DangerousPermission.codeEvaluation`.
   - Importing `dart:developer` now requires
     `DangerousPermission.developerTools`; every developer bridge operation,

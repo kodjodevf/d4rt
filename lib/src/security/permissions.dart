@@ -362,6 +362,10 @@ class NetworkPermission extends Permission {
 }
 
 /// Process permissions control process execution.
+///
+/// Running a process is equivalent to host code execution: the child process
+/// is not constrained by D4rt filesystem or network permissions. Command and
+/// argument scoping only limits which process is started, not what it can do.
 class ProcessRunPermission extends Permission {
   @override
   final String type = 'process';
@@ -520,7 +524,8 @@ class DangerousPermission extends Permission {
 
   DangerousPermission._(this._operation);
 
-  /// Allows evaluation of arbitrary code strings (eval-like functionality).
+  /// Allows evaluation of arbitrary code, including `D4rt.eval()` and
+  /// `Isolate.spawnUri`.
   static final DangerousPermission codeEvaluation = DangerousPermission._(
     'code evaluation',
   );

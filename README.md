@@ -306,20 +306,28 @@ void main() {
   - `IsolatePermission.communicate` - Allow sending and receiving messages
   - `IsolatePermission.any` - Allow all isolate operations
 
+  `Isolate.spawnUri` also requires `DangerousPermission.codeEvaluation`,
+  because it runs native Dart code outside the interpreter sandbox.
+
 - **`DangerousPermission`**: Controls operations that can escape the sandbox
-  - `DangerousPermission.codeEvaluation` - Required by `D4rt.eval()`
+  - `DangerousPermission.codeEvaluation` - Required by `D4rt.eval()` and
+    `Isolate.spawnUri`
   - `DangerousPermission.developerTools` - Required to import `dart:developer`
   - `DangerousPermission.any` - Allow every dangerous operation
 
 All scoped permissions fail closed: a host-only rule does not authorize a
 connection without a host, and a port-specific rule requires the actual port.
 Filesystem scopes are canonicalized, so symlinks cannot be used to escape a
-`readPath`/`writePath` boundary, including through recursive directory listings
-and link resolution. Creating or updating a symlink also requires write access
-to its target.
+`readPath`/`writePath` boundary, including through recursive directory listings,
+filesystem watch events, temporary-directory prefixes and link resolution.
+Creating or updating a symlink also requires write access to its target.
 Scoped network permissions disable transparent HTTP redirects; follow redirects
 manually so every destination is checked. HTTP proxy endpoints returned by
-`findProxy` are also checked against the network permission scope.
+`findProxy` are also checked against the network permission scope. Watching
+host process signals requires `ProcessRunPermission.any` rather than a
+command-scoped process permission. Running a child process is equivalent to
+host code execution: command and argument scoping does not sandbox the child's
+filesystem or network access.
 
 ### Permission Management
 

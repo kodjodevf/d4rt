@@ -228,6 +228,20 @@ class ProcessResultIo {
   );
 }
 
+/// Watching host process signals is a process-wide capability. A permission
+/// scoped to a specific command must not grant it.
+void _checkProcessSignalPermission(InterpreterVisitor visitor) {
+  final d4rt = visitor.moduleLoader.d4rt;
+  if (d4rt == null) return;
+
+  if (!d4rt.checkPermission({'type': 'process'})) {
+    throw RuntimeError(
+      'Process signal handling denied. '
+      'Grant ProcessRunPermission.any to watch host process signals.',
+    );
+  }
+}
+
 /// Bridged implementation of ProcessSignal
 class ProcessSignalIo {
   static BridgedClass get definition => BridgedClass(
@@ -271,8 +285,10 @@ class ProcessSignalIo {
       'hashCode': (visitor, target) => (target as ProcessSignal).hashCode,
     },
     methods: {
-      'watch': (visitor, target, positionalArgs, namedArgs) =>
-          (target as ProcessSignal).watch(),
+      'watch': (visitor, target, positionalArgs, namedArgs) {
+        _checkProcessSignalPermission(visitor);
+        return (target as ProcessSignal).watch();
+      },
       'toString': (visitor, target, positionalArgs, namedArgs) =>
           (target as ProcessSignal).toString(),
     },

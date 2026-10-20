@@ -279,6 +279,54 @@ void main() {
     );
   });
 
+  group('Host capability enforcement', () {
+    test('Isolate.spawnUri requires dangerous code evaluation permission', () {
+      final d4rt = D4rt()..grant(IsolatePermission.any);
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:isolate';
+          void main() {
+            Isolate.spawnUri(Uri.file('/tmp/d4rt-missing.dart'), [], null);
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('DangerousPermission.codeEvaluation'),
+          ),
+        ),
+      );
+    });
+
+    test('ProcessSignal.watch requires unrestricted process permission', () {
+      final d4rt = D4rt()
+        ..grant(FilesystemPermission.read)
+        ..grant(ProcessRunPermission.command('echo'));
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:io';
+          void main() {
+            ProcessSignal.sigint.watch();
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('Process signal handling denied'),
+          ),
+        ),
+      );
+    });
+  });
+
   group('Filesystem canonicalization', () {
     test('symlinks cannot escape a readPath scope', () {
       final root = io.Directory.systemTemp.createTempSync('d4rt-symlink-');
@@ -421,6 +469,48 @@ void main() {
             ),
           ),
         );
+      } finally {
+        if (outside.existsSync()) outside.deleteSync(recursive: true);
+        if (allowed.existsSync()) allowed.deleteSync(recursive: true);
+        if (root.existsSync()) root.deleteSync(recursive: true);
+      }
+    });
+
+    test('temporary directory prefixes cannot escape a write scope', () {
+      final root = io.Directory.systemTemp.createTempSync('d4rt-temp-');
+      final allowed = io.Directory(p.join(root.path, 'allowed'))..createSync();
+      final outside = io.Directory(p.join(root.path, 'outside'))..createSync();
+
+      try {
+        final d4rt = D4rt()
+          ..grant(FilesystemPermission.writePath(allowed.path));
+
+        for (final prefix in [
+          '../outside/escape',
+          p.join(outside.path, 'absolute'),
+        ]) {
+          expect(
+            () => d4rt.execute(
+              source:
+                  '''
+              import 'dart:io';
+              void main() {
+                Directory(${_dartString(allowed.path)}).createTempSync(
+                  ${_dartString(prefix)},
+                );
+              }
+            ''',
+            ),
+            throwsA(
+              isA<RuntimeError>().having(
+                (e) => e.message,
+                'message',
+                contains('Filesystem permission denied'),
+              ),
+            ),
+          );
+        }
+        expect(outside.listSync(), isEmpty);
       } finally {
         if (outside.existsSync()) outside.deleteSync(recursive: true);
         if (allowed.existsSync()) allowed.deleteSync(recursive: true);

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
+import 'package:path/path.dart' as p;
 
 import 'filesystem_permission_helper.dart';
 
@@ -206,10 +207,19 @@ class DirectoryIo {
           directory.path,
           operation: 'watch directory',
         );
-        return directory.watch(
-          events: namedArgs['events'] as int? ?? FileSystemEvent.all,
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        return directory
+            .watch(
+              events: namedArgs['events'] as int? ?? FileSystemEvent.all,
+              recursive: namedArgs['recursive'] as bool? ?? false,
+            )
+            .map((event) {
+              checkFilesystemReadPermission(
+                visitor,
+                event.path,
+                operation: 'watch directory',
+              );
+              return event;
+            });
       },
       'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
@@ -236,6 +246,7 @@ class DirectoryIo {
           directory.path,
           operation: 'create temporary directory',
         );
+        _checkTemporaryDirectoryPrefix(visitor, directory, positionalArgs);
         return directory.createTemp(
           positionalArgs.isNotEmpty ? positionalArgs[0] as String? : null,
         );
@@ -247,6 +258,7 @@ class DirectoryIo {
           directory.path,
           operation: 'create temporary directory',
         );
+        _checkTemporaryDirectoryPrefix(visitor, directory, positionalArgs);
         return directory.createTempSync(
           positionalArgs.isNotEmpty ? positionalArgs[0] as String? : null,
         );
@@ -308,5 +320,28 @@ class DirectoryIo {
         return;
       },
     },
+  );
+}
+
+/// `Directory.createTemp` treats its prefix as a relative path, including
+/// `..` components. Validate the resulting location so a scoped write cannot
+/// escape its directory through the prefix.
+void _checkTemporaryDirectoryPrefix(
+  InterpreterVisitor visitor,
+  Directory directory,
+  List<Object?> positionalArgs,
+) {
+  if (positionalArgs.isEmpty) return;
+
+  final prefix = positionalArgs[0];
+  if (prefix is! String || prefix.isEmpty) return;
+
+  final candidate = p.isAbsolute(prefix)
+      ? prefix
+      : p.join(directory.path, prefix);
+  checkFilesystemWritePermission(
+    visitor,
+    candidate,
+    operation: 'create temporary directory',
   );
 }
