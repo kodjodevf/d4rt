@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 void main() {
   group('dart:developer stdlib tests', () {
     test('log, inspect, and debugger functions', () {
-      final d4rt = D4rt();
+      final d4rt = D4rt()..grant(DangerousPermission.developerTools);
       final result = d4rt.execute(
         source: '''
         import 'dart:developer';
@@ -23,7 +23,7 @@ void main() {
     });
 
     test('Timeline and TimelineTask', () {
-      final d4rt = D4rt();
+      final d4rt = D4rt()..grant(DangerousPermission.developerTools);
       final result = d4rt.execute(
         source: '''
         import 'dart:developer';
@@ -51,7 +51,7 @@ void main() {
     });
 
     test('UserTag', () {
-      final d4rt = D4rt();
+      final d4rt = D4rt()..grant(DangerousPermission.developerTools);
       final result = d4rt.execute(
         source: '''
         import 'dart:developer';
@@ -69,7 +69,7 @@ void main() {
     });
 
     test('ServiceExtensionResponse and Service.getInfo', () async {
-      final d4rt = D4rt();
+      final d4rt = D4rt()..grant(DangerousPermission.developerTools);
       final result = await d4rt.execute(
         source: '''
         import 'dart:developer';

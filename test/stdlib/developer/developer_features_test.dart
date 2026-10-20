@@ -6,7 +6,7 @@ void main() {
     late D4rt d4rt;
 
     setUp(() {
-      d4rt = D4rt();
+      d4rt = D4rt()..grant(DangerousPermission.developerTools);
     });
 
     test('Flow bridge and operations', () {

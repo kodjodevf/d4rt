@@ -204,6 +204,37 @@ void main() {
       );
     });
 
+    test('HTTP proxy endpoints require network permission', () async {
+      final d4rt = D4rt()
+        ..grant(FilesystemPermission.any)
+        ..grant(NetworkPermission.connectTo('example.com'));
+
+      await expectLater(
+        Future(
+          () => d4rt.execute(
+            source: '''
+            import 'dart:io';
+            Future<void> main() async {
+              final client = HttpClient();
+              client.findProxy = (uri) => 'PROXY 127.0.0.1:18080';
+              final request = await client.getUrl(
+                Uri.parse('http://example.com/'),
+              );
+              await request.close();
+            }
+          ''',
+          ),
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('connect to proxy'),
+          ),
+        ),
+      );
+    });
+
     test('scoped network permissions disable transparent redirects', () async {
       final d4rt = D4rt()
         ..grant(FilesystemPermission.any)
@@ -415,6 +446,39 @@ void main() {
 
       d4rt.grant(DangerousPermission.codeEvaluation);
       expect(d4rt.eval('1 + 1'), equals(2));
+    });
+
+    test('dart:developer requires DangerousPermission.developerTools', () {
+      final d4rt = D4rt();
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:developer';
+          void main() {}
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('DangerousPermission.developerTools'),
+          ),
+        ),
+      );
+
+      d4rt.grant(DangerousPermission.developerTools);
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:developer';
+          void main() {
+            debugger(when: false);
+          }
+        ''',
+        ),
+        returnsNormally,
+      );
     });
 
     test('missing modules are rejected even when other bridges exist', () {

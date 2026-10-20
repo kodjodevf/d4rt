@@ -306,6 +306,7 @@ void main() {
 
 - **`DangerousPermission`**: Controls operations that can escape the sandbox
   - `DangerousPermission.codeEvaluation` - Required by `D4rt.eval()`
+  - `DangerousPermission.developerTools` - Required to import `dart:developer`
   - `DangerousPermission.any` - Allow every dangerous operation
 
 All scoped permissions fail closed: a host-only rule does not authorize a
@@ -313,7 +314,8 @@ connection without a host, and a port-specific rule requires the actual port.
 Filesystem scopes are canonicalized, so symlinks cannot be used to escape a
 `readPath`/`writePath` boundary, including through recursive directory listings.
 Scoped network permissions disable transparent HTTP redirects; follow redirects
-manually so every destination is checked.
+manually so every destination is checked. HTTP proxy endpoints returned by
+`findProxy` are also checked against the network permission scope.
 
 ### Permission Management
 
@@ -566,7 +568,7 @@ class User { ... }
 | Operator overloading           | ✅ Full support                    |
 | FFI                            | 🚫 Not supported                                                               |
 | Isolates (`dart:isolate`)      | ✅ Full support                                                               |
-| Developer (`dart:developer`)   | ✅ Full support (Timeline, UserTag, Service, log, debugger, inspect)           |
+| Developer (`dart:developer`)   | ✅ Full support, requires `DangerousPermission.developerTools`                 |
 | Reflection/Mirrors             | 🚫 Not supported                                                               |
 | Records                        | ✅ Supported (positional, named, pattern matching)                             |
 | String interpolation           | ✅ Supported                                                                   |

@@ -386,7 +386,13 @@ class HttpClientIo {
               );
             }
             final result = callback.call(visitor, [url]);
-            return result as String;
+            if (result is! String) {
+              throw RuntimeError(
+                'HttpClient.findProxy callback must return a String.',
+              );
+            }
+            checkNetworkProxyPermission(visitor, result);
+            return result;
           };
         } else {
           (target as HttpClient).findProxy = null;

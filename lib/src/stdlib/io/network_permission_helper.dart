@@ -4,15 +4,82 @@ import 'package:d4rt/d4rt.dart';
 void checkNetworkConnectPermission(
   InterpreterVisitor visitor,
   Object? host,
-  int port,
-) {
+  int port, {
+  String action = 'connect to',
+}) {
   _checkNetworkPermission(
     visitor,
     host: host?.toString(),
     port: port,
     connect: true,
-    action: 'connect to',
+    action: action,
   );
+}
+
+/// Requires permission for every proxy endpoint returned by a `findProxy`
+/// callback. Rules are semicolon-separated and `DIRECT` needs no proxy access.
+void checkNetworkProxyPermission(
+  InterpreterVisitor visitor,
+  String proxyRules,
+) {
+  final rules = proxyRules.trim();
+  if (rules.isEmpty) return;
+
+  for (final rawRule in rules.split(';')) {
+    final rule = rawRule.trim();
+    if (rule.isEmpty) continue;
+    if (rule.toUpperCase() == 'DIRECT') continue;
+
+    final parts = rule.split(RegExp(r'\s+'));
+    if (parts.length != 2) {
+      throw RuntimeError(
+        'Invalid HTTP proxy rule "$rule". Expected "DIRECT" or '
+        '"PROXY host:port".',
+      );
+    }
+
+    final endpoint = _parseProxyEndpoint(parts[1]);
+    if (endpoint == null) {
+      throw RuntimeError(
+        'Invalid HTTP proxy endpoint "${parts[1]}". Expected host:port.',
+      );
+    }
+
+    checkNetworkConnectPermission(
+      visitor,
+      endpoint.host,
+      endpoint.port,
+      action: 'connect to proxy',
+    );
+  }
+}
+
+({String host, int port})? _parseProxyEndpoint(String endpoint) {
+  String host;
+  String portText;
+
+  if (endpoint.startsWith('[')) {
+    final closingBracket = endpoint.indexOf(']');
+    if (closingBracket <= 1 ||
+        closingBracket + 1 >= endpoint.length ||
+        endpoint[closingBracket + 1] != ':') {
+      return null;
+    }
+    host = endpoint.substring(1, closingBracket);
+    portText = endpoint.substring(closingBracket + 2);
+  } else {
+    final separator = endpoint.lastIndexOf(':');
+    if (separator <= 0 || separator == endpoint.length - 1) return null;
+    host = endpoint.substring(0, separator);
+    if (host.contains(':')) return null;
+    portText = endpoint.substring(separator + 1);
+  }
+
+  final port = int.tryParse(portText);
+  if (host.isEmpty || port == null || port < 1 || port > 65535) {
+    return null;
+  }
+  return (host: host, port: port);
 }
 
 /// Requires a [NetworkPermission] allowing a DNS lookup for [host].

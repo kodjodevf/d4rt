@@ -530,6 +530,12 @@ class DangerousPermission extends Permission {
     'native plugins',
   );
 
+  /// Allows access to dart:developer debugging, inspection and VM-service
+  /// APIs.
+  static final DangerousPermission developerTools = DangerousPermission._(
+    'developer tools',
+  );
+
   /// Allows all dangerous operations.
   static final DangerousPermission any = DangerousPermission._(
     'any dangerous operation',

@@ -84,6 +84,16 @@ class ModuleLoader {
           'Use d4rt.grant(IsolatePermission.any) to allow isolate operations.',
         );
       }
+    } else if (uriString == 'dart:developer') {
+      if (!d4rt!.checkPermission({
+        'type': 'dangerous',
+        'operation': 'developer tools',
+      })) {
+        throw RuntimeError(
+          'Access to dart:developer requires DangerousPermission.developerTools. '
+          'Grant it explicitly to allow developer and VM-service APIs.',
+        );
+      }
     }
     // Add more dangerous modules as needed
   }

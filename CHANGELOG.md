@@ -6,11 +6,15 @@
     when host, port, command or arguments are missing.
   - Added permission checks to HTTP, socket, DNS, server bind and UDP send
     operations. Scoped network permissions disable transparent HTTP redirects,
-    and explicit redirect destinations are checked before use.
+    and explicit redirect destinations and HTTP proxy endpoints are checked
+    before use.
     `Process.run`/`start`/`runSync` now enforce command and argument scopes
     instead of only checking for a generic process permission. Directory
     listings also validate every emitted entry, preventing symlink escapes.
   - `D4rt.eval()` now requires `DangerousPermission.codeEvaluation`.
+  - Importing `dart:developer` now requires
+    `DangerousPermission.developerTools`; developer and VM-service calls are
+    checked again at runtime so they remain protected after permission changes.
   - `D4rt.analyze()` no longer evaluates top-level variable initializers,
     including initializers from imported modules.
   - Missing modules are rejected even when other bridges are registered, and

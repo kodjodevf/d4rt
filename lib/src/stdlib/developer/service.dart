@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'dart:isolate';
 import 'package:d4rt/d4rt.dart';
+import 'developer_permission.dart';
 
 class ServiceDeveloper {
   static BridgedClass get definition => BridgedClass(
@@ -10,9 +11,11 @@ class ServiceDeveloper {
     isSubtypeOfFunc: (value) => value is Service,
     staticMethods: {
       'getInfo': (visitor, positionalArgs, namedArgs) {
+        checkDeveloperToolsPermission(visitor);
         return Service.getInfo();
       },
       'getIsolateId': (visitor, positionalArgs, namedArgs) {
+        checkDeveloperToolsPermission(visitor);
         if (positionalArgs.isEmpty || positionalArgs[0] is! Isolate) {
           throw RuntimeError(
             "Service.getIsolateId expects an Isolate argument.",
@@ -21,6 +24,7 @@ class ServiceDeveloper {
         return Service.getIsolateId(positionalArgs[0] as Isolate);
       },
       'controlWebServer': (visitor, positionalArgs, namedArgs) {
+        checkDeveloperToolsPermission(visitor);
         final enable = namedArgs['enable'] as bool? ?? false;
         final silenceOutput = namedArgs['silenceOutput'] as bool?;
         return Service.controlWebServer(

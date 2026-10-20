@@ -7,6 +7,7 @@ import 'developer/timeline.dart';
 import 'developer/user_tag.dart';
 import 'developer/service.dart';
 import 'developer/flow.dart';
+import 'developer/developer_permission.dart';
 
 export 'package:d4rt/src/environment.dart';
 export 'developer/timeline.dart';
@@ -30,6 +31,7 @@ class DeveloperStdlib {
       'log',
       NativeFunction(
         (visitor, arguments, namedArguments, typeArguments) {
+          checkDeveloperToolsPermission(visitor);
           if (arguments.isEmpty || arguments[0] is! String) {
             throw RuntimeError(
               "log requires at least one String message argument.",
@@ -65,6 +67,7 @@ class DeveloperStdlib {
       'debugger',
       NativeFunction(
         (visitor, arguments, namedArguments, typeArguments) {
+          checkDeveloperToolsPermission(visitor);
           final when = namedArguments['when'] as bool? ?? true;
           final message = namedArguments['message'] as String?;
           return debugger(when: when, message: message);
@@ -78,6 +81,7 @@ class DeveloperStdlib {
       'inspect',
       NativeFunction(
         (visitor, arguments, namedArguments, typeArguments) {
+          checkDeveloperToolsPermission(visitor);
           if (arguments.isEmpty) {
             throw RuntimeError("inspect requires one object argument.");
           }
@@ -92,6 +96,7 @@ class DeveloperStdlib {
       'postEvent',
       NativeFunction(
         (visitor, arguments, namedArguments, typeArguments) {
+          checkDeveloperToolsPermission(visitor);
           if (arguments.length < 2 ||
               arguments[0] is! String ||
               arguments[1] is! Map) {
@@ -113,6 +118,7 @@ class DeveloperStdlib {
       'registerExtension',
       NativeFunction(
         (visitor, arguments, namedArguments, typeArguments) {
+          checkDeveloperToolsPermission(visitor);
           if (arguments.length < 2 || arguments[0] is! String) {
             throw RuntimeError(
               "registerExtension requires a String method and a function handler.",
@@ -121,6 +127,7 @@ class DeveloperStdlib {
           final method = arguments[0] as String;
           final handler = arguments[1];
           registerExtension(method, (methodName, parameters) async {
+            checkDeveloperToolsPermission(visitor);
             Object? result;
             if (handler is InterpretedFunction) {
               result = handler.call(visitor, [methodName, parameters]);
