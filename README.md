@@ -157,6 +157,7 @@ Execute code dynamically while preserving execution state:
 
 ```dart
 final interpreter = D4rt();
+interpreter.grant(DangerousPermission.codeEvaluation);
 
 interpreter.execute(source: 'int x = 10;');
 final result = interpreter.eval('x + 5'); // Returns 15
@@ -227,7 +228,7 @@ dart run d4rt
 Inside the REPL:
 ```text
 ==============================================
-  d4rt v0.2.2 - Interactive Dart REPL
+  d4rt v0.2.5 - Interactive Dart REPL
   Type :help for help, :exit or Ctrl+C to quit
 ==============================================
 
@@ -282,18 +283,37 @@ void main() {
   - `FilesystemPermission.any` - Allow all filesystem operations
   - `FilesystemPermission.read` - Allow read-only operations
   - `FilesystemPermission.write` - Allow write operations
-  - `FilesystemPermission.path('/specific/path')` - Allow operations on specific paths
+  - `FilesystemPermission.readPath('/specific/path')` - Allow reads inside a path
+  - `FilesystemPermission.writePath('/specific/path')` - Allow writes inside a path
+  - `FilesystemPermission.path('/specific/path')` - Allow reads, writes and execution inside a path
 
 - **`NetworkPermission`**: Controls network operations
   - `NetworkPermission.any` - Allow all network operations
-  - `NetworkPermission.connect('host:port')` - Allow connections to specific hosts
+  - `NetworkPermission.connect` - Allow outbound connections
+  - `NetworkPermission.listen` - Allow listening on any port
+  - `NetworkPermission.bind` - Allow binding server sockets
+  - `NetworkPermission.connectTo('api.example.com')` - Allow connections to a specific host
+  - `NetworkPermission.connectToPort('api.example.com', 443)` - Allow a host/port pair
+  - `NetworkPermission.listenOn(8080)` - Allow listening on a specific port
 
 - **`ProcessRunPermission`**: Controls process execution
   - `ProcessRunPermission.any` - Allow execution of any command
-  - `ProcessRunPermission.command('specific-command')` - Allow execution of specific commands
+  - `ProcessRunPermission.command('git')` - Allow a specific command
+  - `ProcessRunPermission.commandWithArgs('git', ['status'])` - Restrict arguments too
 
 - **`IsolatePermission`**: Controls isolate creation and communication
   - `IsolatePermission.any` - Allow all isolate operations
+
+- **`DangerousPermission`**: Controls operations that can escape the sandbox
+  - `DangerousPermission.codeEvaluation` - Required by `D4rt.eval()`
+  - `DangerousPermission.any` - Allow every dangerous operation
+
+All scoped permissions fail closed: a host-only rule does not authorize a
+connection without a host, and a port-specific rule requires the actual port.
+Filesystem scopes are canonicalized, so symlinks cannot be used to escape a
+`readPath`/`writePath` boundary, including through recursive directory listings.
+Scoped network permissions disable transparent HTTP redirects; follow redirects
+manually so every destination is checked.
 
 ### Permission Management
 
@@ -336,6 +356,25 @@ Rules:
 - Filesystem modules are blocked unless `allowFileSystemImports` is enabled.
 - Reading modules from disk also requires a matching `FilesystemPermission`.
 - Missing local files raise a `SourceCodeException` with the resolved filesystem path.
+- `analyze()` never evaluates top-level variable initializers, including those
+  of imported modules.
+
+### CLI Sandbox
+
+The `d4rt` command is deny-by-default. Scripts can read files inside their own
+directory, but network, process, isolate, broad filesystem and dangerous
+operations must be enabled explicitly:
+
+```sh
+d4rt script.dart
+d4rt --allow-network script.dart
+d4rt --allow-fs --allow-process script.dart
+d4rt --allow-all script.dart
+```
+
+`-e` and the REPL require code evaluation and receive
+`DangerousPermission.codeEvaluation` automatically; every other permission is
+still denied unless the corresponding flag is passed.
 
 ## Bridging Native Classes & Enums
 

@@ -687,14 +687,42 @@ class FileIo {
         );
         return file.copySync(positionalArgs[0] as String);
       },
-      'length': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).length(),
-      'lengthSync': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).lengthSync(),
-      'lastAccessed': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).lastAccessed(),
-      'lastAccessedSync': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).lastAccessedSync(),
+      'length': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'read file metadata',
+        );
+        return file.length();
+      },
+      'lengthSync': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'read file metadata',
+        );
+        return file.lengthSync();
+      },
+      'lastAccessed': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'read file metadata',
+        );
+        return file.lastAccessed();
+      },
+      'lastAccessedSync': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'read file metadata',
+        );
+        return file.lastAccessedSync();
+      },
       'setLastAccessed': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
         if (positionalArgs.length != 1 || positionalArgs[0] is! DateTime) {
@@ -702,6 +730,11 @@ class FileIo {
             'File.setLastAccessed requires one DateTime argument.',
           );
         }
+        checkFilesystemWritePermission(
+          visitor,
+          file.path,
+          operation: 'write file metadata',
+        );
         return file.setLastAccessed(positionalArgs[0] as DateTime);
       },
       'setLastAccessedSync': (visitor, target, positionalArgs, namedArgs) {
@@ -711,13 +744,32 @@ class FileIo {
             'File.setLastAccessedSync requires one DateTime argument.',
           );
         }
+        checkFilesystemWritePermission(
+          visitor,
+          file.path,
+          operation: 'write file metadata',
+        );
         file.setLastAccessedSync(positionalArgs[0] as DateTime);
         return null;
       },
-      'lastModified': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).lastModified(),
-      'lastModifiedSync': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).lastModifiedSync(),
+      'lastModified': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'read file metadata',
+        );
+        return file.lastModified();
+      },
+      'lastModifiedSync': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'read file metadata',
+        );
+        return file.lastModifiedSync();
+      },
       'setLastModified': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
         if (positionalArgs.length != 1 || positionalArgs[0] is! DateTime) {
@@ -725,6 +777,11 @@ class FileIo {
             'File.setLastModified requires one DateTime argument.',
           );
         }
+        checkFilesystemWritePermission(
+          visitor,
+          file.path,
+          operation: 'write file metadata',
+        );
         return file.setLastModified(positionalArgs[0] as DateTime);
       },
       'setLastModifiedSync': (visitor, target, positionalArgs, namedArgs) {
@@ -734,6 +791,11 @@ class FileIo {
             'File.setLastModifiedSync requires one DateTime argument.',
           );
         }
+        checkFilesystemWritePermission(
+          visitor,
+          file.path,
+          operation: 'write file metadata',
+        );
         file.setLastModifiedSync(positionalArgs[0] as DateTime);
         return null;
       },
@@ -815,11 +877,24 @@ class FileIo {
         );
         return file.statSync();
       })(),
-      'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) =>
-          (target as File).resolveSymbolicLinks(),
-      'resolveSymbolicLinksSync':
-          (visitor, target, positionalArgs, namedArgs) =>
-              (target as File).resolveSymbolicLinksSync(),
+      'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'resolve file links',
+        );
+        return file.resolveSymbolicLinks();
+      },
+      'resolveSymbolicLinksSync': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        checkFilesystemReadPermission(
+          visitor,
+          file.path,
+          operation: 'resolve file links',
+        );
+        return file.resolveSymbolicLinksSync();
+      },
       'create': (visitor, target, positionalArgs, namedArgs) => (() {
         final file = target as File;
         checkFilesystemWritePermission(

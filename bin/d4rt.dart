@@ -1,7 +1,75 @@
 import 'dart:io';
 import 'package:d4rt/d4rt.dart';
 
-const String version = '0.2.3';
+const String version = '0.2.5';
+
+const _permissionFlags = <String>{
+  '--allow-filesystem',
+  '--allow-fs',
+  '--allow-network',
+  '--allow-process',
+  '--allow-isolate',
+  '--allow-dangerous',
+  '--allow-all',
+};
+
+class _CliPermissions {
+  final bool filesystem;
+  final bool network;
+  final bool process;
+  final bool isolate;
+  final bool dangerous;
+  final bool all;
+
+  const _CliPermissions({
+    this.filesystem = false,
+    this.network = false,
+    this.process = false,
+    this.isolate = false,
+    this.dangerous = false,
+    this.all = false,
+  });
+
+  factory _CliPermissions.fromArgs(List<String> args) {
+    final flags = args.where(_permissionFlags.contains).toSet();
+    return _CliPermissions(
+      filesystem:
+          flags.contains('--allow-filesystem') || flags.contains('--allow-fs'),
+      network: flags.contains('--allow-network'),
+      process: flags.contains('--allow-process'),
+      isolate: flags.contains('--allow-isolate'),
+      dangerous: flags.contains('--allow-dangerous'),
+      all: flags.contains('--allow-all'),
+    );
+  }
+}
+
+void _applyPermissions(
+  D4rt d4rt,
+  _CliPermissions permissions, {
+  required String defaultReadRoot,
+  required bool allowCodeEvaluation,
+}) {
+  d4rt.grant(FilesystemPermission.readPath(defaultReadRoot));
+
+  if (permissions.all) {
+    d4rt.grant(FilesystemPermission.any);
+    d4rt.grant(NetworkPermission.any);
+    d4rt.grant(ProcessRunPermission.any);
+    d4rt.grant(IsolatePermission.any);
+    d4rt.grant(DangerousPermission.any);
+    return;
+  }
+
+  if (permissions.filesystem) d4rt.grant(FilesystemPermission.any);
+  if (permissions.network) d4rt.grant(NetworkPermission.any);
+  if (permissions.process) d4rt.grant(ProcessRunPermission.any);
+  if (permissions.isolate) d4rt.grant(IsolatePermission.any);
+  if (permissions.dangerous) d4rt.grant(DangerousPermission.any);
+  if (allowCodeEvaluation) {
+    d4rt.grant(DangerousPermission.codeEvaluation);
+  }
+}
 
 void main(List<String> args) async {
   if (args.contains('-h') || args.contains('--help')) {
@@ -15,7 +83,10 @@ void main(List<String> args) async {
   }
 
   final isDebug = args.contains('--debug');
-  final filteredArgs = args.where((arg) => arg != '--debug').toList();
+  final permissions = _CliPermissions.fromArgs(args);
+  final filteredArgs = args
+      .where((arg) => arg != '--debug' && !_permissionFlags.contains(arg))
+      .toList();
 
   // Check for --eval / -e
   final evalIndex = filteredArgs.indexWhere(
@@ -28,7 +99,7 @@ void main(List<String> args) async {
       return;
     }
     final code = filteredArgs[evalIndex + 1];
-    await _evalCode(code, isDebug: isDebug);
+    await _evalCode(code, isDebug: isDebug, permissions: permissions);
     return;
   }
 
@@ -61,11 +132,16 @@ void main(List<String> args) async {
   }
 
   if (filteredArgs.isEmpty || filteredArgs.first == 'repl') {
-    await _startRepl(isDebug: isDebug);
+    await _startRepl(isDebug: isDebug, permissions: permissions);
   } else {
     final filePath = filteredArgs.first;
     final scriptArgs = filteredArgs.sublist(1);
-    await _executeFile(filePath, scriptArgs, isDebug: isDebug);
+    await _executeFile(
+      filePath,
+      scriptArgs,
+      isDebug: isDebug,
+      permissions: permissions,
+    );
   }
 }
 
@@ -88,17 +164,35 @@ Options:
   -i, --introspection       Print code structure and declaration analysis
   --json-introspection      Print code structure analysis in JSON format
   --debug                   Enable verbose debug logging
+
+Security (deny by default):
+  --allow-fs, --allow-filesystem   Allow all filesystem operations
+  --allow-network                  Allow network connections and servers
+  --allow-process                  Allow launching native processes
+  --allow-isolate                  Allow isolate operations
+  --allow-dangerous                Allow other dangerous operations
+  --allow-all                      Grant every permission
+
+By default, scripts can only read inside their own directory. Use the flags
+above to opt into broader access.
 ''');
 }
 
-Future<void> _evalCode(String code, {required bool isDebug}) async {
+Future<void> _evalCode(
+  String code, {
+  required bool isDebug,
+  required _CliPermissions permissions,
+}) async {
   try {
     final d4rt = D4rt(enableAstCache: true);
     if (isDebug) d4rt.setDebug(true);
 
-    d4rt.grant(FilesystemPermission.any);
-    d4rt.grant(NetworkPermission.any);
-    d4rt.grant(ProcessPermission.any);
+    _applyPermissions(
+      d4rt,
+      permissions,
+      defaultReadRoot: Directory.current.path,
+      allowCodeEvaluation: true,
+    );
 
     // If source contains main(), run execute(), otherwise use eval
     if (code.contains('main(') || code.contains('main()')) {
@@ -147,6 +241,7 @@ Future<void> _executeFile(
   String filePath,
   List<String> scriptArgs, {
   required bool isDebug,
+  required _CliPermissions permissions,
 }) async {
   final file = File(filePath);
   if (!await file.exists()) {
@@ -160,12 +255,13 @@ Future<void> _executeFile(
     final d4rt = D4rt();
     if (isDebug) d4rt.setDebug(true);
 
-    // Grant standard permissions for CLI execution
-    d4rt.grant(FilesystemPermission.any);
-    d4rt.grant(NetworkPermission.any);
-    d4rt.grant(ProcessPermission.any);
-
     final basePath = file.parent.absolute.path;
+    _applyPermissions(
+      d4rt,
+      permissions,
+      defaultReadRoot: basePath,
+      allowCodeEvaluation: false,
+    );
     final result = await d4rt.execute(
       source: source,
       name: 'main',
@@ -185,7 +281,10 @@ Future<void> _executeFile(
   }
 }
 
-Future<void> _startRepl({required bool isDebug}) async {
+Future<void> _startRepl({
+  required bool isDebug,
+  required _CliPermissions permissions,
+}) async {
   stdout.writeln('==============================================');
   stdout.writeln('  d4rt v$version - Interactive Dart REPL');
   stdout.writeln('  Type :help for help, :exit or Ctrl+C to quit');
@@ -194,10 +293,12 @@ Future<void> _startRepl({required bool isDebug}) async {
   var d4rt = D4rt(enableAstCache: true);
   if (isDebug) d4rt.setDebug(true);
 
-  // Grant standard permissions
-  d4rt.grant(FilesystemPermission.any);
-  d4rt.grant(NetworkPermission.any);
-  d4rt.grant(ProcessPermission.any);
+  _applyPermissions(
+    d4rt,
+    permissions,
+    defaultReadRoot: Directory.current.path,
+    allowCodeEvaluation: true,
+  );
 
   // Initialize context
   d4rt.execute(source: 'void main() {}');
@@ -234,9 +335,12 @@ Future<void> _startRepl({required bool isDebug}) async {
       if (trimmed == ':clear') {
         d4rt = D4rt(enableAstCache: true);
         if (isDebug) d4rt.setDebug(true);
-        d4rt.grant(FilesystemPermission.any);
-        d4rt.grant(NetworkPermission.any);
-        d4rt.grant(ProcessPermission.any);
+        _applyPermissions(
+          d4rt,
+          permissions,
+          defaultReadRoot: Directory.current.path,
+          allowCodeEvaluation: true,
+        );
         d4rt.execute(source: 'void main() {}');
         stdout.writeln('Environment cleared.');
         continue;

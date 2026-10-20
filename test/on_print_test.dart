@@ -56,7 +56,7 @@ void main() {
 
     test('d4rt.eval with onPrint', () {
       final evalLogs = <String>[];
-      final d4rt = D4rt();
+      final d4rt = D4rt()..grant(DangerousPermission.codeEvaluation);
       d4rt.execute(source: 'var count = 0; main() {}');
       d4rt.eval(
         'print("Eval print: \${++count}");',

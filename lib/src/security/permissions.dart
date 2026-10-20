@@ -11,10 +11,10 @@
 ///
 /// // Grant filesystem access
 /// interpreter.grant(FilesystemPermission.read);
-/// interpreter.grant(FilesystemPermission.write('/tmp'));
+/// interpreter.grant(FilesystemPermission.writePath('/tmp'));
 ///
 /// // Grant network access
-/// interpreter.grant(NetworkPermission.connect('api.example.com'));
+/// interpreter.grant(NetworkPermission.connectTo('api.example.com'));
 ///
 /// // Grant process execution
 /// interpreter.grant(ProcessRunPermission.any);
@@ -28,6 +28,7 @@
 library;
 
 import 'package:d4rt/src/utils/platform/filesystem.dart';
+import 'package:path/path.dart' as p;
 
 /// Base class for all permissions in the d4rt security system.
 abstract class Permission {
@@ -139,10 +140,21 @@ class FilesystemPermission extends Permission {
   }
 
   static bool _isPathWithinScope(String allowedPath, String requestedPath) {
-    final canonicalAllowed = _canonicalizePath(allowedPath);
-    final canonicalRequested = _canonicalizePath(requestedPath);
-    return canonicalRequested == canonicalAllowed ||
-        canonicalRequested.startsWith('$canonicalAllowed/');
+    final canonicalAllowed = canonicalizeFilesystemPath(allowedPath);
+    final canonicalRequested = canonicalizeFilesystemPath(requestedPath);
+
+    if (canonicalRequested == canonicalAllowed) {
+      return true;
+    }
+
+    // Filesystem roots need special handling: "/" is already a prefix of every
+    // absolute path, and "C:/" is a prefix of every path on that drive.
+    if (canonicalAllowed == '/' ||
+        RegExp(r'^[A-Za-z]:/$').hasMatch(canonicalAllowed)) {
+      return canonicalRequested.startsWith(canonicalAllowed);
+    }
+
+    return canonicalRequested.startsWith('$canonicalAllowed/');
   }
 
   @override
@@ -189,6 +201,27 @@ class FilesystemPermission extends Permission {
 
     return true;
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! FilesystemPermission) return false;
+    final thisPath = _path == null ? null : _canonicalizePath(_path);
+    final otherPath = other._path == null
+        ? null
+        : _canonicalizePath(other._path);
+    return otherPath == thisPath &&
+        other._read == _read &&
+        other._write == _write &&
+        other._execute == _execute;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    _path == null ? null : _canonicalizePath(_path),
+    _read,
+    _write,
+    _execute,
+  );
 }
 
 /// Network permissions control network operations.
@@ -248,11 +281,11 @@ class NetworkPermission extends Permission {
 
   /// Allows connecting to the specified host.
   factory NetworkPermission.connectTo(String host) =>
-      NetworkPermission._(host, null, true, false, false);
+      NetworkPermission._(host.toLowerCase(), null, true, false, false);
 
   /// Allows connecting to the specified host and port.
   factory NetworkPermission.connectToPort(String host, int port) =>
-      NetworkPermission._(host, port, true, false, false);
+      NetworkPermission._(host.toLowerCase(), port, true, false, false);
 
   /// Allows listening on the specified port.
   factory NetworkPermission.listenOn(int port) =>
@@ -298,16 +331,34 @@ class NetworkPermission extends Permission {
       return false;
     }
 
-    // Check host/port restrictions
-    if (_host != null && opHost != null && opHost != _host) {
-      return false;
+    // Check host/port restrictions. Scoped permissions must never fail open
+    // when the operation omits the host or port.
+    if (_host != null) {
+      if (opHost is! String || opHost.toLowerCase() != _host) {
+        return false;
+      }
     }
-    if (_port != null && opPort != null && opPort != _port) {
-      return false;
+    if (_port != null) {
+      if (opPort is! int || opPort != _port) {
+        return false;
+      }
     }
 
     return true;
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NetworkPermission &&
+        other._host == _host &&
+        other._port == _port &&
+        other._connect == _connect &&
+        other._listen == _listen &&
+        other._bind == _bind;
+  }
+
+  @override
+  int get hashCode => Object.hash(_host, _port, _connect, _listen, _bind);
 }
 
 /// Process permissions control process execution.
@@ -354,23 +405,52 @@ class ProcessRunPermission extends Permission {
 
     if (opType != 'process') return false;
 
-    // Check command restrictions
-    if (_command != null && opCommand != _command) {
-      return false;
+    // Check command restrictions. A bare command name such as
+    // ProcessRunPermission.command('echo') also matches '/bin/echo'. A command
+    // that contains a path separator is scoped to that exact normalized path,
+    // so '/usr/bin/git' does not authorize '/tmp/git'.
+    if (_command != null) {
+      if (opCommand is! String) return false;
+      final allowedHasPath = p.basename(_command) != _command;
+      if (allowedHasPath) {
+        if (p.normalize(opCommand) != p.normalize(_command)) return false;
+      } else if (opCommand != _command && p.basename(opCommand) != _command) {
+        return false;
+      }
     }
 
-    // Check argument restrictions
-    if (_allowedArgs != null && opArgs != null) {
-      final args = opArgs as List<String>;
-      if (args.length != _allowedArgs.length) return false;
+    // Check argument restrictions. A permission scoped to specific arguments
+    // must not allow an operation that omits them.
+    if (_allowedArgs != null) {
+      if (opArgs is! List) return false;
+      if (opArgs.length != _allowedArgs.length) return false;
 
-      for (int i = 0; i < args.length; i++) {
-        if (args[i] != _allowedArgs[i]) return false;
+      for (int i = 0; i < opArgs.length; i++) {
+        if (opArgs[i].toString() != _allowedArgs[i]) return false;
       }
     }
 
     return true;
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ProcessRunPermission &&
+        other._command == _command &&
+        _listsEqual(other._allowedArgs, _allowedArgs);
+  }
+
+  @override
+  int get hashCode => Object.hash(_command, Object.hashAll(_allowedArgs ?? []));
+}
+
+bool _listsEqual(List<String>? a, List<String>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null || a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Type alias for [ProcessRunPermission] for convenience.
@@ -419,6 +499,16 @@ class IsolatePermission extends Permission {
 
     return true;
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is IsolatePermission &&
+        other._spawn == _spawn &&
+        other._communicate == _communicate;
+  }
+
+  @override
+  int get hashCode => Object.hash(_spawn, _communicate);
 }
 
 /// Dangerous permissions that should be granted with extreme caution.
@@ -459,4 +549,12 @@ class DangerousPermission extends Permission {
 
     return _operation == 'any dangerous operation' || opOperation == _operation;
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is DangerousPermission && other._operation == _operation;
+  }
+
+  @override
+  int get hashCode => _operation.hashCode;
 }

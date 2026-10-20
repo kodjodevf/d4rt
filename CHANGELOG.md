@@ -1,3 +1,26 @@
+## 0.2.5
+- **security: Hardened sandbox enforcement**
+  - Permissions now implement value equality, so equivalent permissions can be
+    checked and revoked reliably. Scoped filesystem permissions are canonicalized
+    to prevent symlink escapes. Scoped network and process permissions fail closed
+    when host, port, command or arguments are missing.
+  - Added permission checks to HTTP, socket, DNS, server bind and UDP send
+    operations. Scoped network permissions disable transparent HTTP redirects,
+    and explicit redirect destinations are checked before use.
+    `Process.run`/`start`/`runSync` now enforce command and argument scopes
+    instead of only checking for a generic process permission. Directory
+    listings also validate every emitted entry, preventing symlink escapes.
+  - `D4rt.eval()` now requires `DangerousPermission.codeEvaluation`.
+  - `D4rt.analyze()` no longer evaluates top-level variable initializers,
+    including initializers from imported modules.
+  - Missing modules are rejected even when other bridges are registered, and
+    module initialization now honors `timeout` and `maxSteps`.
+  - The CLI is deny-by-default and exposes `--allow-fs`, `--allow-network`,
+    `--allow-process`, `--allow-isolate`, `--allow-dangerous` and `--allow-all`.
+    Scripts get read-only access to their own directory by default.
+  - Updated to analyzer 14.5.0, build 5.0.0, source_gen 4.3.1, build_runner
+    2.17.1 and test 1.33.0, with a Dart SDK constraint of `^3.11.0`.
+
 ## 0.2.4
 - feat: Enhance enum handling with improved equality checks and add comprehensive switch statement tests
 ## 0.2.3

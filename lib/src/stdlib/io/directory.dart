@@ -108,10 +108,19 @@ class DirectoryIo {
           directory.path,
           operation: 'list directory',
         );
-        return directory.list(
-          recursive: namedArgs['recursive'] as bool? ?? false,
-          followLinks: namedArgs['followLinks'] as bool? ?? true,
-        );
+        return directory
+            .list(
+              recursive: namedArgs['recursive'] as bool? ?? false,
+              followLinks: namedArgs['followLinks'] as bool? ?? true,
+            )
+            .map((entity) {
+              checkFilesystemReadPermission(
+                visitor,
+                entity.path,
+                operation: 'list directory',
+              );
+              return entity;
+            });
       },
       'listSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
@@ -120,10 +129,18 @@ class DirectoryIo {
           directory.path,
           operation: 'list directory',
         );
-        return directory.listSync(
+        final entities = directory.listSync(
           recursive: namedArgs['recursive'] as bool? ?? false,
           followLinks: namedArgs['followLinks'] as bool? ?? true,
         );
+        for (final entity in entities) {
+          checkFilesystemReadPermission(
+            visitor,
+            entity.path,
+            operation: 'list directory',
+          );
+        }
+        return entities;
       },
       'rename': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
@@ -245,12 +262,49 @@ class DirectoryIo {
       'isAbsolute': (visitor, target) => (target as Directory).isAbsolute,
     },
     staticGetters: {
-      'systemTemp': (visitor) => Directory.systemTemp,
-      'current': (visitor) => Directory.current,
+      'systemTemp': (visitor) {
+        final directory = Directory.systemTemp;
+        checkFilesystemReadPermission(
+          visitor,
+          directory.path,
+          operation: 'access system temp directory',
+        );
+        return directory;
+      },
+      'current': (visitor) {
+        final directory = Directory.current;
+        checkFilesystemReadPermission(
+          visitor,
+          directory.path,
+          operation: 'access current directory',
+        );
+        return directory;
+      },
     },
     staticSetters: {
       'current': (visitor, value) {
-        Directory.current = value;
+        final String newPath;
+        if (value is Directory) {
+          newPath = value.path;
+        } else if (value is String) {
+          newPath = value;
+        } else {
+          throw RuntimeError(
+            'Directory.current requires a Directory or String value.',
+          );
+        }
+
+        checkFilesystemWritePermission(
+          visitor,
+          Directory.current.path,
+          operation: 'change current directory',
+        );
+        checkFilesystemWritePermission(
+          visitor,
+          newPath,
+          operation: 'change current directory',
+        );
+        Directory.current = newPath;
         return;
       },
     },

@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:d4rt/d4rt.dart';
+import 'package:d4rt/src/utils/platform/filesystem.dart';
 
 void checkFilesystemReadPermission(
   InterpreterVisitor visitor,
@@ -58,7 +57,7 @@ void _checkFilesystemPermission(
   final d4rt = visitor.moduleLoader.d4rt;
   if (d4rt == null) return;
 
-  final normalizedPath = File(path).absolute.path;
+  final normalizedPath = canonicalizeFilesystemPath(path);
   final allowed = d4rt.checkPermission({
     'type': 'filesystem',
     'path': normalizedPath,

@@ -29,6 +29,10 @@ String normalizeFilesystemPath(String path) {
   return p.normalize(p.absolute(path)).replaceAll('\\', '/');
 }
 
+String canonicalizeFilesystemPath(String path) {
+  return normalizeFilesystemPath(path);
+}
+
 String basePathEntryFilePath(
   String basePath, {
   String entryFile = 'main.dart',

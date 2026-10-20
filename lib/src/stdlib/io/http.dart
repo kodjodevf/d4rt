@@ -2,6 +2,40 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:d4rt/d4rt.dart';
+import 'network_permission_helper.dart';
+
+bool _hasUnrestrictedConnectPermission(InterpreterVisitor? visitor) {
+  final d4rt = visitor?.moduleLoader.d4rt;
+  if (d4rt == null) return true;
+  return d4rt.hasPermission(NetworkPermission.connect) ||
+      d4rt.hasPermission(NetworkPermission.any);
+}
+
+/// Scoped network rules must also apply to redirect destinations. Disable
+/// transparent redirects unless outbound connections are unrestricted; callers
+/// can still follow a redirect manually, which performs a fresh permission
+/// check.
+Future<HttpClientRequest> _guardRedirects(
+  Future<HttpClientRequest> requestFuture,
+  InterpreterVisitor visitor,
+) async {
+  final request = await requestFuture;
+  if (!_hasUnrestrictedConnectPermission(visitor)) {
+    request.followRedirects = false;
+  }
+  return request;
+}
+
+void _checkUriNetworkPermission(InterpreterVisitor visitor, Uri uri) {
+  if ((uri.scheme != 'http' && uri.scheme != 'https') || uri.host.isEmpty) {
+    throw RuntimeError(
+      'HTTP requests require an absolute http or https URI with a host.',
+    );
+  }
+
+  final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+  checkNetworkConnectPermission(visitor, uri.host, port);
+}
 
 class HttpClientIo {
   static BridgedClass get definition => BridgedClass(
@@ -33,37 +67,49 @@ class HttpClientIo {
         if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
           throw RuntimeError('getUrl requires a Uri argument.');
         }
-        return (target as HttpClient).getUrl(positionalArgs[0] as Uri);
+        final uri = positionalArgs[0] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects((target as HttpClient).getUrl(uri), visitor);
       },
       'postUrl': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
           throw RuntimeError('postUrl requires a Uri argument.');
         }
-        return (target as HttpClient).postUrl(positionalArgs[0] as Uri);
+        final uri = positionalArgs[0] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects((target as HttpClient).postUrl(uri), visitor);
       },
       'putUrl': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
           throw RuntimeError('putUrl requires a Uri argument.');
         }
-        return (target as HttpClient).putUrl(positionalArgs[0] as Uri);
+        final uri = positionalArgs[0] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects((target as HttpClient).putUrl(uri), visitor);
       },
       'deleteUrl': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
           throw RuntimeError('deleteUrl requires a Uri argument.');
         }
-        return (target as HttpClient).deleteUrl(positionalArgs[0] as Uri);
+        final uri = positionalArgs[0] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects((target as HttpClient).deleteUrl(uri), visitor);
       },
       'headUrl': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
           throw RuntimeError('headUrl requires a Uri argument.');
         }
-        return (target as HttpClient).headUrl(positionalArgs[0] as Uri);
+        final uri = positionalArgs[0] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects((target as HttpClient).headUrl(uri), visitor);
       },
       'patchUrl': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! Uri) {
           throw RuntimeError('patchUrl requires a Uri argument.');
         }
-        return (target as HttpClient).patchUrl(positionalArgs[0] as Uri);
+        final uri = positionalArgs[0] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects((target as HttpClient).patchUrl(uri), visitor);
       },
       'open': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 4 ||
@@ -75,11 +121,19 @@ class HttpClientIo {
             'open requires method, host, port, and path arguments.',
           );
         }
-        return (target as HttpClient).open(
-          positionalArgs[0] as String,
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[1] as String,
           positionalArgs[2] as int,
-          positionalArgs[3] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).open(
+            positionalArgs[0] as String,
+            positionalArgs[1] as String,
+            positionalArgs[2] as int,
+            positionalArgs[3] as String,
+          ),
+          visitor,
         );
       },
       'openUrl': (visitor, target, positionalArgs, namedArgs) {
@@ -88,9 +142,11 @@ class HttpClientIo {
             positionalArgs[1] is! Uri) {
           throw RuntimeError('openUrl requires method and Uri arguments.');
         }
-        return (target as HttpClient).openUrl(
-          positionalArgs[0] as String,
-          positionalArgs[1] as Uri,
+        final uri = positionalArgs[1] as Uri;
+        _checkUriNetworkPermission(visitor, uri);
+        return _guardRedirects(
+          (target as HttpClient).openUrl(positionalArgs[0] as String, uri),
+          visitor,
         );
       },
       'get': (visitor, target, positionalArgs, namedArgs) {
@@ -100,10 +156,18 @@ class HttpClientIo {
             positionalArgs[2] is! String) {
           throw RuntimeError('get requires host, port, and path arguments.');
         }
-        return (target as HttpClient).get(
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[0] as String,
           positionalArgs[1] as int,
-          positionalArgs[2] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).get(
+            positionalArgs[0] as String,
+            positionalArgs[1] as int,
+            positionalArgs[2] as String,
+          ),
+          visitor,
         );
       },
       'post': (visitor, target, positionalArgs, namedArgs) {
@@ -113,10 +177,18 @@ class HttpClientIo {
             positionalArgs[2] is! String) {
           throw RuntimeError('post requires host, port, and path arguments.');
         }
-        return (target as HttpClient).post(
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[0] as String,
           positionalArgs[1] as int,
-          positionalArgs[2] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).post(
+            positionalArgs[0] as String,
+            positionalArgs[1] as int,
+            positionalArgs[2] as String,
+          ),
+          visitor,
         );
       },
       'put': (visitor, target, positionalArgs, namedArgs) {
@@ -126,10 +198,18 @@ class HttpClientIo {
             positionalArgs[2] is! String) {
           throw RuntimeError('put requires host, port, and path arguments.');
         }
-        return (target as HttpClient).put(
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[0] as String,
           positionalArgs[1] as int,
-          positionalArgs[2] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).put(
+            positionalArgs[0] as String,
+            positionalArgs[1] as int,
+            positionalArgs[2] as String,
+          ),
+          visitor,
         );
       },
       'delete': (visitor, target, positionalArgs, namedArgs) {
@@ -139,10 +219,18 @@ class HttpClientIo {
             positionalArgs[2] is! String) {
           throw RuntimeError('delete requires host, port, and path arguments.');
         }
-        return (target as HttpClient).delete(
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[0] as String,
           positionalArgs[1] as int,
-          positionalArgs[2] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).delete(
+            positionalArgs[0] as String,
+            positionalArgs[1] as int,
+            positionalArgs[2] as String,
+          ),
+          visitor,
         );
       },
       'patch': (visitor, target, positionalArgs, namedArgs) {
@@ -152,10 +240,18 @@ class HttpClientIo {
             positionalArgs[2] is! String) {
           throw RuntimeError('patch requires host, port, and path arguments.');
         }
-        return (target as HttpClient).patch(
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[0] as String,
           positionalArgs[1] as int,
-          positionalArgs[2] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).patch(
+            positionalArgs[0] as String,
+            positionalArgs[1] as int,
+            positionalArgs[2] as String,
+          ),
+          visitor,
         );
       },
       'head': (visitor, target, positionalArgs, namedArgs) {
@@ -165,10 +261,18 @@ class HttpClientIo {
             positionalArgs[2] is! String) {
           throw RuntimeError('head requires host, port, and path arguments.');
         }
-        return (target as HttpClient).head(
+        checkNetworkConnectPermission(
+          visitor,
           positionalArgs[0] as String,
           positionalArgs[1] as int,
-          positionalArgs[2] as String,
+        );
+        return _guardRedirects(
+          (target as HttpClient).head(
+            positionalArgs[0] as String,
+            positionalArgs[1] as int,
+            positionalArgs[2] as String,
+          ),
+          visitor,
         );
       },
       'addCredentials': (visitor, target, positionalArgs, namedArgs) {
@@ -337,6 +441,11 @@ class HttpServerIo {
             'HttpServer.bind requires address and port arguments.',
           );
         }
+        checkNetworkListenPermission(
+          visitor,
+          positionalArgs[0],
+          positionalArgs[1] as int,
+        );
         return HttpServer.bind(
           positionalArgs[0],
           positionalArgs[1] as int,
@@ -353,6 +462,11 @@ class HttpServerIo {
             'HttpServer.bindSecure requires address, port, and context arguments.',
           );
         }
+        checkNetworkListenPermission(
+          visitor,
+          positionalArgs[0],
+          positionalArgs[1] as int,
+        );
         return HttpServer.bindSecure(
           positionalArgs[0],
           positionalArgs[1] as int,
@@ -526,7 +640,15 @@ class HttpClientRequestIo {
         return;
       },
       'followRedirects': (visitor, target, value) {
-        (target as HttpClientRequest).followRedirects = value as bool;
+        final follow = value as bool;
+        if (follow && !_hasUnrestrictedConnectPermission(visitor)) {
+          throw RuntimeError(
+            'Automatic HTTP redirects require NetworkPermission.connect or '
+            'NetworkPermission.any. Follow redirects manually so each '
+            'destination can be checked.',
+          );
+        }
+        (target as HttpClientRequest).followRedirects = follow;
         return;
       },
       'maxRedirects': (visitor, target, value) {
@@ -582,7 +704,8 @@ class HttpClientResponseIo {
           'transform not yet implemented in interpreted environment',
         );
       },
-      'redirect': (visitor, target, positionalArgs, namedArgs) {
+      'redirect': (visitor, target, positionalArgs, namedArgs) async {
+        final response = target as HttpClientResponse;
         final method = positionalArgs.isNotEmpty
             ? positionalArgs[0] as String?
             : null;
@@ -590,11 +713,31 @@ class HttpClientResponseIo {
             ? positionalArgs[1] as Uri?
             : null;
         final followLoops = namedArgs['followLoops'] as bool?;
-        return (target as HttpClientResponse).redirect(
-          method,
-          url,
-          followLoops,
-        );
+
+        var destination = url;
+        if (destination == null) {
+          final location = response.headers.value(HttpHeaders.locationHeader);
+          if (location == null) {
+            throw RuntimeError(
+              'HttpClientResponse.redirect requires a URL or a Location header.',
+            );
+          }
+          final base = response.redirects.isNotEmpty
+              ? response.redirects.last.location
+              : null;
+          destination = base == null
+              ? Uri.tryParse(location)
+              : base.resolve(location);
+        }
+
+        if (destination == null) {
+          throw RuntimeError('Invalid HTTP redirect location.');
+        }
+        _checkUriNetworkPermission(visitor, destination);
+
+        // The redirected request inherits followRedirects from the original
+        // request, which is disabled for scoped network permissions.
+        return response.redirect(method, destination, followLoops);
       },
       'detachSocket': (visitor, target, positionalArgs, namedArgs) =>
           (target as HttpClientResponse).detachSocket(),

@@ -83,7 +83,7 @@ void main() {
     });
 
     test('eval respects timeout and maxSteps limits', () {
-      final d4rt = D4rt();
+      final d4rt = D4rt()..grant(DangerousPermission.codeEvaluation);
       d4rt.execute(source: 'void main() {}');
 
       expect(

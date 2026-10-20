@@ -14,6 +14,9 @@ class ProcessIo {
         _checkProcessPermission(
           visitor,
           positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '',
+          positionalArgs.length > 1
+              ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
+              : const <String>[],
         );
         return _start(positionalArgs, namedArgs);
       },
@@ -21,6 +24,9 @@ class ProcessIo {
         _checkProcessPermission(
           visitor,
           positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '',
+          positionalArgs.length > 1
+              ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
+              : const <String>[],
         );
         return _run(positionalArgs, namedArgs);
       },
@@ -28,6 +34,9 @@ class ProcessIo {
         _checkProcessPermission(
           visitor,
           positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '',
+          positionalArgs.length > 1
+              ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
+              : const <String>[],
         );
         return _runSync(positionalArgs, namedArgs);
       },
@@ -184,16 +193,21 @@ class ProcessIo {
   /// Helper method to check if ProcessRunPermission is granted
   static void _checkProcessPermission(
     InterpreterVisitor visitor,
-    String command,
-  ) {
+    String command, [
+    List<String> args = const <String>[],
+  ]) {
     final d4rt = visitor.moduleLoader.d4rt;
     if (d4rt == null) return;
 
-    // Check for ProcessRunPermission
-    if (!d4rt.checkPermission({'type': 'process'})) {
+    // Check for ProcessRunPermission, including any command/argument scope.
+    if (!d4rt.checkPermission({
+      'type': 'process',
+      'command': command,
+      'args': args,
+    })) {
       throw RuntimeError(
-        'Process execution requires ProcessRunPermission. '
-        'Use d4rt.grant(ProcessRunPermission.any) to allow process execution.',
+        'Process execution denied for "$command". '
+        'Grant an appropriate ProcessRunPermission for this command.',
       );
     }
   }

@@ -40,6 +40,10 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
   /// Optional callback to intercept print output.
   final void Function(String)? onPrint;
 
+  /// Whether static initializers should be evaluated. Analysis mode disables
+  /// this so inspecting a program never triggers user code.
+  final bool evaluateInitializers;
+
   /// Cache for the Invocation class for noSuchMethod support
   late final InterpretedClass? _invocationClass = _createInvocationClass();
 
@@ -51,6 +55,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
     this.maxSteps,
     DateTime? startTime,
     this.onPrint,
+    this.evaluateInitializers = true,
   }) : currentLibrary = initiallibrary,
        _startTime = startTime ?? (timeout != null ? DateTime.now() : null),
        environment = globalEnvironment {
@@ -8610,7 +8615,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
           } else {
             // Regular static field handling
             Object? value;
-            if (variable.initializer != null) {
+            if (variable.initializer != null && evaluateInitializers) {
               // When evaluating the initializer, the field should be available in the environment
               // from previous fields or from this expression
               value = variable.initializer!.accept<Object?>(this);
@@ -12270,7 +12275,7 @@ class InterpreterVisitor extends GeneralizingAstVisitor<Object?> {
         for (final variable in member.fields.variables) {
           final fieldName = variable.name.lexeme;
           Object? value;
-          if (variable.initializer != null) {
+          if (variable.initializer != null && evaluateInitializers) {
             // Evaluate static initializer immediately in the current environment
             try {
               value = variable.initializer!.accept<Object?>(this);

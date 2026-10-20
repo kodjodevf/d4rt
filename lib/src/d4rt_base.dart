@@ -187,6 +187,7 @@ class D4rt {
     int? maxSteps,
     DateTime? startTime,
     void Function(String)? onPrint,
+    bool executeInitializers = true,
   }) {
     final moduleLoader = ModuleLoader(
       Environment(),
@@ -196,6 +197,10 @@ class D4rt {
       d4rt: this,
       basePath: basePath,
       allowFileSystemImports: allowFileSystemImports,
+      initializationTimeout: timeout,
+      maxInitializationSteps: maxSteps,
+      initializationStartTime: startTime,
+      executeInitializers: executeInitializers,
     );
     _visitor = InterpreterVisitor(
       globalEnvironment: moduleLoader.globalEnvironment,
@@ -204,6 +209,7 @@ class D4rt {
       maxSteps: maxSteps,
       startTime: startTime,
       onPrint: onPrint ?? this.onPrint,
+      evaluateInitializers: executeInitializers,
     );
     Stdlib(moduleLoader.globalEnvironment).register();
     return moduleLoader;
@@ -794,8 +800,9 @@ class D4rt {
   /// Analyzes the given source code and returns introspection information
   /// about all declared functions, classes, variables, enums, and extensions.
   ///
-  /// This method parses and processes the source code without executing any function,
-  /// allowing you to inspect what declarations are available.
+  /// This method parses and processes the source code without executing any function
+  /// or initializer, including initializers from imported modules, allowing you
+  /// to inspect what declarations are available.
   ///
   /// [source] The source code to analyze.
   ///
@@ -830,7 +837,7 @@ class D4rt {
   }) {
     Logger.debug("[D4rt.analyze] Starting analysis...");
 
-    _moduleLoader = _initModule(sources);
+    _moduleLoader = _initModule(sources, executeInitializers: false);
 
     final parseResult = parseString(
       content: source,
@@ -865,10 +872,13 @@ class D4rt {
       declaration.accept<void>(declarationVisitor);
     }
 
-    // Pass 2: Process imports and interpret declarations (for variable values)
+    // Pass 2: Process imports and populate declaration metadata. Top-level
+    // variable initializers are deliberately not evaluated: analyze() must be
+    // side-effect free.
     _visitor = InterpreterVisitor(
       globalEnvironment: executionEnvironment,
       moduleLoader: _moduleLoader,
+      evaluateInitializers: false,
     );
 
     for (final directive in compilationUnit.directives) {
@@ -878,6 +888,9 @@ class D4rt {
     }
 
     for (final declaration in compilationUnit.declarations) {
+      if (declaration is TopLevelVariableDeclaration) {
+        continue;
+      }
       declaration.accept<Object?>(_visitor!);
     }
 
@@ -895,13 +908,14 @@ class D4rt {
   /// as a previous `execute()` call, similar to a REPL experience.
   ///
   /// **Important**: You must call `execute()` at least once before calling `eval()`
-  /// to establish the execution context.
+  /// to establish the execution context. You must also grant
+  /// [DangerousPermission.codeEvaluation].
   ///
   /// [expression] The Dart expression or statement to evaluate.
   ///
   /// ## Example:
   /// ```dart
-  /// final d4rt = D4rt();
+  /// final d4rt = D4rt()..grant(DangerousPermission.codeEvaluation);
   ///
   /// // First, set up the context
   /// d4rt.execute(source: '''
@@ -928,6 +942,16 @@ class D4rt {
     if (_visitor == null || !_hasExecutedOnce) {
       throw RuntimeError(
         'eval() requires an existing execution context. Call execute() first.',
+      );
+    }
+
+    if (!checkPermission({
+      'type': 'dangerous',
+      'operation': 'code evaluation',
+    })) {
+      throw RuntimeError(
+        'eval() requires DangerousPermission.codeEvaluation. '
+        'Grant it explicitly to allow dynamic code evaluation.',
       );
     }
 

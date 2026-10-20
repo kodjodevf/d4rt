@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:d4rt/d4rt.dart';
+import 'network_permission_helper.dart';
 
 T? _runAction<T>(
   InterpreterVisitor visitor,
@@ -24,10 +25,28 @@ class SocketIo {
     name: 'Socket',
     typeParameterCount: 0,
     staticMethods: {
-      'connect': (visitor, positionalArgs, namedArgs) =>
-          _connect(positionalArgs, namedArgs),
-      'startConnect': (visitor, positionalArgs, namedArgs) =>
-          _startConnect(positionalArgs, namedArgs),
+      'connect': (visitor, positionalArgs, namedArgs) {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('Socket.connect requires host and port');
+        }
+        checkNetworkConnectPermission(
+          visitor,
+          positionalArgs[0],
+          positionalArgs[1] as int,
+        );
+        return _connect(positionalArgs, namedArgs);
+      },
+      'startConnect': (visitor, positionalArgs, namedArgs) {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('Socket.startConnect requires host and port');
+        }
+        checkNetworkConnectPermission(
+          visitor,
+          positionalArgs[0],
+          positionalArgs[1] as int,
+        );
+        return _startConnect(positionalArgs, namedArgs);
+      },
     },
     methods: {
       'destroy': (visitor, target, positionalArgs, namedArgs) {
@@ -462,10 +481,8 @@ class InternetAddressIo {
           throw ArgumentError('InternetAddress.lookup requires host');
         }
 
-        // Check network permission
-        _checkNetworkPermission(visitor, positionalArgs[0].toString());
-
         final host = positionalArgs[0].toString();
+        checkNetworkLookupPermission(visitor, host);
         final type =
             namedArgs['type'] as InternetAddressType? ??
             InternetAddressType.any;
@@ -497,7 +514,9 @@ class InternetAddressIo {
     },
     methods: {
       'reverse': (visitor, target, positionalArgs, namedArgs) {
-        return (target as InternetAddress).reverse();
+        final address = target as InternetAddress;
+        checkNetworkLookupPermission(visitor, address.address);
+        return address.reverse();
       },
     },
     getters: {
@@ -522,20 +541,6 @@ class InternetAddressIo {
       },
     },
   );
-
-  /// Helper method to check if NetworkPermission is granted
-  static void _checkNetworkPermission(InterpreterVisitor visitor, String host) {
-    final d4rt = visitor.moduleLoader.d4rt;
-    if (d4rt == null) return;
-
-    // Check for NetworkPermission
-    if (!d4rt.checkPermission({'type': 'network', 'connect': true})) {
-      throw RuntimeError(
-        'Network operations require NetworkPermission. '
-        'Use d4rt.grant(NetworkPermission.any) to allow network access.',
-      );
-    }
-  }
 }
 
 /// Bridged InternetAddress class
@@ -725,8 +730,12 @@ class ServerSocketIo {
     },
     staticMethods: {
       'bind': (visitor, positionalArgs, namedArgs) {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('ServerSocket.bind requires host and port');
+        }
         final host = positionalArgs[0].toString();
         final port = positionalArgs[1] as int;
+        checkNetworkListenPermission(visitor, host, port);
         final backlog = namedArgs['backlog'] as int? ?? 0;
         final v6Only = namedArgs['v6Only'] as bool? ?? false;
         final shared = namedArgs['shared'] as bool? ?? false;
@@ -818,8 +827,12 @@ class RawSocketIo {
     },
     staticMethods: {
       'connect': (visitor, positionalArgs, namedArgs) async {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('RawSocket.connect requires host and port');
+        }
         final host = positionalArgs[0];
         final port = positionalArgs[1] as int;
+        checkNetworkConnectPermission(visitor, host, port);
         final sourceAddress = namedArgs['sourceAddress'];
         final timeout = namedArgs['timeout'] as Duration?;
         return RawSocket.connect(
@@ -830,8 +843,12 @@ class RawSocketIo {
         );
       },
       'startConnect': (visitor, positionalArgs, namedArgs) async {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('RawSocket.startConnect requires host and port');
+        }
         final host = positionalArgs[0];
         final port = positionalArgs[1] as int;
+        checkNetworkConnectPermission(visitor, host, port);
         final sourceAddress = namedArgs['sourceAddress'];
         return RawSocket.startConnect(host, port, sourceAddress: sourceAddress);
       },
@@ -890,8 +907,12 @@ class RawServerSocketIo {
     },
     staticMethods: {
       'bind': (visitor, positionalArgs, namedArgs) async {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('RawServerSocket.bind requires address and port');
+        }
         final address = positionalArgs[0];
         final port = positionalArgs[1] as int;
+        checkNetworkListenPermission(visitor, address, port);
         final backlog = namedArgs['backlog'] as int? ?? 0;
         final v6Only = namedArgs['v6Only'] as bool? ?? false;
         final shared = namedArgs['shared'] as bool? ?? false;
@@ -1061,9 +1082,17 @@ class RawDatagramSocketIo {
       'receive': (visitor, target, positionalArgs, namedArgs) =>
           (target as RawDatagramSocket).receive(),
       'send': (visitor, target, positionalArgs, namedArgs) {
+        if (positionalArgs.length < 3 ||
+            positionalArgs[1] is! InternetAddress ||
+            positionalArgs[2] is! int) {
+          throw ArgumentError(
+            'RawDatagramSocket.send requires data, address, and port',
+          );
+        }
         final data = positionalArgs[0] as List<int>;
         final address = positionalArgs[1] as InternetAddress;
         final port = positionalArgs[2] as int;
+        checkNetworkConnectPermission(visitor, address, port);
         return (target as RawDatagramSocket).send(data, address, port);
       },
       'close': (visitor, target, positionalArgs, namedArgs) =>
@@ -1110,8 +1139,12 @@ class RawDatagramSocketIo {
     },
     staticMethods: {
       'bind': (visitor, positionalArgs, namedArgs) async {
+        if (positionalArgs.length < 2 || positionalArgs[1] is! int) {
+          throw ArgumentError('RawDatagramSocket.bind requires host and port');
+        }
         final host = positionalArgs[0];
         final port = positionalArgs[1] as int;
+        checkNetworkListenPermission(visitor, host, port);
         final reuseAddress = namedArgs['reuseAddress'] as bool? ?? true;
         final reusePort = namedArgs['reusePort'] as bool? ?? false;
         final ttl = namedArgs['ttl'] as int? ?? 1;
@@ -1165,6 +1198,7 @@ class NetworkInterfaceIo {
     },
     staticMethods: {
       'list': (visitor, positionalArgs, namedArgs) async {
+        checkNetworkInspectionPermission(visitor);
         final includeLoopback = namedArgs['includeLoopback'] as bool? ?? false;
         final includeLinkLocal =
             namedArgs['includeLinkLocal'] as bool? ?? false;

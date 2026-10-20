@@ -37,6 +37,10 @@ class ModuleLoader {
   final List<Map<String, BridgedEnumDefinition>> bridgedEnumDefinitions;
   final List<Map<String, BridgedClass>> bridgedClases;
   final D4rt? d4rt; // Reference to D4rt instance for permission checking
+  final Duration? initializationTimeout;
+  final int? maxInitializationSteps;
+  final DateTime? initializationStartTime;
+  final bool executeInitializers;
 
   ModuleLoader(
     this.globalEnvironment,
@@ -46,6 +50,10 @@ class ModuleLoader {
     this.d4rt,
     this.basePath,
     this.allowFileSystemImports = false,
+    this.initializationTimeout,
+    this.maxInitializationSteps,
+    this.initializationStartTime,
+    this.executeInitializers = true,
   }) {
     Logger.debug(
       "[ModuleLoader] Initialized with ${sources.length} preloaded sources.",
@@ -225,7 +233,9 @@ class ModuleLoader {
   void _checkFileSystemSourceReadPermission(Uri fileUri) {
     if (d4rt == null) return;
 
-    final filePath = absolutePathFromFileUri(fileUri);
+    final filePath = canonicalizeFilesystemPath(
+      absolutePathFromFileUri(fileUri),
+    );
     if (!d4rt!.checkPermission({
       'type': 'filesystem',
       'path': filePath,
@@ -306,18 +316,26 @@ class ModuleLoader {
             moduleEnvironment, // Important: use the module's local environment as base
         moduleLoader: this, // Pass the current loader
         initiallibrary: uri, // The URI of the module being interpreted
+        timeout: initializationTimeout,
+        maxSteps: maxInitializationSteps,
+        startTime: initializationTimeout != null
+            ? (initializationStartTime ?? DateTime.now())
+            : null,
+        evaluateInitializers: executeInitializers,
       );
 
       Logger.debug(
         "[ModuleLoader loadModule for $uri] Executing InterpreterVisitor pass for initializers...",
       );
-      for (final declaration in ast.declarations) {
-        // We only care about the evaluation of TopLevelVariableDeclaration for their initializers.
-        // Functions, classes, and mixins are already "declared" by DeclarationVisitor.
-        // We skip class/mixin/function declarations here to avoid complex dependency resolution issues.
-        // They will be properly populated when processed in the main execution context.
-        if (declaration is TopLevelVariableDeclaration) {
-          declaration.accept(moduleInterpreter);
+      if (executeInitializers) {
+        for (final declaration in ast.declarations) {
+          // We only care about the evaluation of TopLevelVariableDeclaration for their initializers.
+          // Functions, classes, and mixins are already "declared" by DeclarationVisitor.
+          // We skip class/mixin/function declarations here to avoid complex dependency resolution issues.
+          // They will be properly populated when processed in the main execution context.
+          if (declaration is TopLevelVariableDeclaration) {
+            declaration.accept(moduleInterpreter);
+          }
         }
       }
       Logger.debug(
@@ -601,41 +619,44 @@ class ModuleLoader {
         );
       }
     }
-    if (bridgedClases.isNotEmpty || bridgedEnumDefinitions.isNotEmpty) {
-      for (var bridgedEnumDefinition in bridgedEnumDefinitions) {
-        if (bridgedEnumDefinition.containsKey(uriString)) {
-          final definition = bridgedEnumDefinition[uriString]!;
-          try {
-            final bridgedEnum = definition.buildBridgedEnum();
-            globalEnvironment.defineBridgedEnum(bridgedEnum);
-            Logger.debug(
-              " [execute] Registered bridged enum: ${definition.name}",
-            );
-          } catch (e) {
-            Logger.error("registering bridged enum '${definition.name}': $e");
-            throw Exception(
-              "Failed to register bridged enum '${definition.name}': $e",
-            );
-          }
+    var foundBridge = false;
+    for (var bridgedEnumDefinition in bridgedEnumDefinitions) {
+      if (bridgedEnumDefinition.containsKey(uriString)) {
+        foundBridge = true;
+        final definition = bridgedEnumDefinition[uriString]!;
+        try {
+          final bridgedEnum = definition.buildBridgedEnum();
+          globalEnvironment.defineBridgedEnum(bridgedEnum);
+          Logger.debug(
+            " [execute] Registered bridged enum: ${definition.name}",
+          );
+        } catch (e) {
+          Logger.error("registering bridged enum '${definition.name}': $e");
+          throw Exception(
+            "Failed to register bridged enum '${definition.name}': $e",
+          );
         }
       }
+    }
 
-      for (var bridgedClass in bridgedClases) {
-        if (bridgedClass.containsKey(uriString)) {
-          final definition = bridgedClass[uriString]!;
-          try {
-            globalEnvironment.defineBridge(definition);
-            Logger.debug(
-              " [execute] Registered bridged class: ${definition.name}",
-            );
-          } catch (e) {
-            Logger.error("registering bridged class '${definition.name}': $e");
-            throw Exception(
-              "Failed to register bridged class '${definition.name}': $e",
-            );
-          }
+    for (var bridgedClass in bridgedClases) {
+      if (bridgedClass.containsKey(uriString)) {
+        foundBridge = true;
+        final definition = bridgedClass[uriString]!;
+        try {
+          globalEnvironment.defineBridge(definition);
+          Logger.debug(
+            " [execute] Registered bridged class: ${definition.name}",
+          );
+        } catch (e) {
+          Logger.error("registering bridged class '${definition.name}': $e");
+          throw Exception(
+            "Failed to register bridged class '${definition.name}': $e",
+          );
         }
       }
+    }
+    if (foundBridge) {
       return '';
     }
 

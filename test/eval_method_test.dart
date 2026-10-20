@@ -8,7 +8,7 @@ void main() {
     late D4rt d4rt;
 
     setUp(() {
-      d4rt = D4rt();
+      d4rt = D4rt()..grant(DangerousPermission.codeEvaluation);
     });
 
     group('Basic expressions', () {
@@ -701,8 +701,8 @@ void main() {
 
     group('Multiple D4rt instances', () {
       test('eval contexts should be independent', () {
-        final d4rt1 = D4rt();
-        final d4rt2 = D4rt();
+        final d4rt1 = D4rt()..grant(DangerousPermission.codeEvaluation);
+        final d4rt2 = D4rt()..grant(DangerousPermission.codeEvaluation);
 
         d4rt1.execute(
           source: '''
