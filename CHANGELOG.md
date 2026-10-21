@@ -12,11 +12,22 @@
     and explicit redirect destinations and HTTP proxy endpoints are checked
     before use.
     `Process.run`/`start`/`runSync` now enforce command and argument scopes
-    instead of only checking for a generic process permission, and
-    `ProcessSignal.watch` requires unrestricted process permission. Directory
-    listings, watch events, temporary-directory prefixes and link resolution
-    also validate every emitted, created or resolved path, and link creation
-    checks its target, preventing symlink escapes and path traversal.
+    instead of only checking for a generic process permission. Native process
+    execution and signal watching additionally require
+    `DangerousPermission.processExecution`, because child processes run outside
+    D4rt's filesystem and network sandbox. `runInShell: true` requires
+    unrestricted `ProcessRunPermission.any`, since shell parsing can bypass a
+    command/argument scope. Directory listings, watch events,
+    temporary-directory prefixes and link resolution also validate every
+    emitted, created or resolved path, and link creation checks its target,
+    preventing symlink escapes and path traversal.
+  - Added descriptor-based filesystem isolation on POSIX systems. File content
+    reads and writes, open streams, copies, create/delete/rename operations and
+    recursive directory deletes now walk parent components with `openat` and
+    `O_NOFOLLOW`, so a symlink substituted after the permission check fails
+    closed instead of redirecting the operation. Windows and the remaining
+    path-based metadata, listing and watch operations retain the documented
+    TOCTOU limitation.
   - `D4rt.eval()` now requires `DangerousPermission.codeEvaluation`.
   - Importing `dart:developer` now requires
     `DangerousPermission.developerTools`; every developer bridge operation,
@@ -31,6 +42,7 @@
     restrictions.
   - The CLI is deny-by-default and exposes `--allow-fs`, `--allow-network`,
     `--allow-process`, `--allow-isolate`, `--allow-dangerous` and `--allow-all`.
+    `--allow-process` also grants `DangerousPermission.processExecution`.
     Scripts get read-only access to their own directory by default.
   - Updated to analyzer 14.5.0, build 5.0.0, source_gen 4.3.1, build_runner
     2.17.1 and test 1.33.0, with a Dart SDK constraint of `^3.11.0`.

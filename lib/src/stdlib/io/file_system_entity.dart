@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:d4rt/d4rt.dart';
+import 'package:path/path.dart' as p;
 
 import 'filesystem_permission_helper.dart';
+import 'secure_file_opener.dart';
 
 class FileSystemEntityIo {
   static BridgedClass get definition => BridgedClass(
@@ -201,23 +203,57 @@ class FileSystemEntityIo {
       },
       'delete': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final entityTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           entity.path,
           operation: 'delete entity',
         );
-        return entity.delete(
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          final securePath = p.join(entityTarget.parent, entityTarget.name);
+          if (entity is Link) {
+            SecureFileOpener.deleteLink(securePath);
+          } else if (entity is Directory) {
+            if (recursive) {
+              SecureFileOpener.deletePathRecursive(securePath);
+            } else {
+              SecureFileOpener.deleteDirectory(securePath);
+            }
+          } else if (recursive) {
+            SecureFileOpener.deletePathRecursive(securePath);
+          } else {
+            SecureFileOpener.deleteFile(securePath);
+          }
+          return Future<FileSystemEntity>.value(entity);
+        }
+        return entity.delete(recursive: recursive);
       },
       'deleteSync': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final entityTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           entity.path,
           operation: 'delete entity',
         );
-        entity.deleteSync(recursive: namedArgs['recursive'] as bool? ?? false);
+        if (SecureFileOpener.isSupported) {
+          final securePath = p.join(entityTarget.parent, entityTarget.name);
+          if (entity is Link) {
+            SecureFileOpener.deleteLink(securePath);
+          } else if (entity is Directory) {
+            if (recursive) {
+              SecureFileOpener.deletePathRecursive(securePath);
+            } else {
+              SecureFileOpener.deleteDirectory(securePath);
+            }
+          } else if (recursive) {
+            SecureFileOpener.deletePathRecursive(securePath);
+          } else {
+            SecureFileOpener.deleteFile(securePath);
+          }
+          return null;
+        }
+        entity.deleteSync(recursive: recursive);
         return null;
       },
       'rename': (visitor, target, positionalArgs, namedArgs) {
@@ -227,17 +263,31 @@ class FileSystemEntityIo {
           );
         }
         final entity = target as FileSystemEntity;
-        checkFilesystemWritePermission(
+        final newPath = positionalArgs[0] as String;
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           entity.path,
           operation: 'rename entity',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'rename entity',
         );
-        return entity.rename(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          if (entity is Directory) {
+            return Future<FileSystemEntity>.value(Directory(newPath));
+          }
+          if (entity is Link) {
+            return Future<FileSystemEntity>.value(Link(newPath));
+          }
+          return Future<FileSystemEntity>.value(File(newPath));
+        }
+        return entity.rename(newPath);
       },
       'renameSync': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
@@ -246,17 +296,25 @@ class FileSystemEntityIo {
           );
         }
         final entity = target as FileSystemEntity;
-        checkFilesystemWritePermission(
+        final newPath = positionalArgs[0] as String;
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           entity.path,
           operation: 'rename entity',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'rename entity',
         );
-        entity.renameSync(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return null;
+        }
+        entity.renameSync(newPath);
         return null;
       },
       'stat': (visitor, target, positionalArgs, namedArgs) {

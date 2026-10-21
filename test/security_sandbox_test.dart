@@ -298,6 +298,7 @@ void main() {
     test('Running echo command with permission', () {
       final interpreter = D4rt();
       interpreter.grant(ProcessRunPermission.any);
+      interpreter.grant(DangerousPermission.processExecution);
       interpreter.grant(FilesystemPermission.any);
 
       final result = interpreter.execute(
@@ -818,6 +819,7 @@ void main() {
         final interpreter = D4rt();
         interpreter.grant(FilesystemPermission.any);
         interpreter.grant(ProcessRunPermission.any);
+        interpreter.grant(DangerousPermission.processExecution);
 
         final result = interpreter.execute(
           source: '''
@@ -837,6 +839,7 @@ void main() {
         final interpreter = D4rt();
         interpreter.grant(FilesystemPermission.any);
         interpreter.grant(ProcessRunPermission.any);
+        interpreter.grant(DangerousPermission.processExecution);
 
         final result = interpreter.execute(
           source: '''

@@ -1,6 +1,7 @@
 import 'dart:io' as io;
 
 import 'package:d4rt/d4rt.dart';
+import 'package:d4rt/src/stdlib/io/secure_file_opener.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -302,6 +303,55 @@ void main() {
       );
     });
 
+    test('native process execution requires dangerous process permission', () {
+      final d4rt = D4rt()
+        ..grant(FilesystemPermission.read)
+        ..grant(ProcessRunPermission.any);
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:io';
+          void main() {
+            Process.runSync('echo', ['should-not-run']);
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('DangerousPermission.processExecution'),
+          ),
+        ),
+      );
+    });
+
+    test('runInShell requires unrestricted process permission', () {
+      final d4rt = D4rt()
+        ..grant(FilesystemPermission.read)
+        ..grant(ProcessRunPermission.command('echo'))
+        ..grant(DangerousPermission.processExecution);
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:io';
+          void main() {
+            Process.runSync('echo', ['x'], runInShell: true);
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('ProcessRunPermission.any'),
+          ),
+        ),
+      );
+    });
+
     test('ProcessSignal.watch requires unrestricted process permission', () {
       final d4rt = D4rt()
         ..grant(FilesystemPermission.read)
@@ -321,6 +371,30 @@ void main() {
             (e) => e.message,
             'message',
             contains('Process signal handling denied'),
+          ),
+        ),
+      );
+    });
+
+    test('ProcessSignal.watch also requires dangerous process permission', () {
+      final d4rt = D4rt()
+        ..grant(FilesystemPermission.read)
+        ..grant(ProcessRunPermission.any);
+
+      expect(
+        () => d4rt.execute(
+          source: '''
+          import 'dart:io';
+          void main() {
+            ProcessSignal.sigint.watch();
+          }
+        ''',
+        ),
+        throwsA(
+          isA<RuntimeError>().having(
+            (e) => e.message,
+            'message',
+            contains('DangerousPermission.processExecution'),
           ),
         ),
       );
@@ -517,6 +591,118 @@ void main() {
         if (root.existsSync()) root.deleteSync(recursive: true);
       }
     });
+
+    test(
+      'descriptor opener rejects symlinks introduced after canonicalization',
+      () {
+        final root = io.Directory.systemTemp.createTempSync('d4rt-fd-race-');
+        final allowed = io.Directory(p.join(root.path, 'allowed'))
+          ..createSync();
+        final outside = io.Directory(p.join(root.path, 'outside'))
+          ..createSync();
+        final outsideFile = io.File(p.join(outside.path, 'secret.txt'))
+          ..writeAsStringSync('secret');
+
+        try {
+          final canonicalAllowed = allowed.resolveSymbolicLinksSync();
+          final finalLink = io.Link(p.join(allowed.path, 'escape'))
+            ..createSync(outsideFile.path);
+          final parentLink = io.Link(p.join(allowed.path, 'parent'))
+            ..createSync(outside.path);
+          final insideFile = io.File(p.join(allowed.path, 'inside.txt'))
+            ..writeAsStringSync('inside');
+
+          expect(
+            () => SecureFileOpener.openRead(
+              p.join(canonicalAllowed, p.basename(finalLink.path)),
+            ),
+            throwsA(isA<io.FileSystemException>()),
+          );
+          expect(
+            () => SecureFileOpener.openRead(
+              p.join(
+                canonicalAllowed,
+                p.basename(parentLink.path),
+                p.basename(outsideFile.path),
+              ),
+            ),
+            throwsA(isA<io.FileSystemException>()),
+          );
+
+          final handle = SecureFileOpener.openRead(
+            p.join(canonicalAllowed, p.basename(insideFile.path)),
+          );
+          expect(handle, isNotNull);
+          expect(io.File(handle!.path).readAsStringSync(), 'inside');
+          handle.close();
+        } finally {
+          if (root.existsSync()) root.deleteSync(recursive: true);
+        }
+      },
+      skip: !SecureFileOpener.isSupported,
+    );
+
+    test(
+      'descriptor namespace operations reject symlink parents and preserve targets',
+      () {
+        final root = io.Directory.systemTemp.createTempSync('d4rt-fd-ns-');
+        final allowed = io.Directory(p.join(root.path, 'allowed'))
+          ..createSync();
+        final outside = io.Directory(p.join(root.path, 'outside'))
+          ..createSync();
+
+        try {
+          final canonicalAllowed = allowed.resolveSymbolicLinksSync();
+          final outsideFile = io.File(p.join(outside.path, 'secret.txt'))
+            ..writeAsStringSync('secret');
+          final outsideDir = io.Directory(p.join(outside.path, 'dir'))
+            ..createSync();
+          final escapeParent = io.Link(p.join(allowed.path, 'escape'))
+            ..createSync(outside.path);
+
+          expect(
+            () => SecureFileOpener.createFile(
+              p.join(
+                canonicalAllowed,
+                p.basename(escapeParent.path),
+                'pwn.txt',
+              ),
+            ),
+            throwsA(isA<io.FileSystemException>()),
+          );
+          expect(
+            io.File(p.join(outside.path, 'pwn.txt')).existsSync(),
+            isFalse,
+          );
+
+          final canonicalOutsideDir = outsideDir.resolveSymbolicLinksSync();
+          final linkToDir = io.Link(p.join(allowed.path, 'link-to-dir'))
+            ..createSync(canonicalOutsideDir);
+          SecureFileOpener.deleteDirectory(
+            p.join(canonicalAllowed, p.basename(linkToDir.path)),
+          );
+          expect(linkToDir.existsSync(), isFalse);
+          expect(outsideDir.existsSync(), isTrue);
+          expect(outsideFile.existsSync(), isTrue);
+
+          final tree = io.Directory(p.join(allowed.path, 'tree'))..createSync();
+          final nested = io.Directory(p.join(tree.path, 'nested'))
+            ..createSync();
+          io.File(p.join(nested.path, 'data.txt')).writeAsStringSync('data');
+          io.Link(
+            p.join(tree.path, 'outside-link'),
+          ).createSync(outsideFile.path);
+          SecureFileOpener.deletePathRecursive(
+            p.join(canonicalAllowed, p.basename(tree.path)),
+          );
+          expect(tree.existsSync(), isFalse);
+          expect(outsideFile.existsSync(), isTrue);
+        } finally {
+          if (root.existsSync()) root.deleteSync(recursive: true);
+        }
+      },
+      skip: !SecureFileOpener.isSupported,
+    );
 
     test('directory listings cannot traverse symlinks outside a scope', () {
       final root = io.Directory.systemTemp.createTempSync('d4rt-list-');

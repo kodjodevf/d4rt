@@ -77,6 +77,36 @@ void main() {
       expect(execute(source), isTrue);
     });
 
+    test('copySync is a no-op when source and destination are identical', () {
+      const source = '''
+     import 'dart:io';
+     main() {
+          File file = File(Directory.systemTemp.path + "/test_\${DateTime.now().microsecondsSinceEpoch}.txt");
+        file.writeAsStringSync("Hello, world!");
+        file.copySync(file.path);
+        var content = file.readAsStringSync();
+        file.deleteSync();
+        return content;
+      }
+      ''';
+      expect(execute(source), equals('Hello, world!'));
+    });
+
+    test('deleteSync recursively removes a directory tree', () {
+      const source = '''
+     import 'dart:io';
+     main() {
+          Directory directory = Directory(Directory.systemTemp.path + "/test_dir_\${DateTime.now().microsecondsSinceEpoch}");
+        directory.createSync(recursive: true);
+        Directory(directory.path + "/sub").createSync();
+        File(directory.path + "/sub/file.txt").writeAsStringSync("data");
+        File(directory.path).deleteSync(recursive: true);
+        return directory.existsSync();
+      }
+      ''';
+      expect(execute(source), isFalse);
+    });
+
     test('lengthSync', () {
       const source = '''
      import 'dart:io';

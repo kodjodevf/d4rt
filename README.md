@@ -258,8 +258,10 @@ void main() {
   // Grant network access
   interpreter.grant(NetworkPermission.any);
 
-  // Grant process execution
+  // Grant process execution. Native processes are outside the D4rt sandbox,
+  // so the dangerous process-execution permission is also required.
   interpreter.grant(ProcessRunPermission.any);
+  interpreter.grant(DangerousPermission.processExecution);
 
   // Grant isolate operations
   interpreter.grant(IsolatePermission.any);
@@ -300,6 +302,8 @@ void main() {
   - `ProcessRunPermission.any` - Allow execution of any command
   - `ProcessRunPermission.command('git')` - Allow a specific command
   - `ProcessRunPermission.commandWithArgs('git', ['status'])` - Restrict arguments too
+  - Process execution also requires `DangerousPermission.processExecution`
+    because the child process is not confined by D4rt permissions.
 
 - **`IsolatePermission`**: Controls isolate creation and communication
   - `IsolatePermission.spawn` - Allow creating and controlling isolates
@@ -312,6 +316,8 @@ void main() {
 - **`DangerousPermission`**: Controls operations that can escape the sandbox
   - `DangerousPermission.codeEvaluation` - Required by `D4rt.eval()` and
     `Isolate.spawnUri`
+  - `DangerousPermission.processExecution` - Required to launch native
+    processes or watch host process signals
   - `DangerousPermission.developerTools` - Required to import `dart:developer`
   - `DangerousPermission.any` - Allow every dangerous operation
 
@@ -324,10 +330,24 @@ Creating or updating a symlink also requires write access to its target.
 Scoped network permissions disable transparent HTTP redirects; follow redirects
 manually so every destination is checked. HTTP proxy endpoints returned by
 `findProxy` are also checked against the network permission scope. Watching
-host process signals requires `ProcessRunPermission.any` rather than a
-command-scoped process permission. Running a child process is equivalent to
-host code execution: command and argument scoping does not sandbox the child's
-filesystem or network access.
+host process signals requires both `ProcessRunPermission.any` and
+`DangerousPermission.processExecution`; a command-scoped process permission is
+not sufficient. `runInShell: true` also requires `ProcessRunPermission.any`,
+because shell parsing can execute commands outside a command/argument scope.
+Running a child process is equivalent to host code execution: command and
+argument scoping does not sandbox the child's filesystem or network access.
+
+On POSIX systems (macOS, Linux, Android and iOS), file content reads and writes,
+open streams, file copies, create/delete/rename operations and recursive
+directory deletes use descriptor-based filesystem operations. Parent components
+are opened with `openat` and `O_NOFOLLOW`, so a symlink substituted between the
+permission check and the native operation is rejected instead of followed. The
+remaining path-based operations, including directory listings and watches,
+`stat`/`exists`, temporary-directory creation and link-target resolution, still
+have a narrow TOCTOU window. Windows falls back to path-based operations for
+all filesystem bridges. For workloads that require a hard guarantee against a
+concurrent local attacker with write access to the allowed tree, run D4rt in an
+OS-level sandbox or a dedicated user account.
 
 ### Permission Management
 
@@ -386,7 +406,9 @@ d4rt --allow-fs --allow-process script.dart
 d4rt --allow-all script.dart
 ```
 
-`-e` and the REPL require code evaluation and receive
+`--allow-process` grants both `ProcessRunPermission.any` and
+`DangerousPermission.processExecution`, because the flag explicitly opts into
+host process execution. `-e` and the REPL require code evaluation and receive
 `DangerousPermission.codeEvaluation` automatically; every other permission is
 still denied unless the corresponding flag is passed.
 

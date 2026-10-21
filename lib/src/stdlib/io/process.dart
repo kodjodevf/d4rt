@@ -18,6 +18,11 @@ class ProcessIo {
               ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
               : const <String>[],
         );
+        _checkShellExecutionPermission(
+          visitor,
+          positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '',
+          runInShell: namedArgs['runInShell'] as bool? ?? false,
+        );
         return _start(positionalArgs, namedArgs);
       },
       'run': (visitor, positionalArgs, namedArgs) {
@@ -28,6 +33,11 @@ class ProcessIo {
               ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
               : const <String>[],
         );
+        _checkShellExecutionPermission(
+          visitor,
+          positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '',
+          runInShell: namedArgs['runInShell'] as bool? ?? false,
+        );
         return _run(positionalArgs, namedArgs);
       },
       'runSync': (visitor, positionalArgs, namedArgs) {
@@ -37,6 +47,11 @@ class ProcessIo {
           positionalArgs.length > 1
               ? (positionalArgs[1] as List).map((e) => e.toString()).toList()
               : const <String>[],
+        );
+        _checkShellExecutionPermission(
+          visitor,
+          positionalArgs.isNotEmpty ? positionalArgs[0].toString() : '',
+          runInShell: namedArgs['runInShell'] as bool? ?? false,
         );
         return _runSync(positionalArgs, namedArgs);
       },
@@ -190,7 +205,7 @@ class ProcessIo {
     return instance.kill(signal);
   }
 
-  /// Helper method to check if ProcessRunPermission is granted
+  /// Helper method to check process execution capabilities.
   static void _checkProcessPermission(
     InterpreterVisitor visitor,
     String command, [
@@ -208,6 +223,21 @@ class ProcessIo {
       throw RuntimeError(
         'Process execution denied for "$command". '
         'Grant an appropriate ProcessRunPermission for this command.',
+      );
+    }
+
+    // A child process is not confined by D4rt's filesystem or network
+    // permissions. Require an explicit dangerous permission in addition to
+    // the command/argument scope.
+    if (!d4rt.checkPermission({
+      'type': 'dangerous',
+      'operation': 'process execution',
+    })) {
+      throw RuntimeError(
+        'Process execution denied for "$command". '
+        'Native processes run outside the D4rt sandbox and require '
+        'DangerousPermission.processExecution in addition to '
+        'ProcessRunPermission.',
       );
     }
   }
@@ -228,6 +258,27 @@ class ProcessResultIo {
   );
 }
 
+/// Shell execution delegates command parsing to a shell, so a command/argument
+/// scope can no longer describe what will run. Require an unrestricted process
+/// permission instead.
+void _checkShellExecutionPermission(
+  InterpreterVisitor visitor,
+  String command, {
+  required bool runInShell,
+}) {
+  if (!runInShell) return;
+  final d4rt = visitor.moduleLoader.d4rt;
+  if (d4rt == null) return;
+
+  if (!d4rt.checkPermission({'type': 'process'})) {
+    throw RuntimeError(
+      'Process execution denied for "$command" with runInShell. '
+      'Shell execution requires ProcessRunPermission.any because shell '
+      'parsing can run commands outside a command/argument scope.',
+    );
+  }
+}
+
 /// Watching host process signals is a process-wide capability. A permission
 /// scoped to a specific command must not grant it.
 void _checkProcessSignalPermission(InterpreterVisitor visitor) {
@@ -238,6 +289,16 @@ void _checkProcessSignalPermission(InterpreterVisitor visitor) {
     throw RuntimeError(
       'Process signal handling denied. '
       'Grant ProcessRunPermission.any to watch host process signals.',
+    );
+  }
+
+  if (!d4rt.checkPermission({
+    'type': 'dangerous',
+    'operation': 'process execution',
+  })) {
+    throw RuntimeError(
+      'Process signal handling denied. '
+      'Watching host signals requires DangerousPermission.processExecution.',
     );
   }
 }

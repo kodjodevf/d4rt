@@ -1,10 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:d4rt/d4rt.dart';
+import 'package:path/path.dart' as p;
 
 import 'filesystem_permission_helper.dart';
+import 'secure_file_opener.dart';
+
+final Expando<String> _originalRandomAccessFilePaths = Expando(
+  'd4rt.randomAccessFile.originalPath',
+);
 
 /// File mode for opening files
 class FileModeIo {
@@ -248,10 +255,17 @@ class RandomAccessFileIo {
         (target as RandomAccessFile).unlockSync(start, end);
         return null;
       },
-      'toString': (visitor, target, positionalArgs, namedArgs) =>
-          (target as RandomAccessFile).toString(),
+      'toString': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as RandomAccessFile;
+        return _originalRandomAccessFilePaths[file] ?? file.toString();
+      },
     },
-    getters: {'path': (visitor, target) => (target as RandomAccessFile).path},
+    getters: {
+      'path': (visitor, target) {
+        final file = target as RandomAccessFile;
+        return _originalRandomAccessFilePaths[file] ?? file.path;
+      },
+    },
   );
 }
 
@@ -403,6 +417,207 @@ class PipeIo {
   );
 }
 
+T _withSecureReadSync<T>(
+  InterpreterVisitor visitor,
+  File file,
+  String operation,
+  T Function(File securedFile) action,
+) {
+  final canonicalPath = checkFilesystemReadPermission(
+    visitor,
+    file.path,
+    operation: operation,
+  );
+  final handle = SecureFileOpener.openRead(canonicalPath);
+  if (handle == null) return action(file);
+
+  try {
+    return action(File(handle.path));
+  } finally {
+    handle.close();
+  }
+}
+
+Future<T> _withSecureReadAsync<T>(
+  InterpreterVisitor visitor,
+  File file,
+  String operation,
+  Future<T> Function(File securedFile) action,
+) async {
+  final canonicalPath = checkFilesystemReadPermission(
+    visitor,
+    file.path,
+    operation: operation,
+  );
+  final handle = SecureFileOpener.openRead(canonicalPath);
+  if (handle == null) return action(file);
+
+  try {
+    return await action(File(handle.path));
+  } finally {
+    handle.close();
+  }
+}
+
+T _withSecureWriteSync<T>(
+  InterpreterVisitor visitor,
+  File file,
+  FileMode mode,
+  String operation,
+  T Function(File securedFile) action,
+) {
+  final canonicalPath = checkFilesystemWritePermission(
+    visitor,
+    file.path,
+    operation: operation,
+  );
+  final handle = SecureFileOpener.openWrite(canonicalPath, mode: mode);
+  if (handle == null) return action(file);
+
+  try {
+    return action(File(handle.path));
+  } finally {
+    handle.close();
+  }
+}
+
+Future<T> _withSecureWriteAsync<T>(
+  InterpreterVisitor visitor,
+  File file,
+  FileMode mode,
+  String operation,
+  Future<T> Function(File securedFile) action,
+) async {
+  final canonicalPath = checkFilesystemWritePermission(
+    visitor,
+    file.path,
+    operation: operation,
+  );
+  final handle = SecureFileOpener.openWrite(canonicalPath, mode: mode);
+  if (handle == null) return action(file);
+
+  try {
+    return await action(File(handle.path));
+  } finally {
+    handle.close();
+  }
+}
+
+SecureFileHandle? _secureReadHandle(
+  InterpreterVisitor visitor,
+  File file,
+  String operation,
+) {
+  final canonicalPath = checkFilesystemReadPermission(
+    visitor,
+    file.path,
+    operation: operation,
+  );
+  return SecureFileOpener.openRead(canonicalPath);
+}
+
+SecureFileHandle? _secureWriteHandle(
+  InterpreterVisitor visitor,
+  File file,
+  FileMode mode,
+  String operation,
+) {
+  final canonicalPath = checkFilesystemWritePermission(
+    visitor,
+    file.path,
+    operation: operation,
+  );
+  return SecureFileOpener.openWrite(canonicalPath, mode: mode);
+}
+
+Stream<List<int>> _secureOpenRead(
+  SecureFileHandle handle,
+  int? start,
+  int? end,
+) {
+  late StreamSubscription<List<int>> subscription;
+  late StreamController<List<int>> controller;
+
+  controller = StreamController<List<int>>(
+    onListen: () {
+      try {
+        subscription = File(handle.path)
+            .openRead(start, end)
+            .listen(
+              controller.add,
+              onError: controller.addError,
+              onDone: () {
+                handle.close();
+                controller.close();
+              },
+            );
+      } catch (error, stackTrace) {
+        handle.close();
+        controller.addError(error, stackTrace);
+        controller.close();
+      }
+    },
+    onPause: () => subscription.pause(),
+    onResume: () => subscription.resume(),
+    onCancel: () async {
+      await subscription.cancel();
+      handle.close();
+    },
+  );
+
+  return controller.stream;
+}
+
+Future<void> _copySecureAsync(
+  SecureFileHandle source,
+  SecureFileHandle destination,
+  int sourceMode,
+) async {
+  final input = await File(source.path).open(mode: FileMode.read);
+  RandomAccessFile? output;
+  try {
+    if (File(source.path).statSync().type == FileSystemEntityType.directory) {
+      throw FileSystemException('Cannot copy file', source.path);
+    }
+    output = await File(destination.path).open(mode: FileMode.write);
+    while (true) {
+      final chunk = await input.read(64 * 1024);
+      if (chunk.isEmpty) break;
+      await output.writeFrom(chunk);
+    }
+    await output.flush();
+    SecureFileOpener.setMode(destination, sourceMode);
+  } finally {
+    await input.close();
+    await output?.close();
+  }
+}
+
+void _copySecureSync(
+  SecureFileHandle source,
+  SecureFileHandle destination,
+  int sourceMode,
+) {
+  final input = File(source.path).openSync(mode: FileMode.read);
+  RandomAccessFile? output;
+  try {
+    if (File(source.path).statSync().type == FileSystemEntityType.directory) {
+      throw FileSystemException('Cannot copy file', source.path);
+    }
+    output = File(destination.path).openSync(mode: FileMode.write);
+    while (true) {
+      final chunk = input.readSync(64 * 1024);
+      if (chunk.isEmpty) break;
+      output.writeFromSync(chunk);
+    }
+    output.flushSync();
+    SecureFileOpener.setMode(destination, sourceMode);
+  } finally {
+    input.closeSync();
+    output?.closeSync();
+  }
+}
+
 class FileIo {
   static BridgedClass get definition => BridgedClass(
     nativeType: File,
@@ -454,68 +669,56 @@ class FileIo {
         );
         return file.existsSync();
       })(),
-      'readAsString': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file',
-        );
-        return file.readAsString(
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-        );
-      })(),
-      'readAsStringSync': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file',
-        );
-        return file.readAsStringSync(
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-        );
-      })(),
-      'readAsBytes': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file',
-        );
-        return file.readAsBytes();
-      })(),
-      'readAsBytesSync': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file',
-        );
-        return file.readAsBytesSync();
-      })(),
-      'readAsLines': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file',
-        );
-        return file.readAsLines(
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-        );
-      })(),
-      'readAsLinesSync': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file',
-        );
-        return file.readAsLinesSync(
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-        );
-      })(),
+      'readAsString': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadAsync(
+            visitor,
+            target as File,
+            'read file',
+            (file) => file.readAsString(
+              encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+            ),
+          ),
+      'readAsStringSync': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadSync(
+            visitor,
+            target as File,
+            'read file',
+            (file) => file.readAsStringSync(
+              encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+            ),
+          ),
+      'readAsBytes': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadAsync(
+            visitor,
+            target as File,
+            'read file',
+            (file) => file.readAsBytes(),
+          ),
+      'readAsBytesSync': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadSync(
+            visitor,
+            target as File,
+            'read file',
+            (file) => file.readAsBytesSync(),
+          ),
+      'readAsLines': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadAsync(
+            visitor,
+            target as File,
+            'read file',
+            (file) => file.readAsLines(
+              encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+            ),
+          ),
+      'readAsLinesSync': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadSync(
+            visitor,
+            target as File,
+            'read file',
+            (file) => file.readAsLinesSync(
+              encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+            ),
+          ),
       'writeAsString': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
         if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
@@ -523,16 +726,18 @@ class FileIo {
             'File.writeAsString requires one String argument (contents).',
           );
         }
-        checkFilesystemWritePermission(
+        final mode = namedArgs['mode'] as FileMode? ?? FileMode.write;
+        return _withSecureWriteAsync(
           visitor,
-          file.path,
-          operation: 'write file',
-        );
-        return file.writeAsString(
-          positionalArgs[0] as String,
-          mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-          flush: namedArgs['flush'] as bool? ?? false,
+          file,
+          mode,
+          'write file',
+          (securedFile) => securedFile.writeAsString(
+            positionalArgs[0] as String,
+            mode: mode,
+            encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+            flush: namedArgs['flush'] as bool? ?? false,
+          ),
         );
       },
       'writeAsStringSync': (visitor, target, positionalArgs, namedArgs) {
@@ -542,16 +747,18 @@ class FileIo {
             'File.writeAsStringSync requires one String argument (contents).',
           );
         }
-        checkFilesystemWritePermission(
+        final mode = namedArgs['mode'] as FileMode? ?? FileMode.write;
+        _withSecureWriteSync(
           visitor,
-          file.path,
-          operation: 'write file',
-        );
-        file.writeAsStringSync(
-          positionalArgs[0] as String,
-          mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-          flush: namedArgs['flush'] as bool? ?? false,
+          file,
+          mode,
+          'write file',
+          (securedFile) => securedFile.writeAsStringSync(
+            positionalArgs[0] as String,
+            mode: mode,
+            encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+            flush: namedArgs['flush'] as bool? ?? false,
+          ),
         );
         return null;
       },
@@ -562,15 +769,17 @@ class FileIo {
             'File.writeAsBytes requires one List<int> argument (bytes).',
           );
         }
-        checkFilesystemWritePermission(
+        final mode = namedArgs['mode'] as FileMode? ?? FileMode.write;
+        return _withSecureWriteAsync(
           visitor,
-          file.path,
-          operation: 'write file',
-        );
-        return file.writeAsBytes(
-          (positionalArgs[0] as List).cast(),
-          mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
-          flush: namedArgs['flush'] as bool? ?? false,
+          file,
+          mode,
+          'write file',
+          (securedFile) => securedFile.writeAsBytes(
+            (positionalArgs[0] as List).cast(),
+            mode: mode,
+            flush: namedArgs['flush'] as bool? ?? false,
+          ),
         );
       },
       'writeAsBytesSync': (visitor, target, positionalArgs, namedArgs) {
@@ -580,34 +789,54 @@ class FileIo {
             'File.writeAsBytesSync requires one List<int> argument (bytes).',
           );
         }
-        checkFilesystemWritePermission(
+        final mode = namedArgs['mode'] as FileMode? ?? FileMode.write;
+        _withSecureWriteSync(
           visitor,
-          file.path,
-          operation: 'write file',
-        );
-        file.writeAsBytesSync(
-          (positionalArgs[0] as List).cast(),
-          mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
-          flush: namedArgs['flush'] as bool? ?? false,
+          file,
+          mode,
+          'write file',
+          (securedFile) => securedFile.writeAsBytesSync(
+            (positionalArgs[0] as List).cast(),
+            mode: mode,
+            flush: namedArgs['flush'] as bool? ?? false,
+          ),
         );
         return null;
       },
-      'delete': (visitor, target, positionalArgs, namedArgs) => (() {
+      'delete': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
-        checkFilesystemWritePermission(
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           file.path,
           operation: 'delete file',
         );
+        if (SecureFileOpener.isSupported) {
+          final securePath = p.join(targetInfo.parent, targetInfo.name);
+          if (namedArgs['recursive'] as bool? ?? false) {
+            SecureFileOpener.deletePathRecursive(securePath);
+          } else {
+            SecureFileOpener.deleteFile(securePath);
+          }
+          return Future<File>.value(file);
+        }
         return file.delete(recursive: namedArgs['recursive'] as bool? ?? false);
-      })(),
+      },
       'deleteSync': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
-        checkFilesystemWritePermission(
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           file.path,
           operation: 'delete file',
         );
+        if (SecureFileOpener.isSupported) {
+          final securePath = p.join(targetInfo.parent, targetInfo.name);
+          if (namedArgs['recursive'] as bool? ?? false) {
+            SecureFileOpener.deletePathRecursive(securePath);
+          } else {
+            SecureFileOpener.deleteFile(securePath);
+          }
+          return null;
+        }
         file.deleteSync(recursive: namedArgs['recursive'] as bool? ?? false);
         return null;
       },
@@ -618,17 +847,25 @@ class FileIo {
             'File.rename requires one String argument (newPath).',
           );
         }
-        checkFilesystemWritePermission(
+        final newPath = positionalArgs[0] as String;
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           file.path,
           operation: 'rename file',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'rename file',
         );
-        return file.rename(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return Future<File>.value(File(newPath));
+        }
+        return file.rename(newPath);
       },
       'renameSync': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
@@ -637,36 +874,77 @@ class FileIo {
             'File.renameSync requires one String argument (newPath).',
           );
         }
-        checkFilesystemWritePermission(
+        final newPath = positionalArgs[0] as String;
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           file.path,
           operation: 'rename file',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'rename file',
         );
-        return file.renameSync(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return File(newPath);
+        }
+        return file.renameSync(newPath);
       },
-      'copy': (visitor, target, positionalArgs, namedArgs) {
+      'copy': (visitor, target, positionalArgs, namedArgs) async {
         final file = target as File;
         if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
           throw RuntimeError(
             'File.copy requires one String argument (newPath).',
           );
         }
-        checkFilesystemReadPermission(
+        final newPath = positionalArgs[0] as String;
+        final sourcePath = checkFilesystemReadPermission(
           visitor,
           file.path,
           operation: 'copy file',
         );
-        checkFilesystemWritePermission(
+        final destinationPath = checkFilesystemWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'copy file',
         );
-        return file.copy(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          if (sourcePath == destinationPath) {
+            return File(newPath);
+          }
+          if (File(newPath).existsSync() &&
+              FileSystemEntity.identicalSync(file.path, newPath)) {
+            return File(newPath);
+          }
+          final sourceMode = File(file.path).statSync().mode;
+          final source = SecureFileOpener.openRead(sourcePath);
+          if (source != null &&
+              File(source.path).statSync().type ==
+                  FileSystemEntityType.directory) {
+            source.close();
+            throw FileSystemException('Cannot copy file', file.path);
+          }
+          final destination = SecureFileOpener.openWrite(
+            destinationPath,
+            mode: FileMode.write,
+          );
+          if (source != null && destination != null) {
+            try {
+              await _copySecureAsync(source, destination, sourceMode);
+              return File(newPath);
+            } finally {
+              source.close();
+              destination.close();
+            }
+          }
+          source?.close();
+          destination?.close();
+        }
+        return file.copy(newPath);
       },
       'copySync': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
@@ -675,54 +953,79 @@ class FileIo {
             'File.copySync requires one String argument (newPath).',
           );
         }
-        checkFilesystemReadPermission(
+        final newPath = positionalArgs[0] as String;
+        final sourcePath = checkFilesystemReadPermission(
           visitor,
           file.path,
           operation: 'copy file',
         );
-        checkFilesystemWritePermission(
+        final destinationPath = checkFilesystemWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'copy file',
         );
-        return file.copySync(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          if (sourcePath == destinationPath) {
+            return File(newPath);
+          }
+          if (File(newPath).existsSync() &&
+              FileSystemEntity.identicalSync(file.path, newPath)) {
+            return File(newPath);
+          }
+          final sourceMode = File(file.path).statSync().mode;
+          final source = SecureFileOpener.openRead(sourcePath);
+          if (source != null &&
+              File(source.path).statSync().type ==
+                  FileSystemEntityType.directory) {
+            source.close();
+            throw FileSystemException('Cannot copy file', file.path);
+          }
+          final destination = SecureFileOpener.openWrite(
+            destinationPath,
+            mode: FileMode.write,
+          );
+          if (source != null && destination != null) {
+            try {
+              _copySecureSync(source, destination, sourceMode);
+              return File(newPath);
+            } finally {
+              source.close();
+              destination.close();
+            }
+          }
+          source?.close();
+          destination?.close();
+        }
+        return file.copySync(newPath);
       },
-      'length': (visitor, target, positionalArgs, namedArgs) {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file metadata',
-        );
-        return file.length();
-      },
-      'lengthSync': (visitor, target, positionalArgs, namedArgs) {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file metadata',
-        );
-        return file.lengthSync();
-      },
-      'lastAccessed': (visitor, target, positionalArgs, namedArgs) {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file metadata',
-        );
-        return file.lastAccessed();
-      },
-      'lastAccessedSync': (visitor, target, positionalArgs, namedArgs) {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file metadata',
-        );
-        return file.lastAccessedSync();
-      },
+      'length': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadAsync(
+            visitor,
+            target as File,
+            'read file metadata',
+            (file) => file.length(),
+          ),
+      'lengthSync': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadSync(
+            visitor,
+            target as File,
+            'read file metadata',
+            (file) => file.lengthSync(),
+          ),
+      'lastAccessed': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadAsync(
+            visitor,
+            target as File,
+            'read file metadata',
+            (file) => file.lastAccessed(),
+          ),
+      'lastAccessedSync': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadSync(
+            visitor,
+            target as File,
+            'read file metadata',
+            (file) => file.lastAccessedSync(),
+          ),
       'setLastAccessed': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
         if (positionalArgs.length != 1 || positionalArgs[0] is! DateTime) {
@@ -752,24 +1055,20 @@ class FileIo {
         file.setLastAccessedSync(positionalArgs[0] as DateTime);
         return null;
       },
-      'lastModified': (visitor, target, positionalArgs, namedArgs) {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file metadata',
-        );
-        return file.lastModified();
-      },
-      'lastModifiedSync': (visitor, target, positionalArgs, namedArgs) {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'read file metadata',
-        );
-        return file.lastModifiedSync();
-      },
+      'lastModified': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadAsync(
+            visitor,
+            target as File,
+            'read file metadata',
+            (file) => file.lastModified(),
+          ),
+      'lastModifiedSync': (visitor, target, positionalArgs, namedArgs) =>
+          _withSecureReadSync(
+            visitor,
+            target as File,
+            'read file metadata',
+            (file) => file.lastModifiedSync(),
+          ),
       'setLastModified': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
         if (positionalArgs.length != 1 || positionalArgs[0] is! DateTime) {
@@ -799,66 +1098,80 @@ class FileIo {
         file.setLastModifiedSync(positionalArgs[0] as DateTime);
         return null;
       },
-      'open': (visitor, target, positionalArgs, namedArgs) => (() {
+      'open': (visitor, target, positionalArgs, namedArgs) async {
         final file = target as File;
         final mode = namedArgs['mode'] as FileMode? ?? FileMode.read;
-        if (mode == FileMode.read) {
-          checkFilesystemReadPermission(
-            visitor,
-            file.path,
-            operation: 'open file',
-          );
-        } else {
-          checkFilesystemWritePermission(
-            visitor,
-            file.path,
-            operation: 'open file',
-          );
+        final handle = mode == FileMode.read
+            ? _secureReadHandle(visitor, file, 'open file')
+            : _secureWriteHandle(visitor, file, mode, 'open file');
+        if (handle == null) return file.open(mode: mode);
+
+        try {
+          final randomAccessFile = await File(handle.path).open(mode: mode);
+          _originalRandomAccessFilePaths[randomAccessFile] = file.path;
+          return randomAccessFile;
+        } finally {
+          handle.close();
         }
-        return file.open(mode: mode);
-      })(),
-      'openSync': (visitor, target, positionalArgs, namedArgs) => (() {
+      },
+      'openSync': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
         final mode = namedArgs['mode'] as FileMode? ?? FileMode.read;
-        if (mode == FileMode.read) {
-          checkFilesystemReadPermission(
-            visitor,
-            file.path,
-            operation: 'open file',
-          );
-        } else {
-          checkFilesystemWritePermission(
-            visitor,
-            file.path,
-            operation: 'open file',
+        final handle = mode == FileMode.read
+            ? _secureReadHandle(visitor, file, 'open file')
+            : _secureWriteHandle(visitor, file, mode, 'open file');
+        if (handle == null) return file.openSync(mode: mode);
+
+        try {
+          final randomAccessFile = File(handle.path).openSync(mode: mode);
+          _originalRandomAccessFilePaths[randomAccessFile] = file.path;
+          return randomAccessFile;
+        } finally {
+          handle.close();
+        }
+      },
+      'openRead': (visitor, target, positionalArgs, namedArgs) {
+        final file = target as File;
+        final handle = _secureReadHandle(visitor, file, 'open file');
+        if (handle == null) {
+          return file.openRead(
+            positionalArgs.isNotEmpty ? positionalArgs[0] as int? : null,
+            positionalArgs.length > 1 ? positionalArgs[1] as int? : null,
           );
         }
-        return file.openSync(mode: mode);
-      })(),
-      'openRead': (visitor, target, positionalArgs, namedArgs) => (() {
-        final file = target as File;
-        checkFilesystemReadPermission(
-          visitor,
-          file.path,
-          operation: 'open file',
-        );
-        return file.openRead(
+
+        return _secureOpenRead(
+          handle,
           positionalArgs.isNotEmpty ? positionalArgs[0] as int? : null,
           positionalArgs.length > 1 ? positionalArgs[1] as int? : null,
         );
-      })(),
-      'openWrite': (visitor, target, positionalArgs, namedArgs) => (() {
+      },
+      'openWrite': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
-        checkFilesystemWritePermission(
-          visitor,
-          file.path,
-          operation: 'open file',
-        );
-        return file.openWrite(
-          mode: namedArgs['mode'] as FileMode? ?? FileMode.write,
-          encoding: namedArgs['encoding'] as Encoding? ?? utf8,
-        );
-      })(),
+        final mode = namedArgs['mode'] as FileMode? ?? FileMode.write;
+        final handle = _secureWriteHandle(visitor, file, mode, 'open file');
+        if (handle == null) {
+          return file.openWrite(
+            mode: mode,
+            encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+          );
+        }
+
+        try {
+          final sink = File(handle.path).openWrite(
+            mode: mode,
+            encoding: namedArgs['encoding'] as Encoding? ?? utf8,
+          );
+          sink.done.then<void>(
+            (_) => handle.close(),
+            onError: (Object _, StackTrace _) => handle.close(),
+          );
+          return sink;
+        } catch (_) {
+          handle.close();
+          rethrow;
+        }
+      },
       'stat': (visitor, target, positionalArgs, namedArgs) => (() {
         final file = target as File;
         checkFilesystemReadPermission(
@@ -895,25 +1208,41 @@ class FileIo {
         );
         return file.resolveSymbolicLinksSync();
       },
-      'create': (visitor, target, positionalArgs, namedArgs) => (() {
+      'create': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
-        checkFilesystemWritePermission(
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           file.path,
           operation: 'create file',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.createFile(
+            p.join(targetInfo.parent, targetInfo.name),
+            recursive: namedArgs['recursive'] as bool? ?? false,
+            exclusive: namedArgs['exclusive'] as bool? ?? false,
+          );
+          return Future<File>.value(file);
+        }
         return file.create(
           recursive: namedArgs['recursive'] as bool? ?? false,
           exclusive: namedArgs['exclusive'] as bool? ?? false,
         );
-      })(),
+      },
       'createSync': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
-        checkFilesystemWritePermission(
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           file.path,
           operation: 'create file',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.createFile(
+            p.join(targetInfo.parent, targetInfo.name),
+            recursive: namedArgs['recursive'] as bool? ?? false,
+            exclusive: namedArgs['exclusive'] as bool? ?? false,
+          );
+          return null;
+        }
         file.createSync(
           recursive: namedArgs['recursive'] as bool? ?? false,
           exclusive: namedArgs['exclusive'] as bool? ?? false,

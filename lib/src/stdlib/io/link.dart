@@ -4,6 +4,7 @@ import 'package:d4rt/d4rt.dart';
 import 'package:path/path.dart' as p;
 
 import 'filesystem_permission_helper.dart';
+import 'secure_file_opener.dart';
 
 class LinkIo {
   static BridgedClass get definition => BridgedClass(
@@ -64,7 +65,8 @@ class LinkIo {
         }
         final link = target as Link;
         final targetPath = positionalArgs[0] as String;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final linkTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'create link',
@@ -75,10 +77,15 @@ class LinkIo {
           targetPath,
           operation: 'create link target',
         );
-        return link.create(
-          targetPath,
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.createLink(
+            p.join(linkTarget.parent, linkTarget.name),
+            targetPath,
+            recursive: recursive,
+          );
+          return Future<Link>.value(link);
+        }
+        return link.create(targetPath, recursive: recursive);
       },
       'createSync': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.isEmpty || positionalArgs[0] is! String) {
@@ -88,7 +95,8 @@ class LinkIo {
         }
         final link = target as Link;
         final targetPath = positionalArgs[0] as String;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final linkTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'create link',
@@ -99,10 +107,15 @@ class LinkIo {
           targetPath,
           operation: 'create link target',
         );
-        link.createSync(
-          targetPath,
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.createLink(
+            p.join(linkTarget.parent, linkTarget.name),
+            targetPath,
+            recursive: recursive,
+          );
+          return null;
+        }
+        link.createSync(targetPath, recursive: recursive);
         return null;
       },
       'update': (visitor, target, positionalArgs, namedArgs) {
@@ -113,7 +126,7 @@ class LinkIo {
         }
         final link = target as Link;
         final targetPath = positionalArgs[0] as String;
-        checkFilesystemWritePermission(
+        final linkTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'update link',
@@ -124,6 +137,13 @@ class LinkIo {
           targetPath,
           operation: 'update link target',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.updateLink(
+            p.join(linkTarget.parent, linkTarget.name),
+            targetPath,
+          );
+          return Future<Link>.value(link);
+        }
         return link.update(targetPath);
       },
       'updateSync': (visitor, target, positionalArgs, namedArgs) {
@@ -134,7 +154,7 @@ class LinkIo {
         }
         final link = target as Link;
         final targetPath = positionalArgs[0] as String;
-        checkFilesystemWritePermission(
+        final linkTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'update link',
@@ -145,6 +165,13 @@ class LinkIo {
           targetPath,
           operation: 'update link target',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.updateLink(
+            p.join(linkTarget.parent, linkTarget.name),
+            targetPath,
+          );
+          return null;
+        }
         link.updateSync(targetPath);
         return null;
       },
@@ -190,16 +217,23 @@ class LinkIo {
         }
         final link = target as Link;
         final newPath = positionalArgs[0] as String;
-        checkFilesystemWritePermission(
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'rename link',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           newPath,
           operation: 'rename link',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return Future<Link>.value(Link(newPath));
+        }
         return link.rename(newPath);
       },
       'renameSync': (visitor, target, positionalArgs, namedArgs) {
@@ -210,34 +244,53 @@ class LinkIo {
         }
         final link = target as Link;
         final newPath = positionalArgs[0] as String;
-        checkFilesystemWritePermission(
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'rename link',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           newPath,
           operation: 'rename link',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return null;
+        }
         return link.renameSync(newPath);
       },
       'delete': (visitor, target, positionalArgs, namedArgs) {
         final link = target as Link;
-        checkFilesystemWritePermission(
+        final linkTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'delete link',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.deleteLink(
+            p.join(linkTarget.parent, linkTarget.name),
+          );
+          return Future<Link>.value(link);
+        }
         return link.delete(recursive: namedArgs['recursive'] as bool? ?? false);
       },
       'deleteSync': (visitor, target, positionalArgs, namedArgs) {
         final link = target as Link;
-        checkFilesystemWritePermission(
+        final linkTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           link.path,
           operation: 'delete link',
         );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.deleteLink(
+            p.join(linkTarget.parent, linkTarget.name),
+          );
+          return null;
+        }
         link.deleteSync(recursive: namedArgs['recursive'] as bool? ?? false);
         return null;
       },

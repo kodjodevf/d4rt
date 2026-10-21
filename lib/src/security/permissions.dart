@@ -18,6 +18,7 @@
 ///
 /// // Grant process execution
 /// interpreter.grant(ProcessRunPermission.any);
+/// interpreter.grant(DangerousPermission.processExecution);
 ///
 /// // Execute code with restricted permissions
 /// final result = interpreter.execute(source: '''
@@ -528,6 +529,16 @@ class DangerousPermission extends Permission {
   /// `Isolate.spawnUri`.
   static final DangerousPermission codeEvaluation = DangerousPermission._(
     'code evaluation',
+  );
+
+  /// Allows launching native processes.
+  ///
+  /// Child processes inherit the host process's filesystem, network and user
+  /// privileges. This permission is deliberately separate from
+  /// [ProcessRunPermission] so hosts must explicitly acknowledge that process
+  /// execution is outside the D4rt sandbox.
+  static final DangerousPermission processExecution = DangerousPermission._(
+    'process execution',
   );
 
   /// Allows loading and executing native plugins/libraries.

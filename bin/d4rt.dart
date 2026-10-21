@@ -63,7 +63,10 @@ void _applyPermissions(
 
   if (permissions.filesystem) d4rt.grant(FilesystemPermission.any);
   if (permissions.network) d4rt.grant(NetworkPermission.any);
-  if (permissions.process) d4rt.grant(ProcessRunPermission.any);
+  if (permissions.process) {
+    d4rt.grant(ProcessRunPermission.any);
+    d4rt.grant(DangerousPermission.processExecution);
+  }
   if (permissions.isolate) d4rt.grant(IsolatePermission.any);
   if (permissions.dangerous) d4rt.grant(DangerousPermission.any);
   if (allowCodeEvaluation) {
@@ -168,7 +171,7 @@ Options:
 Security (deny by default):
   --allow-fs, --allow-filesystem   Allow all filesystem operations
   --allow-network                  Allow network connections and servers
-  --allow-process                  Allow launching native processes
+  --allow-process                  Allow native processes (host code execution)
   --allow-isolate                  Allow isolate operations
   --allow-dangerous                Allow other dangerous operations
   --allow-all                      Grant every permission

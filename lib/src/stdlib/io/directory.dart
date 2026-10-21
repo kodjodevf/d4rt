@@ -4,6 +4,7 @@ import 'package:d4rt/d4rt.dart';
 import 'package:path/path.dart' as p;
 
 import 'filesystem_permission_helper.dart';
+import 'secure_file_opener.dart';
 
 class DirectoryIo {
   static BridgedClass get definition => BridgedClass(
@@ -58,48 +59,76 @@ class DirectoryIo {
       },
       'create': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           directory.path,
           operation: 'create directory',
         );
-        return directory.create(
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.createDirectory(
+            p.join(targetInfo.parent, targetInfo.name),
+            recursive: recursive,
+          );
+          return Future<Directory>.value(directory);
+        }
+        return directory.create(recursive: recursive);
       },
       'createSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           directory.path,
           operation: 'create directory',
         );
-        directory.createSync(
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.createDirectory(
+            p.join(targetInfo.parent, targetInfo.name),
+            recursive: recursive,
+          );
+          return null;
+        }
+        directory.createSync(recursive: recursive);
         return null;
       },
       'delete': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           directory.path,
           operation: 'delete directory',
         );
-        return directory.delete(
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          final securePath = p.join(targetInfo.parent, targetInfo.name);
+          if (recursive) {
+            SecureFileOpener.deletePathRecursive(securePath);
+          } else {
+            SecureFileOpener.deleteDirectory(securePath);
+          }
+          return Future<Directory>.value(directory);
+        }
+        return directory.delete(recursive: recursive);
       },
       'deleteSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemWritePermission(
+        final recursive = namedArgs['recursive'] as bool? ?? false;
+        final targetInfo = checkFilesystemNamespaceWritePermission(
           visitor,
           directory.path,
           operation: 'delete directory',
         );
-        directory.deleteSync(
-          recursive: namedArgs['recursive'] as bool? ?? false,
-        );
+        if (SecureFileOpener.isSupported) {
+          final securePath = p.join(targetInfo.parent, targetInfo.name);
+          if (recursive) {
+            SecureFileOpener.deletePathRecursive(securePath);
+          } else {
+            SecureFileOpener.deleteDirectory(securePath);
+          }
+          return null;
+        }
+        directory.deleteSync(recursive: recursive);
         return null;
       },
       'list': (visitor, target, positionalArgs, namedArgs) {
@@ -150,17 +179,25 @@ class DirectoryIo {
           );
         }
         final directory = target as Directory;
-        checkFilesystemWritePermission(
+        final newPath = positionalArgs[0] as String;
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           directory.path,
           operation: 'rename directory',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'rename directory',
         );
-        return directory.rename(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return Future<Directory>.value(Directory(newPath));
+        }
+        return directory.rename(newPath);
       },
       'renameSync': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
@@ -169,17 +206,25 @@ class DirectoryIo {
           );
         }
         final directory = target as Directory;
-        checkFilesystemWritePermission(
+        final newPath = positionalArgs[0] as String;
+        final oldTarget = checkFilesystemNamespaceWritePermission(
           visitor,
           directory.path,
           operation: 'rename directory',
         );
-        checkFilesystemWritePermission(
+        final newTarget = checkFilesystemNamespaceWritePermission(
           visitor,
-          positionalArgs[0] as String,
+          newPath,
           operation: 'rename directory',
         );
-        directory.renameSync(positionalArgs[0] as String);
+        if (SecureFileOpener.isSupported) {
+          SecureFileOpener.renamePath(
+            p.join(oldTarget.parent, oldTarget.name),
+            p.join(newTarget.parent, newTarget.name),
+          );
+          return null;
+        }
+        directory.renameSync(newPath);
         return null;
       },
       'stat': (visitor, target, positionalArgs, namedArgs) {
