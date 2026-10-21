@@ -550,6 +550,176 @@ void main() {
       }
     });
 
+    test(
+      'reading link targets requires access to both link and target',
+      () async {
+        final root = io.Directory.systemTemp.createTempSync('d4rt-link-read-');
+        final allowed = io.Directory(p.join(root.path, 'allowed'))
+          ..createSync();
+        final outside = io.Directory(p.join(root.path, 'outside'))
+          ..createSync();
+        final insideTarget = io.File(p.join(allowed.path, 'inside.txt'))
+          ..writeAsStringSync('inside');
+        final outsideTarget = io.File(p.join(outside.path, 'outside.txt'))
+          ..writeAsStringSync('outside');
+        final inward = io.Link(p.join(outside.path, 'inward'))
+          ..createSync(insideTarget.path);
+        final outward = io.Link(p.join(allowed.path, 'outward'))
+          ..createSync(outsideTarget.path);
+        final internal = io.Link(p.join(allowed.path, 'internal'))
+          ..createSync(insideTarget.path);
+
+        try {
+          final d4rt = D4rt()
+            ..grant(FilesystemPermission.readPath(allowed.path));
+
+          final target = await d4rt.execute(
+            source:
+                '''
+            import 'dart:io';
+            Future<String> main() async =>
+                Link(${_dartString(internal.path)}).target();
+          ''',
+          );
+          expect(target, insideTarget.path);
+
+          for (final path in [inward.path, outward.path]) {
+            expect(
+              () => d4rt.execute(
+                source:
+                    '''
+              import 'dart:io';
+              String main() => Link(${_dartString(path)}).targetSync();
+            ''',
+              ),
+              throwsA(
+                isA<RuntimeError>().having(
+                  (e) => e.message,
+                  'message',
+                  contains('Filesystem permission denied'),
+                ),
+              ),
+            );
+          }
+        } finally {
+          if (root.existsSync()) root.deleteSync(recursive: true);
+        }
+      },
+    );
+
+    test('FileStat static methods enforce read permissions', () async {
+      final root = io.Directory.systemTemp.createTempSync('d4rt-stat-');
+      final allowed = io.Directory(p.join(root.path, 'allowed'))..createSync();
+      final outside = io.Directory(p.join(root.path, 'outside'))..createSync();
+      final inside = io.File(p.join(allowed.path, 'inside.txt'))
+        ..writeAsStringSync('inside');
+      final secret = io.File(p.join(outside.path, 'secret.txt'))
+        ..writeAsStringSync('secret');
+
+      try {
+        final d4rt = D4rt()..grant(FilesystemPermission.readPath(allowed.path));
+
+        expect(
+          () => d4rt.execute(
+            source:
+                '''
+              import 'dart:io';
+              void main() {
+                FileStat.statSync(${_dartString(secret.path)});
+              }
+            ''',
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('Filesystem permission denied'),
+            ),
+          ),
+        );
+
+        await expectLater(
+          d4rt.execute(
+            source:
+                '''
+              import 'dart:io';
+              Future<void> main() async {
+                await FileStat.stat(${_dartString(secret.path)});
+              }
+            ''',
+          ),
+          throwsA(
+            isA<RuntimeError>().having(
+              (e) => e.message,
+              'message',
+              contains('Filesystem permission denied'),
+            ),
+          ),
+        );
+
+        final size = await d4rt.execute(
+          source:
+              '''
+            import 'dart:io';
+            int main() => FileStat.statSync(${_dartString(inside.path)}).size;
+          ''',
+        );
+        expect(size, inside.lengthSync());
+      } finally {
+        if (root.existsSync()) root.deleteSync(recursive: true);
+      }
+    });
+
+    test(
+      'instance stat and existence checks use descriptor-backed metadata',
+      () async {
+        final root = io.Directory.systemTemp.createTempSync(
+          'd4rt-stat-instance-',
+        );
+        final allowed = io.Directory(p.join(root.path, 'allowed'))
+          ..createSync();
+        final file = io.File(p.join(allowed.path, 'inside.txt'))
+          ..writeAsStringSync('hello');
+        final directory = io.Directory(p.join(allowed.path, 'child'))
+          ..createSync();
+        final link = io.Link(p.join(allowed.path, 'link'))
+          ..createSync(file.path);
+
+        try {
+          final d4rt = D4rt()
+            ..grant(FilesystemPermission.readPath(allowed.path));
+          final result = await d4rt.execute(
+            source:
+                '''
+            import 'dart:io';
+            Future<bool> main() async {
+              final file = File(${_dartString(file.path)});
+              final directory = Directory(${_dartString(directory.path)});
+              final link = Link(${_dartString(link.path)});
+              final asyncStat = await file.stat();
+              final fileStat = await FileStat.stat(${_dartString(file.path)});
+              return file.existsSync() &&
+                  directory.existsSync() &&
+                  !File(${_dartString(directory.path)}).existsSync() &&
+                  !Directory(${_dartString(file.path)}).existsSync() &&
+                  await file.exists() &&
+                  await directory.exists() &&
+                  file.statSync().size == 5 &&
+                  asyncStat.size == 5 &&
+                  fileStat.size == 5 &&
+                  directory.statSync().size >= 0 &&
+                  link.statSync().size == 5 &&
+                  FileStat.statSync(${_dartString(file.path)}).size == 5;
+            }
+          ''',
+          );
+          expect(result, isTrue);
+        } finally {
+          if (root.existsSync()) root.deleteSync(recursive: true);
+        }
+      },
+    );
+
     test('temporary directory prefixes cannot escape a write scope', () {
       final root = io.Directory.systemTemp.createTempSync('d4rt-temp-');
       final allowed = io.Directory(p.join(root.path, 'allowed'))..createSync();
@@ -629,12 +799,40 @@ void main() {
             throwsA(isA<io.FileSystemException>()),
           );
 
+          final escapedStat = SecureFileOpener.stat(
+            p.join(canonicalAllowed, p.basename(finalLink.path)),
+          );
+          expect(escapedStat?.type, io.FileSystemEntityType.notFound);
+          expect(
+            SecureFileOpener.existsAs(
+              p.join(canonicalAllowed, p.basename(finalLink.path)),
+              io.FileSystemEntityType.file,
+            ),
+            isFalse,
+          );
+          expect(
+            SecureFileOpener.stat(
+              p.join(
+                canonicalAllowed,
+                p.basename(parentLink.path),
+                p.basename(outsideFile.path),
+              ),
+            )?.type,
+            io.FileSystemEntityType.notFound,
+          );
+
           final handle = SecureFileOpener.openRead(
             p.join(canonicalAllowed, p.basename(insideFile.path)),
           );
           expect(handle, isNotNull);
           expect(io.File(handle!.path).readAsStringSync(), 'inside');
           handle.close();
+
+          final insideStat = SecureFileOpener.stat(
+            p.join(canonicalAllowed, p.basename(insideFile.path)),
+          );
+          expect(insideStat?.type, io.FileSystemEntityType.file);
+          expect(insideStat?.size, 6);
         } finally {
           if (root.existsSync()) root.deleteSync(recursive: true);
         }

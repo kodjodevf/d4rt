@@ -27,9 +27,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
     Environment? tempEnvironment;
 
     if (typeParameters != null) {
-      Logger.debug(
-        "[DeclarationVisitor.visitClassDeclaration] Class '$className' has ${typeParameters.typeParameters.length} type parameters",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[DeclarationVisitor.visitClassDeclaration] Class '$className' has ${typeParameters.typeParameters.length} type parameters",
+        );
+      }
 
       // Create a temporary environment for type resolution
       tempEnvironment = Environment(enclosing: environment);
@@ -40,9 +42,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
         final typeParamPlaceholder = TypeParameter(paramName);
         tempEnvironment.define(paramName, typeParamPlaceholder);
 
-        Logger.debug(
-          "[DeclarationVisitor.visitClassDeclaration]   Defined type parameter '$paramName' in temp environment",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[DeclarationVisitor.visitClassDeclaration]   Defined type parameter '$paramName' in temp environment",
+          );
+        }
       }
     }
 
@@ -98,9 +102,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       typeParameterBounds: typeParameterBounds,
     );
     environment.define(className, placeholder);
-    Logger.debug(
-      "[DeclarationVisitor] Defined placeholder for class '$className' in env: [38;5;244m${environment.hashCode}[0m",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[DeclarationVisitor] Defined placeholder for class '$className' in env: [38;5;244m${environment.hashCode}[0m",
+      );
+    }
   }
 
   @override
@@ -132,9 +138,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       mixins: [], // Initially empty (mixins cannot use 'with')
     );
     environment.define(mixinName, placeholder);
-    Logger.debug(
-      "[DeclarationVisitor] Defined placeholder for mixin '$mixinName' in env: [38;5;244m${environment.hashCode}[0m",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[DeclarationVisitor] Defined placeholder for mixin '$mixinName' in env: [38;5;244m${environment.hashCode}[0m",
+      );
+    }
   }
 
   @override
@@ -156,9 +164,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
 
     // Define the enum type placeholder in the current environment
     environment.define(enumName, enumPlaceholder);
-    Logger.debug(
-      "[DeclarationVisitor] Defined placeholder for enum '$enumName' with value order [${valueNames.join(', ')}] in env: [38;5;244m${environment.hashCode}[0m",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[DeclarationVisitor] Defined placeholder for enum '$enumName' with value order [${valueNames.join(', ')}] in env: [38;5;244m${environment.hashCode}[0m",
+      );
+    }
 
     // Do NOT process members or constants here. That happens in Pass 2 (InterpreterVisitor).
   }
@@ -167,9 +177,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     final functionName = node.name.lexeme;
-    Logger.debug(
-      "[DeclarationVisitor.visitFunctionDeclaration] Processing function: $functionName",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[DeclarationVisitor.visitFunctionDeclaration] Processing function: $functionName",
+      );
+    }
 
     if (environment.isDefinedLocally(functionName)) {
       return;
@@ -180,9 +192,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
     final typeParameters = node.functionExpression.typeParameters;
 
     if (typeParameters != null) {
-      Logger.debug(
-        "[DeclarationVisitor.visitFunctionDeclaration] Function '$functionName' has ${typeParameters.typeParameters.length} type parameters",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[DeclarationVisitor.visitFunctionDeclaration] Function '$functionName' has ${typeParameters.typeParameters.length} type parameters",
+        );
+      }
 
       // Create a temporary environment for type resolution
       tempEnvironment = Environment(enclosing: environment);
@@ -195,9 +209,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
         final typeParamPlaceholder = TypeParameter(paramName);
         tempEnvironment.define(paramName, typeParamPlaceholder);
 
-        Logger.debug(
-          "[DeclarationVisitor.visitFunctionDeclaration]   Defined type parameter '$paramName' in temp environment",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[DeclarationVisitor.visitFunctionDeclaration]   Defined type parameter '$paramName' in temp environment",
+          );
+        }
       }
     }
 
@@ -248,9 +264,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
 
     if (returnTypeNode is NamedType) {
       final typeSource = returnTypeNode.toSource();
-      Logger.debug(
-        "[DeclarationVisitor.visitFunctionDeclaration]   Return type node: $typeSource",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[DeclarationVisitor.visitFunctionDeclaration]   Return type node: $typeSource",
+        );
+      }
 
       try {
         if (isAsync && returnTypeNode.name.lexeme == 'Future') {
@@ -299,9 +317,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       declaredReturnType,
       isNullable,
     );
-    Logger.debug(
-      "[DeclarationVisitor.visitFunctionDeclaration]   Defining function '$functionName' with declaredReturnType: ${declaredReturnType.name} (Hash: ${declaredReturnType.hashCode})",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[DeclarationVisitor.visitFunctionDeclaration]   Defining function '$functionName' with declaredReturnType: ${declaredReturnType.name} (Hash: ${declaredReturnType.hashCode})",
+      );
+    }
     environment.define(functionName, function);
   }
 
@@ -317,9 +337,11 @@ class DeclarationVisitor extends GeneralizingAstVisitor<void> {
       // The actual initialization will happen in InterpreterVisitor.
       if (!environment.isDefinedLocally(variable.name.lexeme)) {
         environment.define(variable.name.lexeme, null);
-        Logger.debug(
-          "[DeclarationVisitor] Defined top-level variable placeholder '${variable.name.lexeme}' in env: ${environment.hashCode}",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[DeclarationVisitor] Defined top-level variable placeholder '${variable.name.lexeme}' in env: ${environment.hashCode}",
+          );
+        }
       }
     }
   }

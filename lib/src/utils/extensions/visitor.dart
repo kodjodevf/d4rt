@@ -21,6 +21,14 @@ extension InterpreterVisitorExtension on InterpreterVisitor {
     if (nativeObject is BridgedInstance) {
       return (nativeObject, true);
     }
+    // D4rt's own runtime objects never have a native bridge. Avoid scanning
+    // the bridge registry (and throwing) for every interpreted instance,
+    // function or type encountered by the interpreter.
+    if (nativeObject is RuntimeValue ||
+        nativeObject is RuntimeType ||
+        nativeObject is Callable) {
+      return (null, false);
+    }
     try {
       return (globalEnvironment.toBridgedInstance(nativeObject), true);
     } catch (e) {

@@ -22,12 +22,18 @@
     emitted, created or resolved path, and link creation checks its target,
     preventing symlink escapes and path traversal.
   - Added descriptor-based filesystem isolation on POSIX systems. File content
-    reads and writes, open streams, copies, create/delete/rename operations and
-    recursive directory deletes now walk parent components with `openat` and
-    `O_NOFOLLOW`, so a symlink substituted after the permission check fails
-    closed instead of redirecting the operation. Windows and the remaining
-    path-based metadata, listing and watch operations retain the documented
-    TOCTOU limitation.
+    reads and writes, open streams, copies, create/delete/rename operations,
+    recursive directory deletes, temporary-directory creation and symbolic-link
+    target reads now walk parent components with `openat` and `O_NOFOLLOW`, so
+    a symlink substituted after the permission check fails closed instead of
+    redirecting the operation. Temporary directories use `mkdirat` with mode
+    `0700`, while link targets are read with `readlinkat` and revalidated.
+    `FileStat.stat`/`statSync` now enforce filesystem read permissions, and
+    file, directory and link `stat` operations plus file/directory existence
+    checks use descriptor-backed metadata as well. `resolveSymbolicLinks`
+    results are checked against the active scope before being returned. Windows
+    and the remaining path-based link-existence, type, directory-listing and
+    watch operations retain the documented TOCTOU limitation.
   - `D4rt.eval()` now requires `DangerousPermission.codeEvaluation`.
   - Importing `dart:developer` now requires
     `DangerousPermission.developerTools`; every developer bridge operation,
@@ -46,6 +52,16 @@
     Scripts get read-only access to their own directory by default.
   - Updated to analyzer 14.5.0, build 5.0.0, source_gen 4.3.1, build_runner
     2.17.1 and test 1.33.0, with a Dart SDK constraint of `^3.11.0`.
+- **perf: Reduce interpreter overhead in hot paths**
+  - Added direct numeric, string and boolean binary/compound-assignment fast
+    paths, avoided redundant environment and bridge lookups, and reused block
+    environments when a block cannot introduce bindings.
+  - Debug logging is now guarded by `Logger.debugEnabled` throughout the
+    interpreter, runtime types and loaders, so interpolation and allocation are
+    skipped when debug logging is disabled.
+  - These changes reduce the local loop, recursion, method-call, string and
+    collection microbenchmark suite from roughly 2.1 s to 0.33 s while keeping
+    the full test suite green.
 
 ## 0.2.4
 - feat: Enhance enum handling with improved equality checks and add comprehensive switch statement tests

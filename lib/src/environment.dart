@@ -111,7 +111,9 @@ class Environment {
     }
     _bridgedClasses[name] = bridgedClass;
     _bridgedClassesLookupByType[bridgedClass.nativeType] = bridgedClass;
-    Logger.debug("[Environment] Defined bridge for class: $name");
+    if (Logger.debugEnabled) {
+      Logger.debug("[Environment] Defined bridge for class: $name");
+    }
   }
 
   /// Converts a native object to a bridged instance if a bridge exists.
@@ -241,7 +243,9 @@ class Environment {
       );
     }
     _bridgedEnums[name] = bridgedEnum;
-    Logger.debug("[Environment] Defined bridge for enum: $name");
+    if (Logger.debugEnabled) {
+      Logger.debug("[Environment] Defined bridge for enum: $name");
+    }
   }
 
   /// Checks if the given object is a bridged enum value
@@ -272,28 +276,35 @@ class Environment {
   /// Searches the current environment, then recursively searches parent environments.
   /// Returns `null` if the name is not found in the entire chain.
   dynamic get(String name) {
-    Logger.debug(
-      '[Env.get] Attempting to get "$name" in env: $hashCode',
-    ); // Log attempt + env hash
+    if (Logger.debugEnabled) {
+      Logger.debug('[Env.get] Attempting to get "$name" in env: $hashCode');
+    } // Log attempt + env hash
 
     // Check first if the name directly corresponds to a prefixed import.
-    if (_prefixedImports.containsKey(name)) {
-      Logger.debug(
-        "[Env.get] Name '$name' corresponds to a prefixed import. Returning the prefixed environment.",
-      );
-      return _prefixedImports[name]; // Return the Environment itself.
+    if (_prefixedImports.isNotEmpty) {
+      final prefixedImport = _prefixedImports[name];
+      if (prefixedImport != null) {
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[Env.get] Name '$name' corresponds to a prefixed import. Returning the prefixed environment.",
+          );
+        }
+        return prefixedImport; // Return the Environment itself.
+      }
     }
 
     // Check if it's a prefixed access (ex: math.pi)
-    if (name.contains('.')) {
+    if (_prefixedImports.isNotEmpty && name.contains('.')) {
       final parts = name.split('.');
       if (parts.length == 2) {
         final prefix = parts[0];
         final identifier = parts[1];
         if (_prefixedImports.containsKey(prefix)) {
-          Logger.debug(
-            "[Env.get] Prefixed access for '$name'. Searching for '$identifier' in the prefixed environment '$prefix'.",
-          );
+          if (Logger.debugEnabled) {
+            Logger.debug(
+              "[Env.get] Prefixed access for '$name'. Searching for '$identifier' in the prefixed environment '$prefix'.",
+            );
+          }
           // Recursive call on the stored environment for the prefix.
           // No need to check _enclosing here, the prefixed environment will do that.
           try {
@@ -310,9 +321,11 @@ class Environment {
           // We could fall into the normal search if 'prefix.identifier' is a valid variable name.
           // However, in Dart, an identifier cannot contain a '.' except for access.
           // So, if the prefix is not in _prefixedImports, it's an error.
-          Logger.debug(
-            "[Env.get] Prefix '$prefix' for '$name' not found in prefixed imports.",
-          );
+          if (Logger.debugEnabled) {
+            Logger.debug(
+              "[Env.get] Prefix '$prefix' for '$name' not found in prefixed imports.",
+            );
+          }
         }
       } else {
         // Handle the case of multiple points, for example a.b.c. For now, we only support prefix.identifier.
@@ -327,46 +340,66 @@ class Environment {
       }
     }
 
-    // Normal search if there's no valid prefixed access or if the prefix is not resolved
-    if (_values.containsKey(name)) {
-      Logger.debug('[Env.get] Found \'$name\' locally in env: $hashCode');
-      return _values[name];
+    // Normal search if there's no valid prefixed access or if the prefix is not resolved.
+    // A null value is a valid binding, so only fall back to containsKey when needed.
+    final localValue = _values[name];
+    if (localValue != null || _values.containsKey(name)) {
+      if (Logger.debugEnabled) {
+        Logger.debug('[Env.get] Found \'$name\' locally in env: $hashCode');
+      }
+      return localValue;
     }
 
-    if (_bridgedClasses.containsKey(name)) {
-      Logger.debug(
-        " [Env.get] Found bridged class '$name' locally in env: $hashCode",
-      );
-      return _bridgedClasses[name];
+    final bridgedClass = _bridgedClasses[name];
+    if (bridgedClass != null) {
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [Env.get] Found bridged class '$name' locally in env: $hashCode",
+        );
+      }
+      return bridgedClass;
     }
 
     // Check for bridged enums
-    if (_bridgedEnums.containsKey(name)) {
-      Logger.debug(
-        " [Env.get] Found bridged enum '$name' locally in env: $hashCode",
-      );
-      return _bridgedEnums[name];
+    final bridgedEnum = _bridgedEnums[name];
+    if (bridgedEnum != null) {
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [Env.get] Found bridged enum '$name' locally in env: $hashCode",
+        );
+      }
+      return bridgedEnum;
     }
 
     if (_enclosing != null) {
-      Logger.debug(
-        '[Env.get] Looking for \'$name\' in parent env: ${_enclosing.hashCode}',
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          '[Env.get] Looking for \'$name\' in parent env: ${_enclosing.hashCode}',
+        );
+      }
       return _enclosing.get(name); // Recurse
     }
 
-    Logger.debug(
-      '[Env.get] \'$name\' not found in env chain starting from: $hashCode (no parent)',
-    ); // Log chain end
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        '[Env.get] \'$name\' not found in env chain starting from: $hashCode (no parent)',
+      );
+    } // Log chain end
     throw RuntimeError("Undefined variable: $name");
   }
 
   Object? assign(String name, Object? value) {
-    Logger.debug(
-      "[Env.assign] Attempting to assign '$name' = $value in env: $hashCode",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Env.assign] Attempting to assign '$name' = $value in env: $hashCode",
+      );
+    }
     if (_values.containsKey(name)) {
-      Logger.debug(" [Env.assign] Assigned '$name' locally in env: $hashCode");
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [Env.assign] Assigned '$name' locally in env: $hashCode",
+        );
+      }
       _values[name] = value;
       return value;
     }
@@ -381,24 +414,39 @@ class Environment {
     }
 
     if (_enclosing != null) {
-      Logger.debug(
-        " [Env.assign] '$name' not found locally, assigning in parent env: ${_enclosing.hashCode}",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [Env.assign] '$name' not found locally, assigning in parent env: ${_enclosing.hashCode}",
+        );
+      }
       return _enclosing.assign(
         name,
         value,
       ); // Delegate to the parent environment
     }
 
-    Logger.debug(
-      "[Env.assign] Variable '$name' not found for assignment, throwing error.",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Env.assign] Variable '$name' not found for assignment, throwing error.",
+      );
+    }
     throw RuntimeError("Assigning to undefined variable '$name'.");
   }
 
   // Check if a variable is defined in *this* specific scope
   bool isDefinedLocally(String name) {
     return _values.containsKey(name);
+  }
+
+  /// Returns the value bound directly in this scope, or `null` when absent.
+  ///
+  /// A `null` result is ambiguous because `null` is also a valid value; call
+  /// [isDefinedLocally] when that distinction matters.
+  Object? getLocalValue(String name) => _values[name];
+
+  /// Assigns a value directly in this scope without walking the parent chain.
+  void assignLocalValue(String name, Object? value) {
+    _values[name] = value;
   }
 
   // Find the environment where a variable is defined
@@ -425,29 +473,37 @@ class Environment {
   }) {
     final targetType = getRuntimeType(target); // Helper to get RuntimeType
     if (targetType == null) {
-      Logger.debug(
-        "[Environment.findExtensionMember] Could not determine type for target",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[Environment.findExtensionMember] Could not determine type for target",
+        );
+      }
       return null;
     }
 
-    Logger.debug(
-      "[Environment.findExtensionMember] Looking for extension member '$name' on type ${targetType.name}",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Environment.findExtensionMember] Looking for extension member '$name' on type ${targetType.name}",
+      );
+    }
     // Search current environment and enclosing ones
     Environment? current = this;
     while (current != null) {
       // Check unnamed extensions
       for (final ext in current._unnamedExtensions) {
-        Logger.debug(
-          "[Environment.findExtensionMember]   Checking unnamed extension on ${ext.onType.name}",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[Environment.findExtensionMember]   Checking unnamed extension on ${ext.onType.name}",
+          );
+        }
         if (targetType.isSubtypeOf(ext.onType)) {
           final member = ext.findMember(name);
           if (member != null) {
-            Logger.debug(
-              "[Environment] Found extension member '$name' in unnamed ext on ${ext.onType.name}",
-            );
+            if (Logger.debugEnabled) {
+              Logger.debug(
+                "[Environment] Found extension member '$name' in unnamed ext on ${ext.onType.name}",
+              );
+            }
             // Need to bind 'target' to the call somehow.
             // This will likely require returning a bound callable or modifying the call site.
             return member; // Return the raw callable for now
@@ -457,15 +513,19 @@ class Environment {
       // Check named extensions (stored as values)
       for (final value in current._values.values) {
         if (value is InterpretedExtension) {
-          Logger.debug(
-            "[Environment.findExtensionMember]   Checking named extension '${value.name}' on ${value.onType.name}",
-          );
+          if (Logger.debugEnabled) {
+            Logger.debug(
+              "[Environment.findExtensionMember]   Checking named extension '${value.name}' on ${value.onType.name}",
+            );
+          }
           if (targetType.isSubtypeOf(value.onType)) {
             final member = value.findMember(name);
             if (member != null) {
-              Logger.debug(
-                "[Environment] Found extension member '$name' in named ext '${value.name}' on ${value.onType.name}",
-              );
+              if (Logger.debugEnabled) {
+                Logger.debug(
+                  "[Environment] Found extension member '$name' in named ext '${value.name}' on ${value.onType.name}",
+                );
+              }
               return member; // Return the raw callable
             }
           } else if (targetType is NativeFunction &&
@@ -475,9 +535,11 @@ class Environment {
             if (valueType.name == targetType.name) {
               final member = value.findMember(name);
               if (member != null) {
-                Logger.debug(
-                  "[Environment] Found extension member '$name' in named ext '${value.name}' on ${value.onType.name}",
-                );
+                if (Logger.debugEnabled) {
+                  Logger.debug(
+                    "[Environment] Found extension member '$name' in named ext '${value.name}' on ${value.onType.name}",
+                  );
+                }
                 return member; // Return the raw callable
               }
             }
@@ -501,9 +563,11 @@ class Environment {
           if (targetType.isSubtypeOf(ext.onType)) {
             final member = ext.findMember(name);
             if (member != null) {
-              Logger.debug(
-                "[Environment] Found extension member '$name' in global unnamed ext on ${ext.onType.name}",
-              );
+              if (Logger.debugEnabled) {
+                Logger.debug(
+                  "[Environment] Found extension member '$name' in global unnamed ext on ${ext.onType.name}",
+                );
+              }
               return member;
             }
           }
@@ -514,9 +578,11 @@ class Environment {
             if (targetType.isSubtypeOf(value.onType)) {
               final member = value.findMember(name);
               if (member != null) {
-                Logger.debug(
-                  "[Environment] Found extension member '$name' in global named ext '${value.name}' on ${value.onType.name}",
-                );
+                if (Logger.debugEnabled) {
+                  Logger.debug(
+                    "[Environment] Found extension member '$name' in global named ext '${value.name}' on ${value.onType.name}",
+                  );
+                }
                 return member;
               }
             } else if (targetType is NativeFunction &&
@@ -525,9 +591,11 @@ class Environment {
               if (valueType.name == targetType.name) {
                 final member = value.findMember(name);
                 if (member != null) {
-                  Logger.debug(
-                    "[Environment] Found extension member '$name' in global named ext '${value.name}' on ${value.onType.name}",
-                  );
+                  if (Logger.debugEnabled) {
+                    Logger.debug(
+                      "[Environment] Found extension member '$name' in global named ext '${value.name}' on ${value.onType.name}",
+                    );
+                  }
                   return member;
                 }
               }
@@ -538,9 +606,11 @@ class Environment {
       }
     }
 
-    Logger.debug(
-      "[Environment.findExtensionMember] No extension found for '$name' on type ${targetType.name}",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Environment.findExtensionMember] No extension found for '$name' on type ${targetType.name}",
+      );
+    }
     return null; // Not found
   }
 
@@ -698,9 +768,11 @@ class Environment {
     // Copy unnamed extensions (cannot be filtered by name)
     newEnv._unnamedExtensions.addAll(_unnamedExtensions);
 
-    Logger.debug(
-      "[Environment.shallowCopyFiltered] Created filtered environment. Original size: ${_values.length} values. New size: ${newEnv._values.length} values.",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Environment.shallowCopyFiltered] Created filtered environment. Original size: ${_values.length} values. New size: ${newEnv._values.length} values.",
+      );
+    }
     return newEnv;
   }
 
@@ -726,14 +798,18 @@ class Environment {
         showNames: show,
         hideNames: hide,
       );
-      Logger.debug(
-        "[Environment.importEnvironment] Importing from a filtered version of other env (hashCode: ${other.hashCode}).",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[Environment.importEnvironment] Importing from a filtered version of other env (hashCode: ${other.hashCode}).",
+        );
+      }
     } else {
       sourceEnvToImportFrom = other;
-      Logger.debug(
-        "[Environment.importEnvironment] Importing directly from other env (hashCode: ${other.hashCode}).",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[Environment.importEnvironment] Importing directly from other env (hashCode: ${other.hashCode}).",
+        );
+      }
     }
 
     // Perform the merge from sourceEnvToImportFrom
@@ -822,16 +898,20 @@ class Environment {
     // Unnamed extensions are additive.
     _unnamedExtensions.addAll(sourceEnvToImportFrom._unnamedExtensions);
 
-    Logger.debug(
-      "[Environment.importEnvironment] Merge complete. Current env (hashCode: $hashCode) updated.",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Environment.importEnvironment] Merge complete. Current env (hashCode: $hashCode) updated.",
+      );
+    }
   }
 
   // New method to handle prefixed imports
   void definePrefixedImport(String prefix, Environment importEnvironment) {
-    Logger.debug(
-      "[Env.definePrefixedImport] Defining prefixed import '$prefix' with environment $importEnvironment (hash: ${importEnvironment.hashCode})",
-    );
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[Env.definePrefixedImport] Defining prefixed import '$prefix' with environment $importEnvironment (hash: ${importEnvironment.hashCode})",
+      );
+    }
     _prefixedImports[prefix] = importEnvironment;
   }
 }

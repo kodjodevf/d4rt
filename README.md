@@ -341,13 +341,19 @@ On POSIX systems (macOS, Linux, Android and iOS), file content reads and writes,
 open streams, file copies, create/delete/rename operations and recursive
 directory deletes use descriptor-based filesystem operations. Parent components
 are opened with `openat` and `O_NOFOLLOW`, so a symlink substituted between the
-permission check and the native operation is rejected instead of followed. The
-remaining path-based operations, including directory listings and watches,
-`stat`/`exists`, temporary-directory creation and link-target resolution, still
-have a narrow TOCTOU window. Windows falls back to path-based operations for
-all filesystem bridges. For workloads that require a hard guarantee against a
-concurrent local attacker with write access to the allowed tree, run D4rt in an
-OS-level sandbox or a dedicated user account.
+permission check and the native operation is rejected instead of followed.
+Temporary-directory creation and symbolic-link target reads are also anchored on
+verified parent descriptors with `mkdirat` and `readlinkat`, with validated
+prefixes and targets. `File`/`Directory`/`Link` `stat` operations,
+`FileStat.stat` and file/directory existence checks open the target with
+`O_NOFOLLOW` and read metadata from the descriptor, so a path substituted after
+the permission check cannot redirect them. The remaining path-based operations,
+including link existence, directory listings, watches, `FileSystemEntity.type`
+and symbolic-link resolution, still have a narrow TOCTOU window; resolved paths
+are revalidated before being returned. Windows falls back to path-based
+operations for all filesystem bridges. For workloads that require a hard
+guarantee against a concurrent local attacker with write access to the allowed
+tree, run D4rt in an OS-level sandbox or a dedicated user account.
 
 ### Permission Management
 

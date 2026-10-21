@@ -653,21 +653,31 @@ class FileIo {
     methods: {
       'exists': (visitor, target, positionalArgs, namedArgs) => (() {
         final file = target as File;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           file.path,
           operation: 'check existence',
         );
-        return file.exists();
+        final secureExists = SecureFileOpener.existsAs(
+          canonical,
+          FileSystemEntityType.file,
+        );
+        return secureExists == null
+            ? file.exists()
+            : Future<bool>.value(secureExists);
       })(),
       'existsSync': (visitor, target, positionalArgs, namedArgs) => (() {
         final file = target as File;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           file.path,
           operation: 'check existence',
         );
-        return file.existsSync();
+        return SecureFileOpener.existsAs(
+              canonical,
+              FileSystemEntityType.file,
+            ) ??
+            file.existsSync();
       })(),
       'readAsString': (visitor, target, positionalArgs, namedArgs) =>
           _withSecureReadAsync(
@@ -1174,21 +1184,24 @@ class FileIo {
       },
       'stat': (visitor, target, positionalArgs, namedArgs) => (() {
         final file = target as File;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           file.path,
           operation: 'stat file',
         );
-        return file.stat();
+        final secureStat = SecureFileOpener.stat(canonical);
+        return secureStat == null
+            ? file.stat()
+            : Future<FileStat>.value(secureStat);
       })(),
       'statSync': (visitor, target, positionalArgs, namedArgs) => (() {
         final file = target as File;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           file.path,
           operation: 'stat file',
         );
-        return file.statSync();
+        return SecureFileOpener.stat(canonical) ?? file.statSync();
       })(),
       'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
@@ -1197,7 +1210,14 @@ class FileIo {
           file.path,
           operation: 'resolve file links',
         );
-        return file.resolveSymbolicLinks();
+        return file.resolveSymbolicLinks().then((resolved) {
+          checkFilesystemReadPermission(
+            visitor,
+            resolved,
+            operation: 'resolve file links',
+          );
+          return resolved;
+        });
       },
       'resolveSymbolicLinksSync': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;
@@ -1206,7 +1226,13 @@ class FileIo {
           file.path,
           operation: 'resolve file links',
         );
-        return file.resolveSymbolicLinksSync();
+        final resolved = file.resolveSymbolicLinksSync();
+        checkFilesystemReadPermission(
+          visitor,
+          resolved,
+          operation: 'resolve file links',
+        );
+        return resolved;
       },
       'create': (visitor, target, positionalArgs, namedArgs) {
         final file = target as File;

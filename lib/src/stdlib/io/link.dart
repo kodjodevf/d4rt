@@ -182,6 +182,12 @@ class LinkIo {
           link.path,
           operation: 'read link target',
         );
+        final targetPath = _secureReadLinkTarget(
+          visitor,
+          link,
+          operation: 'read link target',
+        );
+        if (targetPath != null) return Future<String>.value(targetPath);
         return link.target();
       },
       'targetSync': (visitor, target, positionalArgs, namedArgs) {
@@ -191,6 +197,12 @@ class LinkIo {
           link.path,
           operation: 'read link target',
         );
+        final targetPath = _secureReadLinkTarget(
+          visitor,
+          link,
+          operation: 'read link target',
+        );
+        if (targetPath != null) return targetPath;
         return link.targetSync();
       },
       'resolveSymbolicLinks': (visitor, target, positionalArgs, namedArgs) {
@@ -200,7 +212,14 @@ class LinkIo {
           link.path,
           operation: 'resolve symbolic links',
         );
-        return link.resolveSymbolicLinks();
+        return link.resolveSymbolicLinks().then((resolved) {
+          checkFilesystemReadPermission(
+            visitor,
+            resolved,
+            operation: 'resolve symbolic links',
+          );
+          return resolved;
+        });
       },
       'resolveSymbolicLinksSync': (visitor, target, positionalArgs, namedArgs) {
         final link = target as Link;
@@ -209,7 +228,13 @@ class LinkIo {
           link.path,
           operation: 'resolve symbolic links',
         );
-        return link.resolveSymbolicLinksSync();
+        final resolved = link.resolveSymbolicLinksSync();
+        checkFilesystemReadPermission(
+          visitor,
+          resolved,
+          operation: 'resolve symbolic links',
+        );
+        return resolved;
       },
       'rename': (visitor, target, positionalArgs, namedArgs) {
         if (positionalArgs.isEmpty || positionalArgs[0] is! String) {
@@ -296,21 +321,24 @@ class LinkIo {
       },
       'stat': (visitor, target, positionalArgs, namedArgs) {
         final link = target as Link;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           link.path,
           operation: 'stat link',
         );
-        return link.stat();
+        final secureStat = SecureFileOpener.stat(canonical);
+        return secureStat == null
+            ? link.stat()
+            : Future<FileStat>.value(secureStat);
       },
       'statSync': (visitor, target, positionalArgs, namedArgs) {
         final link = target as Link;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           link.path,
           operation: 'stat link',
         );
-        return link.statSync();
+        return SecureFileOpener.stat(canonical) ?? link.statSync();
       },
       'toString': (visitor, target, positionalArgs, namedArgs) {
         return (target as Link).toString();
@@ -340,4 +368,33 @@ void _checkLinkTargetPermission(
       ? targetPath
       : p.join(p.dirname(link.path), targetPath);
   checkFilesystemWritePermission(visitor, resolvedTarget, operation: operation);
+}
+
+/// Reads a symlink target through a descriptor anchored on its canonical parent.
+///
+/// Reading link metadata requires access to both the link entry (represented by
+/// its parent directory) and the target. The returned target is revalidated so
+/// a link swapped to an out-of-scope destination cannot leak that destination.
+String? _secureReadLinkTarget(
+  InterpreterVisitor visitor,
+  Link link, {
+  required String operation,
+}) {
+  if (!SecureFileOpener.isSupported) return null;
+
+  final canonicalParent = checkFilesystemReadPermission(
+    visitor,
+    p.dirname(link.path),
+    operation: operation,
+  );
+  final absolute = p.normalize(p.absolute(link.path));
+  final name = p.basename(absolute);
+  final target = SecureFileOpener.readLink(p.join(canonicalParent, name));
+  if (target == null) return null;
+
+  final resolvedTarget = p.isAbsolute(target)
+      ? target
+      : p.join(p.dirname(link.path), target);
+  checkFilesystemReadPermission(visitor, resolvedTarget, operation: operation);
+  return target;
 }

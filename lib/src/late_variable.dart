@@ -18,9 +18,11 @@ class LateVariable {
         // Lazy initialization
         _value = _initializer();
         _isInitialized = true;
-        Logger.debug(
-          "[LateVariable] Lazy initialized '$_name' with value: $_value",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[LateVariable] Lazy initialized '$_name' with value: $_value",
+          );
+        }
       } else {
         // Late variable without initializer accessed before assignment
         throw LateInitializationError(
@@ -40,7 +42,9 @@ class LateVariable {
     }
     _value = value;
     _isInitialized = true;
-    Logger.debug("[LateVariable] Assigned '$_name' = $value");
+    if (Logger.debugEnabled) {
+      Logger.debug("[LateVariable] Assigned '$_name' = $value");
+    }
   }
 
   /// Set the value

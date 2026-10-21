@@ -185,21 +185,33 @@ class FileSystemEntityIo {
     methods: {
       'exists': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           entity.path,
           operation: 'check existence',
         );
-        return entity.exists();
+        if (entity is Link) return entity.exists();
+        final expected = entity is Directory
+            ? FileSystemEntityType.directory
+            : FileSystemEntityType.file;
+        final secureExists = SecureFileOpener.existsAs(canonical, expected);
+        return secureExists == null
+            ? entity.exists()
+            : Future<bool>.value(secureExists);
       },
       'existsSync': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           entity.path,
           operation: 'check existence',
         );
-        return entity.existsSync();
+        if (entity is Link) return entity.existsSync();
+        final expected = entity is Directory
+            ? FileSystemEntityType.directory
+            : FileSystemEntityType.file;
+        return SecureFileOpener.existsAs(canonical, expected) ??
+            entity.existsSync();
       },
       'delete': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
@@ -319,21 +331,24 @@ class FileSystemEntityIo {
       },
       'stat': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           entity.path,
           operation: 'stat entity',
         );
-        return entity.stat();
+        final secureStat = SecureFileOpener.stat(canonical);
+        return secureStat == null
+            ? entity.stat()
+            : Future<FileStat>.value(secureStat);
       },
       'statSync': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           entity.path,
           operation: 'stat entity',
         );
-        return entity.statSync();
+        return SecureFileOpener.stat(canonical) ?? entity.statSync();
       },
       'watch': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
@@ -363,7 +378,14 @@ class FileSystemEntityIo {
           entity.path,
           operation: 'resolve symbolic links',
         );
-        return entity.resolveSymbolicLinks();
+        return entity.resolveSymbolicLinks().then((resolved) {
+          checkFilesystemReadPermission(
+            visitor,
+            resolved,
+            operation: 'resolve symbolic links',
+          );
+          return resolved;
+        });
       },
       'resolveSymbolicLinksSync': (visitor, target, positionalArgs, namedArgs) {
         final entity = target as FileSystemEntity;
@@ -372,7 +394,13 @@ class FileSystemEntityIo {
           entity.path,
           operation: 'resolve symbolic links',
         );
-        return entity.resolveSymbolicLinksSync();
+        final resolved = entity.resolveSymbolicLinksSync();
+        checkFilesystemReadPermission(
+          visitor,
+          resolved,
+          operation: 'resolve symbolic links',
+        );
+        return resolved;
       },
     },
     getters: {
@@ -404,7 +432,16 @@ class FileStatIo {
             'FileStat.stat requires one String argument (path).',
           );
         }
-        return FileStat.stat(positionalArgs[0] as String);
+        final path = positionalArgs[0] as String;
+        final canonical = checkFilesystemReadPermission(
+          visitor,
+          path,
+          operation: 'stat entity',
+        );
+        final secureStat = SecureFileOpener.stat(canonical);
+        return secureStat == null
+            ? FileStat.stat(path)
+            : Future<FileStat>.value(secureStat);
       },
       'statSync': (visitor, positionalArgs, namedArgs) {
         if (positionalArgs.length != 1 || positionalArgs[0] is! String) {
@@ -412,7 +449,13 @@ class FileStatIo {
             'FileStat.statSync requires one String argument (path).',
           );
         }
-        return FileStat.statSync(positionalArgs[0] as String);
+        final path = positionalArgs[0] as String;
+        final canonical = checkFilesystemReadPermission(
+          visitor,
+          path,
+          operation: 'stat entity',
+        );
+        return SecureFileOpener.stat(canonical) ?? FileStat.statSync(path);
       },
     },
     methods: {

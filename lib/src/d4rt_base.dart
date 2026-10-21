@@ -239,7 +239,11 @@ class D4rt {
   /// ```
   void grant(Permission permission) {
     _grantedPermissions.add(permission);
-    Logger.debug("[D4rt.grant] Granted permission: ${permission.description}");
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[D4rt.grant] Granted permission: ${permission.description}",
+      );
+    }
   }
 
   /// Revokes a previously granted permission.
@@ -247,7 +251,11 @@ class D4rt {
   /// [permission] The permission to revoke.
   void revoke(Permission permission) {
     _grantedPermissions.remove(permission);
-    Logger.debug("[D4rt.revoke] Revoked permission: ${permission.description}");
+    if (Logger.debugEnabled) {
+      Logger.debug(
+        "[D4rt.revoke] Revoked permission: ${permission.description}",
+      );
+    }
   }
 
   /// Checks if a specific permission is granted.
@@ -503,13 +511,17 @@ class D4rt {
       startTime: startTime,
       onPrint: onPrint ?? this.onPrint,
     );
-    Logger.debug("[D4rt.execute] Starting execution. library: $library");
+    if (Logger.debugEnabled) {
+      Logger.debug("[D4rt.execute] Starting execution. library: $library");
+    }
     CompilationUnit compilationUnit;
 
     if (library != null) {
-      Logger.debug(
-        "[D4rt.execute] Attempting to load the $name source via ModuleLoader for URI: $library",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[D4rt.execute] Attempting to load the $name source via ModuleLoader for URI: $library",
+        );
+      }
 
       if (!_moduleLoader.sources.containsKey(library.toString()) &&
           !allowFileSystemImports) {
@@ -528,9 +540,11 @@ class D4rt {
       try {
         final loadedRootModule = _moduleLoader.loadModule(Uri.parse(library));
         compilationUnit = loadedRootModule.ast;
-        Logger.debug(
-          "[D4rt.execute] $name source loaded and parsed successfully via ModuleLoader for $library.",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[D4rt.execute] $name source loaded and parsed successfully via ModuleLoader for $library.",
+          );
+        }
       } catch (e) {
         Logger.error(
           "[D4rt.execute] Failed to load $name source $library via ModuleLoader: $e",
@@ -547,12 +561,16 @@ class D4rt {
       if (source == null) {
         throw RuntimeError('No source provided for execution.');
       }
-      Logger.debug(
-        "[D4rt.execute] Parsing direct source string (AST cache: $enableAstCache)...",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          "[D4rt.execute] Parsing direct source string (AST cache: $enableAstCache)...",
+        );
+      }
 
       if (enableAstCache && _astCache.containsKey(source)) {
-        Logger.debug("[D4rt.execute] Reusing cached AST for source.");
+        if (Logger.debugEnabled) {
+          Logger.debug("[D4rt.execute] Reusing cached AST for source.");
+        }
         compilationUnit = _astCache[source]!.compilationUnit;
       } else {
         final parseResult = parseString(
@@ -583,9 +601,11 @@ class D4rt {
             basePath: basePath,
           );
         }
-        Logger.debug(
-          "[D4rt.execute] Direct source string parsed successfully.",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[D4rt.execute] Direct source string parsed successfully.",
+          );
+        }
       }
     }
 
@@ -621,12 +641,16 @@ class D4rt {
     for (var function in _nativeFunctions) {
       executionEnvironment.define(function.name, function);
     }
-    Logger.debug("[execute] Starting Pass 1: Declaration");
+    if (Logger.debugEnabled) {
+      Logger.debug("[execute] Starting Pass 1: Declaration");
+    }
     final declarationVisitor = DeclarationVisitor(executionEnvironment);
     for (final declaration in compilationUnit.declarations) {
       declaration.accept<void>(declarationVisitor);
     }
-    Logger.debug("[execute] Finished Pass 1: Declaration");
+    if (Logger.debugEnabled) {
+      Logger.debug("[execute] Finished Pass 1: Declaration");
+    }
 
     _visitor = InterpreterVisitor(
       globalEnvironment: executionEnvironment,
@@ -643,39 +667,63 @@ class D4rt {
     );
     Object? functionResult;
     try {
-      Logger.debug(" [execute] Starting Pass 2: Interpretation");
-      Logger.debug(
-        " [execute] Processing directives (imports, exports, etc.)...",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Starting Pass 2: Interpretation");
+      }
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [execute] Processing directives (imports, exports, etc.)...",
+        );
+      }
       for (final directive in compilationUnit.directives) {
         if (directive is ImportDirective) {
-          Logger.debug(
-            " [execute]   - Processing ImportDirective: ${directive.uri.stringValue}",
-          );
+          if (Logger.debugEnabled) {
+            Logger.debug(
+              " [execute]   - Processing ImportDirective: ${directive.uri.stringValue}",
+            );
+          }
           _visitor!.visitImportDirective(directive);
         } else {
-          Logger.debug(
-            " [execute]   - Skipping directive of type: ${directive.runtimeType}",
-          );
+          if (Logger.debugEnabled) {
+            Logger.debug(
+              " [execute]   - Skipping directive of type: ${directive.runtimeType}",
+            );
+          }
         }
       }
-      Logger.debug(" [execute] Finished processing directives.");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Finished processing directives.");
+      }
 
-      Logger.debug(
-        " [execute] Ensuring imported classes have constructors populated...",
-      );
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [execute] Ensuring imported classes have constructors populated...",
+        );
+      }
       _ensureImportedClassesHaveConstructors(executionEnvironment, _visitor!);
-      Logger.debug(" [execute] Finished ensuring imported classes are ready.");
+      if (Logger.debugEnabled) {
+        Logger.debug(
+          " [execute] Finished ensuring imported classes are ready.",
+        );
+      }
 
-      Logger.debug(" [execute] Processing ALL declarations sequentially");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Processing ALL declarations sequentially");
+      }
 
-      Logger.debug(" [execute] Top-level declarations for Pass 2:");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Top-level declarations for Pass 2:");
+      }
       for (final declaration in compilationUnit.declarations) {
-        Logger.debug(" [execute]   - ${declaration.runtimeType}");
+        if (Logger.debugEnabled) {
+          Logger.debug(" [execute]   - ${declaration.runtimeType}");
+        }
       }
 
       // Pre-process extensions first so they are available for all other code
-      Logger.debug(" [execute] Pre-processing extensions...");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Pre-processing extensions...");
+      }
       for (final declaration in compilationUnit.declarations) {
         if (declaration is ExtensionDeclaration) {
           try {
@@ -687,7 +735,9 @@ class D4rt {
           }
         }
       }
-      Logger.debug(" [execute] Finished pre-processing extensions");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Finished pre-processing extensions");
+      }
 
       // Process all other declarations
       for (final declaration in compilationUnit.declarations) {
@@ -695,8 +745,12 @@ class D4rt {
           declaration.accept<Object?>(_visitor!);
         }
       }
-      Logger.debug(" [execute] Finished processing declarations");
-      Logger.debug("[execute] Looking for $name function");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Finished processing declarations");
+      }
+      if (Logger.debugEnabled) {
+        Logger.debug("[execute] Looking for $name function");
+      }
       final functionCallable = executionEnvironment.get(name);
       if (functionCallable is Callable) {
         List<Object?> interpreterArgs = positionalArgs ?? [];
@@ -711,9 +765,11 @@ class D4rt {
             namedArgs?.isEmpty != false) {
           // main expects args but none were provided - pass empty list
           interpreterArgs = [<String>[]];
-          Logger.debug(
-            "[execute] 'main' expects arguments but none provided. Passing empty list.",
-          );
+          if (Logger.debugEnabled) {
+            Logger.debug(
+              "[execute] 'main' expects arguments but none provided. Passing empty list.",
+            );
+          }
         }
 
         // Validate arity (only for positional args, named args are validated by the function itself)
@@ -723,9 +779,11 @@ class D4rt {
           );
         }
 
-        Logger.debug(
-          "[execute] Calling '$name' with positionalArgs: $interpreterArgs, namedArgs: $interpreterNamedArgs",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[execute] Calling '$name' with positionalArgs: $interpreterArgs, namedArgs: $interpreterNamedArgs",
+          );
+        }
 
         functionResult = functionCallable.call(
           _visitor!,
@@ -737,7 +795,9 @@ class D4rt {
           "No callable '$name' function found in the test source code.",
         );
       }
-      Logger.debug(" [execute] Finished Pass 2: Interpretation");
+      if (Logger.debugEnabled) {
+        Logger.debug(" [execute] Finished Pass 2: Interpretation");
+      }
     } on InternalInterpreterException catch (e) {
       if (e.originalThrownValue is RuntimeError) {
         throw e.originalThrownValue as RuntimeError;
@@ -790,9 +850,11 @@ class D4rt {
         // This class has no constructors populated yet.
         // We can't easily populate them here without the original AST node,
         // so we rely on lazy initialization in InterpreterClass call()
-        Logger.debug(
-          "[D4rt._ensureImportedClassesHaveConstructors] Class '${value.name}' has no constructors yet",
-        );
+        if (Logger.debugEnabled) {
+          Logger.debug(
+            "[D4rt._ensureImportedClassesHaveConstructors] Class '${value.name}' has no constructors yet",
+          );
+        }
       }
     });
   }
@@ -835,7 +897,9 @@ class D4rt {
     Map<String, String>? sources,
     bool includeBuiltins = false,
   }) {
-    Logger.debug("[D4rt.analyze] Starting analysis...");
+    if (Logger.debugEnabled) {
+      Logger.debug("[D4rt.analyze] Starting analysis...");
+    }
 
     _moduleLoader = _initModule(sources, executeInitializers: false);
 
@@ -894,7 +958,9 @@ class D4rt {
       declaration.accept<Object?>(_visitor!);
     }
 
-    Logger.debug("[D4rt.analyze] Analysis complete.");
+    if (Logger.debugEnabled) {
+      Logger.debug("[D4rt.analyze] Analysis complete.");
+    }
     return IntrospectionBuilder.buildFromEnvironment(
       executionEnvironment,
       includeBuiltins: includeBuiltins,
@@ -965,7 +1031,9 @@ class D4rt {
       );
     }
 
-    Logger.debug("[D4rt.eval] Evaluating: $expression");
+    if (Logger.debugEnabled) {
+      Logger.debug("[D4rt.eval] Evaluating: $expression");
+    }
     final executionEnvironment = _moduleLoader.globalEnvironment;
 
     // First, try to parse as a top-level declaration (function, class, variable)
@@ -996,7 +1064,9 @@ class D4rt {
         declaration.accept<Object?>(_visitor!);
       }
 
-      Logger.debug("[D4rt.eval] Processed declaration(s)");
+      if (Logger.debugEnabled) {
+        Logger.debug("[D4rt.eval] Processed declaration(s)");
+      }
       return null;
     }
 
@@ -1042,7 +1112,9 @@ class D4rt {
       }
 
       final bridgedResult = _bridgeInterpreterValueToNative(result);
-      Logger.debug("[D4rt.eval] Result: $bridgedResult");
+      if (Logger.debugEnabled) {
+        Logger.debug("[D4rt.eval] Result: $bridgedResult");
+      }
 
       if (bridgedResult is Future) {
         return bridgedResult.then(
@@ -1092,7 +1164,9 @@ class D4rt {
         }
       }
 
-      Logger.debug("[D4rt.eval] Executed statement");
+      if (Logger.debugEnabled) {
+        Logger.debug("[D4rt.eval] Executed statement");
+      }
       return null;
     }
 

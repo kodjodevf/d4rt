@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:path/path.dart' as p;
 
@@ -90,6 +91,54 @@ class SecureFileOpener {
     return _openPath(canonicalPath, _oRdonly | _oNoFollow | _oCloexec);
   }
 
+  /// Returns metadata for [canonicalPath] using a verified descriptor.
+  ///
+  /// The final entry is opened with `O_NOFOLLOW`; metadata is then read from
+  /// the descriptor path, so replacing the original path with a symlink after
+  /// the permission check cannot redirect the stat operation.
+  static FileStat? stat(String canonicalPath) {
+    if (!isSupported) return null;
+
+    try {
+      final handle = _openPath(
+        canonicalPath,
+        _oMetadata | _oNoFollow | _oCloexec,
+      );
+      if (handle == null) return null;
+      try {
+        final info = FileStat.statSync(handle.path);
+        // On Linux, O_PATH|O_NOFOLLOW opens the symlink itself. Treat that
+        // race result as missing rather than exposing the substituted entry.
+        if (info.type == FileSystemEntityType.link) {
+          return _notFoundStat();
+        }
+        return info;
+      } finally {
+        handle.close();
+      }
+    } on PathNotFoundException {
+      return _notFoundStat();
+    } on FileSystemException {
+      return _notFoundStat();
+    }
+  }
+
+  /// Checks whether [canonicalPath] is an existing entity of [expectedType].
+  ///
+  /// Returns `null` when descriptor operations are unavailable.
+  static bool? existsAs(
+    String canonicalPath,
+    FileSystemEntityType expectedType,
+  ) {
+    final info = stat(canonicalPath);
+    if (info == null) return null;
+    return info.type == expectedType;
+  }
+
+  static FileStat _notFoundStat() {
+    return FileStat.statSync('${_fdRoot!}/-1');
+  }
+
   /// Applies POSIX permission bits to an open descriptor.
   ///
   /// This is used by file copies so the destination keeps the source mode
@@ -146,6 +195,106 @@ class SecureFileOpener {
       );
     }
     return handle;
+  }
+
+  /// Creates a uniquely named directory with mode 0700 in [canonicalParent].
+  ///
+  /// The random suffix is appended to [namePrefix]. The suffix is returned so
+  /// the caller can preserve the user-facing prefix spelling in the returned
+  /// `Directory` path.
+  static String? createTempDirectory(
+    String canonicalParent,
+    String namePrefix,
+  ) {
+    if (!isSupported) return null;
+    if (namePrefix.contains('\u0000') || namePrefix.contains(p.separator)) {
+      throw FileSystemException(
+        'Invalid temporary directory prefix',
+        namePrefix,
+      );
+    }
+
+    final parent = _openDirectory(canonicalParent);
+    if (parent == null) return null;
+
+    try {
+      for (var attempt = 0; attempt < 64; attempt++) {
+        final suffix = _randomSuffix();
+        final name = '$namePrefix$suffix';
+        final result = _withCString(
+          name,
+          (entry) => _mkdirat!(parent._descriptor, entry, _tempDirectoryMode),
+        );
+        if (result == 0) return suffix;
+
+        final code = _errnoCode();
+        if (code == _eExist) continue;
+        _throwNamespaceError(
+          p.join(canonicalParent, name),
+          'create temporary directory',
+          code: code,
+        );
+      }
+    } finally {
+      parent.close();
+    }
+
+    throw FileSystemException(
+      'Unable to create a unique temporary directory',
+      canonicalParent,
+    );
+  }
+
+  /// Reads a symbolic link target relative to a verified parent descriptor.
+  static String? readLink(String canonicalPath) {
+    if (!isSupported) return null;
+
+    final target = namespaceTarget(canonicalPath);
+    if (target == null) return null;
+
+    final parent = _openDirectory(target.parent);
+    if (parent == null) return null;
+
+    try {
+      var size = 256;
+      while (size <= 65536) {
+        final buffer = _malloc!(size).cast<Uint8>();
+        try {
+          final result = _withCString(
+            target.name,
+            (name) => _readlinkat!(parent._descriptor, name, buffer, size),
+          );
+          if (result < 0) {
+            _throwNamespaceError(canonicalPath, 'read link');
+          }
+          if (result < size) {
+            return utf8.decode(buffer.asTypedList(result));
+          }
+        } finally {
+          _free!(buffer.cast<Void>());
+        }
+        size *= 2;
+      }
+    } finally {
+      parent.close();
+    }
+
+    throw FileSystemException(
+      'Symbolic link target is too long',
+      canonicalPath,
+    );
+  }
+
+  static final Random _random = Random.secure();
+
+  static String _randomSuffix() {
+    const alphabet =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final buffer = StringBuffer();
+    for (var index = 0; index < 8; index++) {
+      buffer.write(alphabet[_random.nextInt(alphabet.length)]);
+    }
+    return buffer.toString();
   }
 
   /// Splits [path] into a parent directory and its final name.
@@ -840,6 +989,9 @@ class SecureFileOpener {
   static bool get _isMacLike => Platform.isMacOS || Platform.isIOS;
 
   static int get _oRdonly => 0;
+  // Linux O_PATH and Apple O_EVTONLY allow metadata operations without read
+  // permission on the final entry.
+  static int get _oMetadata => _isMacLike ? 0x8000 : 0x200000;
   static int get _oWronly => 1;
   static int get _oRdwr => 2;
   static int get _oCreat => _isMacLike ? 0x0200 : 0x40;
@@ -853,6 +1005,7 @@ class SecureFileOpener {
 
   static const int _defaultMode = 0x1A4; // 0644
   static const int _defaultDirectoryMode = 0x1ED; // 0755
+  static const int _tempDirectoryMode = 0x1C0; // 0700
   static const int _ePerm = 1;
   static const int _eNoEnt = 2;
   static const int _eAcces = 13;

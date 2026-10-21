@@ -41,21 +41,31 @@ class DirectoryIo {
     methods: {
       'exists': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           directory.path,
           operation: 'check directory existence',
         );
-        return directory.exists();
+        final secureExists = SecureFileOpener.existsAs(
+          canonical,
+          FileSystemEntityType.directory,
+        );
+        return secureExists == null
+            ? directory.exists()
+            : Future<bool>.value(secureExists);
       },
       'existsSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           directory.path,
           operation: 'check directory existence',
         );
-        return directory.existsSync();
+        return SecureFileOpener.existsAs(
+              canonical,
+              FileSystemEntityType.directory,
+            ) ??
+            directory.existsSync();
       },
       'create': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
@@ -229,21 +239,24 @@ class DirectoryIo {
       },
       'stat': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           directory.path,
           operation: 'stat directory',
         );
-        return directory.stat();
+        final secureStat = SecureFileOpener.stat(canonical);
+        return secureStat == null
+            ? directory.stat()
+            : Future<FileStat>.value(secureStat);
       },
       'statSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
-        checkFilesystemReadPermission(
+        final canonical = checkFilesystemReadPermission(
           visitor,
           directory.path,
           operation: 'stat directory',
         );
-        return directory.statSync();
+        return SecureFileOpener.stat(canonical) ?? directory.statSync();
       },
       'watch': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
@@ -273,7 +286,14 @@ class DirectoryIo {
           directory.path,
           operation: 'resolve links',
         );
-        return directory.resolveSymbolicLinks();
+        return directory.resolveSymbolicLinks().then((resolved) {
+          checkFilesystemReadPermission(
+            visitor,
+            resolved,
+            operation: 'resolve links',
+          );
+          return resolved;
+        });
       },
       'resolveSymbolicLinksSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
@@ -282,31 +302,77 @@ class DirectoryIo {
           directory.path,
           operation: 'resolve links',
         );
-        return directory.resolveSymbolicLinksSync();
+        final resolved = directory.resolveSymbolicLinksSync();
+        checkFilesystemReadPermission(
+          visitor,
+          resolved,
+          operation: 'resolve links',
+        );
+        return resolved;
       },
       'createTemp': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
+        final prefix = positionalArgs.isNotEmpty
+            ? positionalArgs[0] as String?
+            : null;
         checkFilesystemWritePermission(
           visitor,
           directory.path,
           operation: 'create temporary directory',
         );
-        _checkTemporaryDirectoryPrefix(visitor, directory, positionalArgs);
-        return directory.createTemp(
-          positionalArgs.isNotEmpty ? positionalArgs[0] as String? : null,
+        final info = _temporaryDirectoryInfo(
+          visitor,
+          directory,
+          positionalArgs,
         );
+        if (SecureFileOpener.isSupported) {
+          final parent = checkFilesystemWritePermission(
+            visitor,
+            info.parent,
+            operation: 'create temporary directory',
+          );
+          final suffix = SecureFileOpener.createTempDirectory(
+            parent,
+            info.namePrefix,
+          );
+          if (suffix != null) {
+            return Future<Directory>.value(
+              Directory('${info.fullPrefix}$suffix'),
+            );
+          }
+        }
+        return directory.createTemp(prefix);
       },
       'createTempSync': (visitor, target, positionalArgs, namedArgs) {
         final directory = target as Directory;
+        final prefix = positionalArgs.isNotEmpty
+            ? positionalArgs[0] as String?
+            : null;
         checkFilesystemWritePermission(
           visitor,
           directory.path,
           operation: 'create temporary directory',
         );
-        _checkTemporaryDirectoryPrefix(visitor, directory, positionalArgs);
-        return directory.createTempSync(
-          positionalArgs.isNotEmpty ? positionalArgs[0] as String? : null,
+        final info = _temporaryDirectoryInfo(
+          visitor,
+          directory,
+          positionalArgs,
         );
+        if (SecureFileOpener.isSupported) {
+          final parent = checkFilesystemWritePermission(
+            visitor,
+            info.parent,
+            operation: 'create temporary directory',
+          );
+          final suffix = SecureFileOpener.createTempDirectory(
+            parent,
+            info.namePrefix,
+          );
+          if (suffix != null) {
+            return Directory('${info.fullPrefix}$suffix');
+          }
+        }
+        return directory.createTempSync(prefix);
       },
       'toString': (visitor, target, positionalArgs, namedArgs) =>
           (target as Directory).toString(),
@@ -368,25 +434,56 @@ class DirectoryIo {
   );
 }
 
-/// `Directory.createTemp` treats its prefix as a relative path, including
-/// `..` components. Validate the resulting location so a scoped write cannot
-/// escape its directory through the prefix.
-void _checkTemporaryDirectoryPrefix(
+/// Computes the native `Directory.createTemp` prefix layout and validates the
+/// requested location before a descriptor-based creation.
+({String fullPrefix, String parent, String namePrefix}) _temporaryDirectoryInfo(
   InterpreterVisitor visitor,
   Directory directory,
   List<Object?> positionalArgs,
 ) {
-  if (positionalArgs.isEmpty) return;
+  final prefix = positionalArgs.isNotEmpty
+      ? positionalArgs[0] as String?
+      : null;
+  final prefixValue = prefix ?? '';
+  if (directory.path.isEmpty) {
+    throw ArgumentError(
+      'Directory.createTemp called with an empty path. '
+      'To use the system temp directory, use Directory.systemTemp',
+    );
+  }
 
-  final prefix = positionalArgs[0];
-  if (prefix is! String || prefix.isEmpty) return;
+  final fullPrefix = directory.path.endsWith(p.separator)
+      ? '${directory.path}$prefixValue'
+      : '${directory.path}${p.separator}$prefixValue';
+  if (fullPrefix.contains('\u0000')) {
+    throw FileSystemException(
+      'Filesystem paths cannot contain NUL characters',
+      fullPrefix,
+    );
+  }
 
-  final candidate = p.isAbsolute(prefix)
-      ? prefix
-      : p.join(directory.path, prefix);
-  checkFilesystemWritePermission(
-    visitor,
-    candidate,
-    operation: 'create temporary directory',
-  );
+  if (prefixValue.isNotEmpty) {
+    // Keep the existing fail-closed check for absolute prefixes and `..`
+    // traversal. The native API treats an absolute prefix as relative to this
+    // directory, but rejecting an out-of-scope absolute prefix is safer for
+    // interpreted code.
+    final candidate = p.isAbsolute(prefixValue)
+        ? prefixValue
+        : p.join(directory.path, prefixValue);
+    checkFilesystemWritePermission(
+      visitor,
+      candidate,
+      operation: 'create temporary directory',
+    );
+  }
+
+  final separatorIndex = fullPrefix.lastIndexOf(p.separator);
+  final parent = separatorIndex <= 0
+      ? (separatorIndex == 0 ? p.separator : '.')
+      : fullPrefix.substring(0, separatorIndex);
+  final namePrefix = separatorIndex < 0
+      ? ''
+      : fullPrefix.substring(separatorIndex + 1);
+
+  return (fullPrefix: fullPrefix, parent: parent, namePrefix: namePrefix);
 }
