@@ -1,3 +1,5 @@
+## 0.2.6
+- Downgrade build and build_runner dependencies for compatibility
 ## 0.2.5
 - **security: Hardened sandbox enforcement**
   - Permissions now implement value equality, so equivalent permissions can be
